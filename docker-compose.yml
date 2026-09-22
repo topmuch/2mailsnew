@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ETS LAMP FALL — Docker Compose prêt pour Coolify
+#
+# Dans Coolify : « New Resource » → « Docker Compose » → pointer sur ce fichier.
+# Le volume nommé lampfall-data persiste la base SQLite (/app/data) entre les
+# déploiements et les redémarrages.
+#
+# Le port exposé est 3000 : dans Coolify, associer le domaine au port 3000.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  lampfall:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lampfall-app
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - DATABASE_URL=file:/app/data/lampfall.db
+      - TZ=Africa/Dakar
+      # Recommandé en production : chaîne aléatoire (openssl rand -hex 32)
+      - AUTH_SECRET=${AUTH_SECRET:-lampfall-facturation-secret-2024}
+      # Mot de passe du compte admin créé au premier démarrage (défaut : admin123)
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    volumes:
+      - lampfall-data:/app/data
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  lampfall-data:

@@ -1,0 +1,31 @@
+# ─── Contexte de build Docker (.dockerignore) — ETS LAMP FALL ────────────────
+
+# Dépendances et artefacts de build (recréés dans l'image)
+node_modules
+.next
+out
+
+# Données locales : la base SQLite vit dans le volume Docker /app/data
+db
+data
+*.db
+*.db-journal
+
+# Journaux et fichiers d'environnement locaux
+*.log
+.env
+.env*.local
+
+# Dossiers d'atelier non requis à l'exécution
+.git
+.gitignore
+tool-results
+agent-ctx
+tests
+examples
+upload
+
+# Fichiers de déploiement (inutiles dans le contexte de build)
+Dockerfile
+docker-compose.yml
+COOLIFY.md

@@ -534,3 +534,26 @@ Stage Summary:
 - Le système dispose désormais d'une Boîte mail (réception IMAP configurable, envoi SMTP réel via nodemailer avec repli local), d'un Calendrier d'activité (événements colorés par type, à venir, stats) et d'un module QR & Étiquettes branché sur les deux services demandés (génération QRtag.net fonctionnelle, vérification d'étiquettes QRBags avec format officiel et lien de suivi).
 - Nouveaux artefacts : src/app/api/{mails/*,mail-settings,events/*,qr/*}, src/components/{mail-view,calendar-view,qr-view}.tsx, prisma/seed-v4.ts ; configuration SMTP/IMAP dans le dialog « Configuration » de la Boîte mail (réservé admin).
 - Repo GitHub : https://github.com/topmuch/2mailsnew (code poussé).
+
+---
+Task ID: 16
+Agent: Z.ai Code (principal)
+Task: Préparer le code pour une installation Coolify (déploiement Docker auto-hébergé).
+
+Work Log:
+- Audit du Dockerfile existant (hérité d'un ancien essai) : il re-clonait GitHub au moment du build (cassé si repo privé, aucun cache Docker, dépendance réseau) et masquait les erreurs de schéma (`prisma db push 2>/dev/null || true`) — réécriture complète.
+- Réécrit `Dockerfile` en build multi-stage : (1) `oven/bun:1` — `bun install --frozen-lockfile` (bun.lock) ; (2) builder — `bunx prisma generate` + `bun run build` (Next standalone, copie .next/static + public via le script build) ; (3) runner `node:20-slim` — copie de `.next/standalone`, de la CLI Prisma (`node_modules/prisma`, `.prisma`, `@prisma`) pour le `db push` au démarrage, de `sharp` + `@img` (optimisation next/image), du schéma et des scripts ; `apt openssl ca-certificates tzdata` ; ENV PORT=3000, HOSTNAME=0.0.0.0, TZ=Africa/Dakar, DATABASE_URL=file:/app/data/lampfall.db ; EXPOSE 3000 ; HEALTHCHECK sur /api/health (fetch natif Node 20) ; ENTRYPOINT = scripts/docker-entrypoint.sh.
+- Créé `.dockerignore` : exclus node_modules, .next, bases SQLite locales (db/, *.db), .env, logs, .git, tool-results, agent-ctx, tests, examples — le build part du contexte du repo (Coolify clone lui-même le dépôt).
+- Créé `scripts/docker-entrypoint.sh` (POSIX sh, set -e) : déduit le dossier de données de DATABASE_URL, `prisma db push --skip-generate` SANS --accept-data-loss (échec visible dans les logs Coolify en cas d'évolution destructrice, plutôt que perte de données), puis seed admin, puis `exec node server.js` (le serveur standalone respecte $PORT/$HOSTNAME).
+- Créé `scripts/seed-admin.mjs` (JS pur exécutable sous Node dans l'image finale) : upsert Setting "main" + création du compte admin/admin123 (hash scrypt identique à src/lib/auth.ts) si absent, mot de passe surchargeable via ADMIN_PASSWORD — idempotent à chaque démarrage.
+- Créé `src/app/api/health/route.ts` : sonde de santé — 200 {status:"ok", db:true} si la base répond, 503 sinon (console.error "GET /api/health").
+- Créé `docker-compose.yml` (variante Coolify "Docker Compose") : service lampfall, volume nommé lampfall-data → /app/data, healthcheck, restart unless-stopped, env AUTH_SECRET/ADMIN_PASSWORD surchargeables.
+- Créé `.env.example` (DATABASE_URL, PORT, TZ, AUTH_SECRET recommandé en prod via openssl rand -hex 32, ADMIN_PASSWORD) + exception `!.env.example` dans .gitignore (le motif `.env*` l'ignorait).
+- Rédigé `COOLIFY.md` : guide FR complet — prérequis, méthode A "Dockerfile" (port 3000, variables, ⚠ stockage persistant /app/data, healthcheck, domaine/SSL), méthode B "Docker Compose", première connexion admin/admin123, mises à jour (Redeploy + db push automatique), sauvegardes (volume + export JSON), dépannage, note SQLite mono-instance.
+- Vérifications : syntaxe `sh -n` de l'entrypoint OK ; `bun scripts/seed-admin.mjs` exécuté réellement (upsert idempotent OK) ; `bunx prisma db push --skip-generate` → "already in sync" ; lint 0 erreur ; dev server 200 ; agent-browser : dashboard rendu avec données réelles (KPI, graphique recharts, dernières factures), /api/health renvoie {"status":"ok","db":true}, console propre sans erreur JS.
+- Découvert en route : les 2 commits de la Task 15 (b666933 + 76d8a16) n'étaient pas encore sur origin (Lampfall) — poussés dans ce lot.
+
+Stage Summary:
+- Le dépôt est désormais 100 % prêt pour Coolify : "New Resource → Dockerfile", port 3000, stockage persistant /app/data, déployer. Premier démarrage = schéma + admin créés automatiquement.
+- Fichiers : Dockerfile (réécrit), .dockerignore, scripts/docker-entrypoint.sh, scripts/seed-admin.mjs, src/app/api/health/route.ts, docker-compose.yml, .env.example (+ .gitignore !.env.example), COOLIFY.md.
+- Le code est poussé sur les deux dépôts : topmuch/Lampfall (origin, rattrapage Task 15 inclus) et topmuch/2mailsnew (miroir tenu à jour) — Coolify peut pointer sur l'un ou l'autre.
