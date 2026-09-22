@@ -374,3 +374,89 @@ export interface SalesReport {
   topProducts: { name: string; quantity: number; total: number; margin: number }[];
   invoices: Invoice[];
 }
+
+// ─── Boîte mail ─────────────────────────────────────────────────────────────
+
+export interface Mail {
+  id: string;
+  direction: "IN" | "OUT";
+  folder: "INBOX" | "SENT" | "TRASH";
+  fromName: string | null;
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+  messageId: string | null;
+  read: boolean;
+  starred: boolean;
+  sentAt: string;
+  createdAt: string;
+}
+
+export interface MailCounts {
+  inbox: number;
+  unread: number;
+  sent: number;
+  trash: number;
+}
+
+export interface MailConfig {
+  mailFromName: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpSecure: boolean;
+  imapHost: string;
+  imapPort: number;
+  imapUser: string;
+  smtpConfigured: boolean;
+  imapConfigured: boolean;
+  lastMailSync: string | null;
+}
+
+// ─── Calendrier ─────────────────────────────────────────────────────────────
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  date: string; // ISO
+  startTime: string | null; // HH:mm
+  endTime: string | null; // HH:mm
+  color: "green" | "gold" | "orange" | "red";
+  type: "RDV" | "TACHE" | "RAPPEL";
+  done: boolean;
+  createdAt: string;
+}
+
+// ─── QR Tags (QRtag.net + QRBags) ───────────────────────────────────────────
+
+export interface QrLookup {
+  id: string;
+  provider: "QRTAG" | "QRBAGS";
+  query: string;
+  options: string | null;
+  result: string | null;
+  status: "OK" | "ERREUR";
+  createdAt: string;
+}
+
+export interface QrTagResult {
+  provider: "QRTAG";
+  url: string; // URL encodée dans le QR
+  imageUrl: string; // URL de l'image QR (qrtag.net)
+  format: "png" | "svg";
+  size: number;
+  transparent: boolean;
+}
+
+export interface QrBagsResult {
+  provider: "QRBAGS";
+  reference: string;
+  validFormat: boolean;
+  formatAttendu: string;
+  reachable: boolean;
+  info: string | null; // infos extraites de la page de suivi si disponibles
+  sourceUrl: string; // page officielle de suivi
+  message: string;
+}

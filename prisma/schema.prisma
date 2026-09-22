@@ -279,6 +279,18 @@ model Setting {
   rc          String  @default("")
   ninea       String  @default("")
   logo        String? // data-URL du logo personnalisé
+  // Configuration boîte mail (SMTP envoi / IMAP réception)
+  mailFromName String  @default("ETS LAMP FALL")
+  smtpHost    String  @default("")
+  smtpPort    Int     @default(587)
+  smtpUser    String  @default("")
+  smtpPass    String  @default("")
+  smtpSecure  Boolean @default(false) // true = TLS direct (port 465)
+  imapHost    String  @default("")
+  imapPort    Int     @default(993)
+  imapUser    String  @default("")
+  imapPass    String  @default("")
+  lastMailSync DateTime?
   updatedAt   DateTime @updatedAt
 }
 
@@ -293,4 +305,49 @@ model User {
   actif        Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// ─── Boîte mail (réception IMAP + envoi SMTP) ───────────────────────────────
+
+model Mail {
+  id        String   @id @default(cuid())
+  direction String   @default("IN") // IN = reçu | OUT = envoyé
+  folder    String   @default("INBOX") // INBOX | SENT | TRASH
+  fromName  String?
+  from      String
+  to        String
+  subject   String   @default("")
+  body      String   @default("")
+  messageId String? // identifiant serveur (dédoublonnage IMAP)
+  read      Boolean  @default(false)
+  starred   Boolean  @default(false)
+  sentAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+// ─── Calendrier (événements / rendez-vous) ──────────────────────────────────
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  startTime   String? // HH:mm
+  endTime     String? // HH:mm
+  color       String   @default("green") // green | gold | orange | red
+  type        String   @default("RDV") // RDV | TACHE | RAPPEL
+  done        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ─── QR Tags (historique QRtag.net + QRBags) ────────────────────────────────
+
+model QrLookup {
+  id        String   @id @default(cuid())
+  provider  String // QRTAG | QRBAGS
+  query     String // URL encodée (QRTAG) ou référence (QRBAGS)
+  options   String? // JSON : format / taille / transparent
+  result    String? // JSON résultat normalisé
+  status    String   @default("OK") // OK | ERREUR
+  createdAt DateTime @default(now())
 }

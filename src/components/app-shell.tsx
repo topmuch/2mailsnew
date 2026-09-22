@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
   BarChart3,
   Building2,
+  CalendarDays,
   ChevronDown,
   ClipboardList,
   FileSignature,
@@ -29,8 +30,10 @@ import {
   LayoutDashboard,
   Loader2,
   LogOut,
+  Mail,
   Menu,
   Package,
+  QrCode,
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
@@ -54,6 +57,9 @@ import { AuditView } from "@/components/audit-view";
 import { UsersView } from "@/components/users-view";
 import { SettingsView } from "@/components/settings-view";
 import { LoginView } from "@/components/login-view";
+import MailView from "@/components/mail-view";
+import CalendarView from "@/components/calendar-view";
+import QrTagsView from "@/components/qr-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useSettingsStore } from "@/lib/settings-store";
 import { authFetch, clearSession, getCachedUser, verifySession } from "@/lib/auth-client";
@@ -67,6 +73,9 @@ type ViewId =
   | "commandes"
   | "clients"
   | "rapports"
+  | "calendrier"
+  | "mails"
+  | "qrtags"
   | "achats"
   | "fournisseurs"
   | "commercant"
@@ -88,6 +97,9 @@ const NAV: {
   // ─── Pilotage ───
   { id: "dashboard", label: "Tableau de bord", short: "Dashboard", icon: LayoutDashboard, section: "Pilotage" },
   { id: "rapports", label: "Rapports de vente", short: "Rapports", icon: BarChart3, section: "Pilotage" },
+  { id: "calendrier", label: "Calendrier", short: "Calendrier", icon: CalendarDays, section: "Pilotage" },
+  { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
+  { id: "qrtags", label: "QR & Étiquettes", short: "QR Tags", icon: QrCode, section: "Communication" },
   // ─── Ventes ───
   { id: "factures", label: "Factures", short: "Factures", icon: FileText, section: "Ventes" },
   { id: "proforma", label: "Factures proforma", short: "Proforma", icon: FileSignature, section: "Ventes" },
@@ -470,6 +482,9 @@ export function AppShell() {
               {view === "commercant" && <CreditPurchasesView destination="COMMERCANT" />}
               {view === "clients" && <ClientsView />}
               {view === "rapports" && <ReportsView />}
+              {view === "calendrier" && <CalendarView />}
+              {view === "mails" && <MailView />}
+              {view === "qrtags" && <QrTagsView />}
               {view === "produits" && <ProductsView />}
               {view === "mouvements" && <StockMovementsView />}
               {view === "immo" && <CreditPurchasesView destination="IMMO" />}
