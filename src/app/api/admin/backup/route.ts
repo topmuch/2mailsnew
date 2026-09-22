@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Accès réservé à l'administrateur" }, { status: 403 });
     }
 
-    const [clients, categories, products, invoices, purchases, orders, tenants, suppliers, settings, users] =
+    const [clients, categories, products, invoices, purchases, orders, suppliers, settings, users] =
       await Promise.all([
         db.client.findMany({ orderBy: { createdAt: "asc" } }),
         db.category.findMany({ orderBy: { code: "asc" } }),
@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
         }),
         db.purchase.findMany({ include: { items: true }, orderBy: { date: "desc" } }),
         db.order.findMany({ include: { items: true }, orderBy: { date: "desc" } }),
-        db.tenant.findMany({ include: { rents: { orderBy: { month: "desc" } } } }),
         db.supplier.findMany({ orderBy: { name: "asc" } }),
         db.setting.findMany(),
         db.user.findMany({
@@ -48,7 +47,6 @@ export async function GET(request: NextRequest) {
       invoices,
       purchases,
       orders,
-      tenants,
       suppliers,
       settings,
       users, // sans le champ password
@@ -65,8 +63,6 @@ export async function GET(request: NextRequest) {
       purchaseItems: data.purchases.reduce((s, a) => s + a.items.length, 0),
       orders: data.orders.length,
       orderItems: data.orders.reduce((s, c) => s + c.items.length, 0),
-      tenants: data.tenants.length,
-      rents: data.tenants.reduce((s, t) => s + t.rents.length, 0),
       suppliers: data.suppliers.length,
       settings: data.settings.length,
       users: data.users.length,

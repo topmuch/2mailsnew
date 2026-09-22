@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-    const [ventes, proformaCount, clientCount, productCount, purchases, orders, products, recentRaw, prevYear, paymentsToday, creditPurchases, todayVentes, todayProformas, statusRows] =
+    const [ventes, proformaCount, clientCount, productCount, purchases, orders, products, recentRaw, prevYear, paymentsToday, todayVentes, todayProformas, statusRows] =
       await Promise.all([
         db.invoice.findMany({
           where: { type: "VENTE" },
@@ -80,8 +80,6 @@ export async function GET(request: NextRequest) {
           _sum: { amount: true },
           _count: true,
         }),
-        // Achats à crédit (Commerçant + Immo)
-        db.creditPurchase.findMany({ select: { total: true, amountPaid: true } }),
         // Ventes du jour
         db.invoice.aggregate({
           where: { type: "VENTE", date: { gte: dayStart, lt: dayEnd } },
@@ -179,9 +177,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const creditTotal = creditPurchases.reduce((s, c) => s + c.total, 0);
-    const creditPaid = creditPurchases.reduce((s, c) => s + c.amountPaid, 0);
-
     return NextResponse.json({
       year,
       month,
@@ -210,12 +205,6 @@ export async function GET(request: NextRequest) {
         proformaCount: todayProformas,
       },
       statusCounts,
-      credit: {
-        count: creditPurchases.length,
-        total: Math.round(creditTotal),
-        paid: Math.round(creditPaid),
-        reste: Math.round(creditTotal - creditPaid),
-      },
     });
   } catch (error) {
     console.error("GET /api/dashboard", error);

@@ -31,7 +31,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bell,
-  CreditCard,
   Download,
   Eye,
   FileDown,
@@ -51,7 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDebouncedValue, useFetch } from "@/hooks/use-fetch";
 import { formatMoney } from "@/lib/constants";
-import type { Client, CreditPurchase, Invoice, Product } from "@/lib/types";
+import type { Client, Invoice, Product } from "@/lib/types";
 import {
   DeliveryBadge,
   PaymentBadge,
@@ -66,7 +65,6 @@ import {
   printInvoiceA4,
   saveOrOpenInvoicePDF,
 } from "@/lib/pdf";
-import { TransferCreditDialog } from "@/components/transfer-credit-dialog";
 
 interface InvoicesViewProps {
   type: "VENTE" | "PROFORMA";
@@ -119,14 +117,6 @@ export function InvoicesView({ type, onNavigateToInvoices, autoOpenNew, onAutoOp
   const [shareInvoice, setShareInvoice] = useState<Invoice | null>(null);
   const [shareMode, setShareMode] = useState<"relance" | "envoi">("relance");
   const [paymentsInvoice, setPaymentsInvoice] = useState<Invoice | null>(null);
-
-  // Transfert en achat à crédit (Commerçant / Immo)
-  const [transferTarget, setTransferTarget] = useState<Invoice | null>(null);
-  const { data: transfers, refetch: refetchTransfers } = useFetch<CreditPurchase[]>("/api/credit-purchases");
-  const transferMap = useMemo(
-    () => new Map((transfers ?? []).map((t) => [t.sourceId, t.destination] as const)),
-    [transfers]
-  );
 
   const totals = useMemo(() => {
     const list = invoices ?? [];
@@ -415,18 +405,7 @@ export function InvoicesView({ type, onNavigateToInvoices, autoOpenNew, onAutoOp
                 {invoices.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">
-                      <span className="inline-flex flex-wrap items-center gap-1.5">
-                        {inv.number}
-                        {transferMap.get(inv.id) && (
-                          <Badge
-                            className="gap-0.5 border-gold/50 bg-gold-soft/60 px-1.5 py-0 text-[10px] font-bold text-amber-800 hover:bg-gold-soft/60 dark:text-amber-300"
-                            title={`Classée à crédit — onglet ${transferMap.get(inv.id) === "IMMO" ? "Immo" : "Commerçant"}`}
-                          >
-                            <CreditCard className="h-3 w-3" aria-hidden /> Crédit ·{" "}
-                            {transferMap.get(inv.id) === "IMMO" ? "Immo" : "Commerçant"}
-                          </Badge>
-                        )}
-                      </span>
+                      {inv.number}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {new Date(inv.date).toLocaleDateString("fr-FR")}
@@ -500,9 +479,6 @@ export function InvoicesView({ type, onNavigateToInvoices, autoOpenNew, onAutoOp
                               <Repeat1 className="h-4 w-4" /> Convertir en facture
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => setTransferTarget(inv)}>
-                            <CreditCard className="h-4 w-4" /> Transférer en achat à crédit
-                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setDeleting(inv)}
@@ -527,13 +503,11 @@ export function InvoicesView({ type, onNavigateToInvoices, autoOpenNew, onAutoOp
         onClose={() => setEditorOpen(false)}
         onSaved={() => {
           refetch();
-          refetchTransfers();
         }}
         type={type}
         invoice={editing}
         clients={clients ?? []}
         products={products ?? []}
-        alreadyTransferred={editing ? transferMap.get(editing.id) ?? null : null}
       />
 
       {/* Dialog partage : relance / envoi (WhatsApp, email, copie, PDF) */}
@@ -550,14 +524,6 @@ export function InvoicesView({ type, onNavigateToInvoices, autoOpenNew, onAutoOp
         open={paymentsInvoice !== null}
         onOpenChange={(v) => !v && setPaymentsInvoice(null)}
         onUpdated={refetch}
-      />
-
-      {/* Dialog transfert en achat à crédit (Commerçant / Immo) */}
-      <TransferCreditDialog
-        invoice={transferTarget}
-        open={transferTarget !== null}
-        onOpenChange={(v) => !v && setTransferTarget(null)}
-        onTransferred={() => refetchTransfers()}
       />
 
       {/* Confirmation suppression */}

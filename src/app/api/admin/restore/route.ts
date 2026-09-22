@@ -26,8 +26,6 @@ const INVOICE_ITEM_FIELDS = ["id", "invoiceId", "productId", "productName", "cat
 const PAYMENT_FIELDS = ["id", "invoiceId", "amount", "method", "paidAt", "note", "createdAt"];
 const ORDER_FIELDS = ["id", "number", "clientId", "clientName", "date", "deliveryDate", "status", "notes", "createdAt"];
 const ORDER_ITEM_FIELDS = ["id", "orderId", "productId", "productName", "category", "unit", "quantity", "unitPrice", "total"];
-const TENANT_FIELDS = ["id", "name", "phone", "building", "unit", "monthlyRent", "notes", "createdAt"];
-const RENT_FIELDS = ["id", "tenantId", "month", "amount", "status", "paidAt", "notes", "createdAt"];
 const SETTING_FIELDS = ["id", "nomSociete", "tagline", "adresse", "telephone", "email", "rc", "ninea", "logo", "updatedAt"];
 
 /** Ne garde que les champs connus d'une liste de lignes JSON. */
@@ -105,12 +103,6 @@ export async function POST(request: NextRequest) {
       ORDER_ITEM_FIELDS
     ) as unknown as Prisma.OrderItemCreateManyInput[];
 
-    const tenants = sanitize(d.tenants, TENANT_FIELDS) as unknown as Prisma.TenantCreateManyInput[];
-    const rents = sanitize(
-      nested(d.tenants, "rents"),
-      RENT_FIELDS
-    ) as unknown as Prisma.RentCreateManyInput[];
-
     const restored = await db.$transaction(async (tx) => {
       // 1) Purge complète, dans l'ordre des dépendances (enfants d'abord)
       await tx.payment.deleteMany();
@@ -120,8 +112,6 @@ export async function POST(request: NextRequest) {
       await tx.purchase.deleteMany();
       await tx.orderItem.deleteMany();
       await tx.order.deleteMany();
-      await tx.rent.deleteMany();
-      await tx.tenant.deleteMany();
       await tx.stockMovement.deleteMany();
       await tx.auditLog.deleteMany();
       await tx.supplier.deleteMany();
@@ -149,8 +139,6 @@ export async function POST(request: NextRequest) {
       counts.orderItems = orderItems.length
         ? (await tx.orderItem.createMany({ data: orderItems })).count
         : 0;
-      counts.tenants = tenants.length ? (await tx.tenant.createMany({ data: tenants })).count : 0;
-      counts.rents = rents.length ? (await tx.rent.createMany({ data: rents })).count : 0;
       // Paramètres : recréés seulement si la sauvegarde en contient
       counts.settings = settings.length ? (await tx.setting.createMany({ data: settings })).count : 0;
       // users : volontairement non restaurée (comptes conservés)

@@ -204,7 +204,6 @@ export function SettingsView() {
         invoices: "factures",
         purchases: "achats",
         orders: "commandes",
-        tenants: "locataires",
         suppliers: "fournisseurs",
         users: "utilisateurs",
         settings: "paramètres",

@@ -593,3 +593,28 @@ Work Log:
 Stage Summary:
 - Dockerfile « modèle qrbags » adapté à 2mailsnew : build par git clone du dépôt public, base SQLite /app/data/2mails.db (volume persistant Coolify), schéma poussé + identifiants admin/admin123 créés à chaque démarrage via scripts/seed-admin.mjs, serveur standalone sur le port 3000.
 - Le seul fichier touché est le Dockerfile ; tout le reste du projet est inchangé.
+
+---
+Task ID: 19
+Agent: Z.ai Code (principal)
+Task: Supprimer les modules « Commerçant » (achats à crédit) et « Immo » (achats à crédit + gestion locative) à la demande de l'utilisateur.
+
+Work Log:
+- Supprimé les fichiers : src/components/credit-purchases-view.tsx, src/components/transfer-credit-dialog.tsx, src/components/immo-view.tsx, src/app/api/credit-purchases/ (route + [id] + payments), src/app/api/rents/, src/app/api/tenants/.
+- prisma/schema.prisma : retiré les modèles Tenant, Rent, CreditPurchase, CreditPayment → bun run db:push (base synchronisée, client Prisma régénéré) → redémarrage du serveur de dev.
+- app-shell.tsx : retiré les entrées de navigation « commercant » et « immo » (section Crédits), le ViewId correspondant, l'import CreditPurchasesView et les icônes Store/Building2.
+- invoices-view.tsx : retiré la fonctionnalité « Transférer en achat à crédit » (import TransferCreditDialog, type CreditPurchase, état transferTarget, fetch /api/credit-purchases, transferMap, badge Crédit sur les lignes, item de menu, prop alreadyTransferred) + icône CreditCard.
+- invoice-editor.tsx : retiré le bloc « Classement du crédit » (type Destination, props alreadyTransferred, états destination/creditTier/creditDueDate/creditNote, POST /api/credit-purchases dans le submit, destinationOptions, cartes UI) + icônes Store/Building2/CheckCircle2/CreditCard ; texte d'aide mis à jour.
+- dashboard-view.tsx : retiré le KPI « Crédits à payer » et la BigStat « Achats à crédit » + icônes Store/Building2 ; api/dashboard : retiré la requête creditPurchase et le bloc `credit` de la réponse.
+- api/reports/daily : retiré creditPayment (requête, creditPaidTotal, creditPayments dans la réponse) ; pdf.ts : retiré la section « Règlements crédit (Commerçant / Immo) » du rapport du jour, grandTotal = receivedTotal.
+- pdf.ts : retiré buildRentReceiptPDF et buildTenantRentsPDF (quittance + échéancier loyers) et les imports Tenant/Rent/RENT_STATUS_LABELS/monthLabel ; troncature du fichier à 1691 lignes.
+- types.ts : retiré Tenant, Rent, CreditPayment, CreditPurchase, DailyCreditPaymentRow, creditPaidTotal, creditPayments, credit (DashboardStats). constants.ts : retiré Tenant/Rent des AUDIT_ENTITY_LABELS et RENT_STATUSES/RENT_STATUS_LABELS. status-badges.tsx : retiré RentStatusBadge.
+- login-view.tsx : retiré la carte « Gestion locative immo », fallback tagline « Facturation • Stock • Gestion », bandeau « Immobilier » supprimé. settings-view.tsx : label tenants retiré.
+- api/admin/backup : retiré tenants (findMany, data, counts). api/admin/restore : retiré TENANT_FIELDS/RENT_FIELDS, sanitize tenants/rents, purge et recréation. prisma/seed-v2.ts : section Immobilier + helpers monthStr/daysAgo supprimés.
+- Vérifications : rg = 0 référence restante ; lint 0 erreur/0 warning ; API health OK, dashboard 200, credit-purchases & rents 404, daily OK.
+- Agent-browser : connexion admin, sidebar sans Commerçant/Immo (desktop + drawer mobile), dashboard sans KPI crédit, création facture FV-2026-0008 (TVA 18 % calculée, « Document enregistré ») puis suppression, proforma sans bouton de transfert, Rapports OK, 0 erreur console, dev.log propre.
+
+Stage Summary:
+- Les modules « Commerçant — Achats à crédit » et « Immo — Achats à crédit » ainsi que la gestion locative immobilière (locataires/loyers/quittances) sont entièrement supprimés : UI, API, schéma Prisma, seeds, sauvegarde/restauration, PDF.
+- Les factures/proformas retrouvent un flux simple : plus de transfert à crédit. La fonctionnalité Paiements multiples (versements par facture) est conservée.
+- Application vérifiée de bout en bout dans le navigateur après suppression.

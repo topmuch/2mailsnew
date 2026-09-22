@@ -19,7 +19,6 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import {
   ArrowLeftRight,
   BarChart3,
-  Building2,
   CalendarDays,
   ChevronDown,
   ClipboardList,
@@ -37,7 +36,6 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
-  Store,
   Truck,
   Users2,
 } from "lucide-react";
@@ -49,7 +47,6 @@ import { ClientsView } from "@/components/clients-view";
 import { ProductsView } from "@/components/products-view";
 import { PurchasesView } from "@/components/purchases-view";
 import { OrdersView } from "@/components/orders-view";
-import { CreditPurchasesView } from "@/components/credit-purchases-view";
 import { ReportsView } from "@/components/reports-view";
 import { SuppliersView } from "@/components/suppliers-view";
 import { StockMovementsView } from "@/components/stock-movements-view";
@@ -78,10 +75,8 @@ type ViewId =
   | "qrtags"
   | "achats"
   | "fournisseurs"
-  | "commercant"
   | "produits"
   | "mouvements"
-  | "immo"
   | "utilisateurs"
   | "audit"
   | "parametres";
@@ -105,9 +100,6 @@ const NAV: {
   { id: "proforma", label: "Factures proforma", short: "Proforma", icon: FileSignature, section: "Ventes" },
   { id: "commandes", label: "Commandes prévisionnelles", short: "Commandes", icon: ClipboardList, section: "Ventes" },
   { id: "clients", label: "Clients", short: "Clients", icon: Users2, section: "Ventes" },
-  // ─── Crédits (achats à crédit) ───
-  { id: "commercant", label: "Commerçant — Achats à crédit", short: "Commerçant", icon: Store, section: "Crédits" },
-  { id: "immo", label: "Immo — Achats à crédit", short: "Immo", icon: Building2, section: "Crédits" },
   // ─── Achats & stock ───
   { id: "achats", label: "Factures d'achat", short: "Achats", icon: ShoppingBag, section: "Achats & stock" },
   { id: "fournisseurs", label: "Fournisseurs", short: "Fournisseurs", icon: Truck, section: "Achats & stock" },
@@ -479,7 +471,6 @@ export function AppShell() {
               {view === "commandes" && <OrdersView />}
               {view === "achats" && <PurchasesView />}
               {view === "fournisseurs" && <SuppliersView />}
-              {view === "commercant" && <CreditPurchasesView destination="COMMERCANT" />}
               {view === "clients" && <ClientsView />}
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
@@ -487,7 +478,6 @@ export function AppShell() {
               {view === "qrtags" && <QrTagsView />}
               {view === "produits" && <ProductsView />}
               {view === "mouvements" && <StockMovementsView />}
-              {view === "immo" && <CreditPurchasesView destination="IMMO" />}
               {view === "utilisateurs" && (isAdmin ? <UsersView currentUser={user} /> : <RestrictedCard />)}
               {view === "audit" && (isAdmin ? <AuditView /> : <RestrictedCard />)}
               {view === "parametres" && (isAdmin ? <SettingsView /> : <RestrictedCard />)}

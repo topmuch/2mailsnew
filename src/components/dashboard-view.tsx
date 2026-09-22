@@ -15,7 +15,6 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
-  Building2,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -25,7 +24,6 @@ import {
   Package,
   Plus,
   Printer,
-  Store,
   TrendingUp,
   Users,
   Wallet,
@@ -397,13 +395,6 @@ export function DashboardView({
             tone="rose"
             hint="Reste à encaisser"
           />
-          <ColoredKpi
-            title="Crédits à payer"
-            value={formatMoneyCompact(stats.credit.reste)}
-            icon={Store}
-            tone="teal"
-            hint={`${stats.credit.count} achat(s) à crédit`}
-          />
         </div>
       </div>
 
@@ -608,13 +599,6 @@ export function DashboardView({
           icon={Package}
           onClick={() => onNavigate("produits")}
           actionLabel="Voir les produits"
-        />
-        <BigStat
-          title="Achats à crédit"
-          value={String(stats.credit.count)}
-          icon={Building2}
-          onClick={() => onNavigate("commercant")}
-          actionLabel="Onglet Commerçant"
         />
 
         <Card className="card-luxe shadow-luxe lg:col-span-3">

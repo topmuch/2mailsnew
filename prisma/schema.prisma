@@ -152,64 +152,6 @@ model OrderItem {
   total       Float
 }
 
-// ─── Immobilier (locataires & loyers) ───────────────────────────────────────
-
-model Tenant {
-  id          String   @id @default(cuid())
-  name        String
-  phone       String?
-  building    String // Immeuble (ex : Immeuble F)
-  unit        String? // Logement / local occupé
-  monthlyRent Float    @default(0) // Loyer mensuel
-  notes       String?
-  createdAt   DateTime @default(now())
-
-  rents Rent[]
-}
-
-model Rent {
-  id       String    @id @default(cuid())
-  tenantId String
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  month    String // AAAA-MM (ex : 2026-07)
-  amount   Float     @default(0)
-  status   String    @default("NON_PAYE") // PAYE | NON_PAYE
-  paidAt   DateTime?
-  notes    String?
-  createdAt DateTime @default(now())
-
-  @@unique([tenantId, month])
-}
-
-// ─── Achats à crédit (factures / proformas transférées) ─────────────────────
-
-model CreditPurchase {
-  id          String    @id @default(cuid())
-  destination String // COMMERCANT | IMMO
-  sourceType  String // VENTE | PROFORMA (type du document d'origine)
-  sourceId    String    @unique // un document ne peut être transféré qu'une fois
-  number      String // numéro du document d'origine
-  tier        String // commerçant / bailleur concerné
-  total       Float     @default(0)
-  amountPaid  Float     @default(0)
-  dueDate     DateTime?
-  note        String?
-  createdAt   DateTime  @default(now())
-
-  payments CreditPayment[]
-}
-
-model CreditPayment {
-  id         String         @id @default(cuid())
-  purchaseId String
-  purchase   CreditPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  amount     Float
-  method     String         @default("ESPECES") // ESPECES | WAVE | ORANGE_MONEY | FREE_MONEY | VIREMENT | CHEQUE
-  paidAt     DateTime       @default(now())
-  note       String?
-  createdAt  DateTime       @default(now())
-}
-
 // ─── Versements (paiements multiples par facture) ───────────────────────────
 
 model Payment {

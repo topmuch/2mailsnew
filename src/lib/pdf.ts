@@ -3,14 +3,12 @@
 // Génération de documents PDF côté client avec jsPDF + AutoTable
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { Invoice, Order, Purchase, Client, Tenant, Rent, SalesReport, Product, DailyReport } from "./types";
+import type { Invoice, Order, Purchase, Client, SalesReport, Product, DailyReport } from "./types";
 import {
   DELIVERY_LABELS,
   ORDER_STATUS_LABELS,
   PAYMENT_LABELS,
   PAYMENT_METHOD_LABELS,
-  RENT_STATUS_LABELS,
-  monthLabel,
 } from "./constants";
 
 // ─── Couleurs (charte ETS LAMP FALL) ────────────────────────────────────────
@@ -1541,37 +1539,9 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
     margin: { left: 14, right: 14 },
   });
 
-  // ─── Règlements des achats à crédit du jour ───────────────────────────────
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...ORANGE);
-  doc.text("Règlements crédit (Commerçant / Immo)", 14, y);
-  autoTable(doc, {
-    startY: y + 2,
-    head: [["Heure", "Document", "Tiers", "Registre", "Mode", "Montant"]],
-    body:
-      report.creditPayments.length > 0
-        ? report.creditPayments.map((p) => [
-            new Date(p.paidAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-            p.number,
-            p.tier,
-            p.destination === "IMMO" ? "Immo" : "Commerçant",
-            PAYMENT_METHOD_LABELS[p.method] ?? p.method,
-            fmtMoney(p.amount),
-          ])
-        : [["—", "Aucun règlement ce jour", "", "", "", ""]],
-    theme: "grid",
-    styles: { fontSize: 8, cellPadding: 2, textColor: DARK },
-    headStyles: { fillColor: [...ORANGE], textColor: 255, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [253, 246, 236] },
-    columnStyles: { 5: { halign: "right" } },
-    margin: { left: 14, right: 14 },
-  });
-
   // ─── Total encaissé du jour ───────────────────────────────────────────────
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-  const grandTotal = report.summary.receivedTotal + report.summary.creditPaidTotal;
+  const grandTotal = report.summary.receivedTotal;
   doc.setFillColor(...GREEN);
   doc.roundedRect(120, y - 5, 76, 12, 2, 2, "F");
   doc.setTextColor(255, 255, 255);
@@ -1711,156 +1681,6 @@ export async function buildClientHistoryPDF(
       3: { cellWidth: 32, halign: "right" },
       4: { cellWidth: 24, halign: "center" },
       5: { halign: "center" },
-    },
-    margin: { left: 14, right: 14 },
-  });
-
-  drawFooter(doc);
-  return doc;
-}
-
-// ─── Immobilier : quittance de loyer ────────────────────────────────────
-
-export async function buildRentReceiptPDF(tenant: Tenant, rent: Rent): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const logo = await getLogoBase64();
-  const paid = rent.status === "PAYE";
-
-  drawHeader(
-    doc,
-    logo,
-    paid ? "QUITTANCE DE LOYER" : "AVIS D'ÉCHÉANCE DE LOYER",
-    `Période : ${monthLabel(rent.month)}`
-  );
-
-  if (!paid) watermark(doc, "NON PAYÉ", [220, 190, 190]);
-
-  const blockY = 55;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY);
-  doc.text("LOCATAIRE", 14, blockY);
-  doc.setFontSize(12);
-  doc.setTextColor(...DARK);
-  doc.text(doc.splitTextToSize(tenant.name, 90), 14, blockY + 6);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  let cy = blockY + 6 + doc.splitTextToSize(tenant.name, 90).length * 5.5;
-  const infos = [
-    `Immeuble : ${tenant.building}`,
-    tenant.unit ? `Logement : ${tenant.unit}` : null,
-    tenant.phone ? `Tél : ${tenant.phone}` : null,
-  ].filter(Boolean) as string[];
-  for (const line of infos) {
-    doc.text(line, 14, cy);
-    cy += 5;
-  }
-
-  // Encadré montant
-  doc.setDrawColor(...GREEN);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(110, blockY - 2, 86, 34, 2, 2, "S");
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.text("Mois concerné :", 114, blockY + 4);
-  doc.text("Loyer mensuel :", 114, blockY + 11);
-  doc.text("Statut :", 114, blockY + 18);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.setTextColor(...DARK);
-  doc.text(monthLabel(rent.month), 194, blockY + 4, { align: "right" });
-  doc.text(fmtMoney(rent.amount), 194, blockY + 11, { align: "right" });
-  doc.setTextColor(...(paid ? GREEN : RED));
-  doc.text(RENT_STATUS_LABELS[rent.status] ?? rent.status, 194, blockY + 18, { align: "right" });
-  if (paid && rent.paidAt) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...GRAY);
-    doc.text(`Réglé le ${fmtDate(rent.paidAt)}`, 194, blockY + 24, { align: "right" });
-  }
-
-  // Montant en lettres
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...DARK);
-  doc.text(
-    doc.splitTextToSize(
-      paid
-        ? `Reçu de ${tenant.name} la somme de : ${amountInWordsFCFA(rent.amount)}`
-        : `Loyer dû au titre de ${monthLabel(rent.month)} : ${amountInWordsFCFA(rent.amount)}`,
-      180
-    ),
-    14,
-    cy + 10
-  );
-
-  // Signature
-  const sy = cy + 26;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY);
-  doc.text(
-    paid ? "Cachet et signature du bailleur :" : "Cachet et signature du locataire :",
-    130,
-    sy
-  );
-  doc.setDrawColor(...GRAY);
-  doc.setLineWidth(0.25);
-  doc.roundedRect(130, sy + 2, 60, 22, 1, 1, "S");
-
-  drawFooter(doc);
-  return doc;
-}
-
-// ─── Immobilier : échéancier des loyers d'un locataire ──────────────
-
-export async function buildTenantRentsPDF(tenant: Tenant): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const logo = await getLogoBase64();
-  const rents = [...tenant.rents].sort((a, b) => a.month.localeCompare(b.month));
-
-  drawHeader(
-    doc,
-    logo,
-    "ÉCHÉANCIER DES LOYERS",
-    `${tenant.name} — ${tenant.building}`
-  );
-
-  autoTable(doc, {
-    startY: 48,
-    head: [["Mois", "Loyer (FCFA)", "Statut", "Réglé le"]],
-    body: rents.map((r) => [
-      monthLabel(r.month),
-      fmtNum(r.amount),
-      RENT_STATUS_LABELS[r.status] ?? r.status,
-      r.status === "PAYE" && r.paidAt ? fmtDate(r.paidAt) : "—",
-    ]),
-    foot: [
-      [
-        "TOTAL",
-        fmtNum(rents.reduce((s, r) => s + r.amount, 0)),
-        "",
-        `Dû : ${fmtNum(rents.filter((r) => r.status === "NON_PAYE").reduce((s, r) => s + r.amount, 0))}`,
-      ],
-    ],
-    theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: 8.5,
-      textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
-      lineWidth: 0.15,
-      cellPadding: { top: 2, right: 2.5, bottom: 2, left: 2.5 },
-    },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
-    columnStyles: {
-      0: { cellWidth: 60, fontStyle: "bold" },
-      1: { cellWidth: 45, halign: "right" },
-      2: { cellWidth: 35, halign: "center" },
-      3: { halign: "center" },
     },
     margin: { left: 14, right: 14 },
   });

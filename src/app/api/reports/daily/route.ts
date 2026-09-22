@@ -5,8 +5,8 @@ import type { DailyReport } from "@/lib/types";
 
 /**
  * GET /api/reports/daily?date=AAAA-MM-JJ
- * Rapport du jour : factures de vente du jour, versements encaissés,
- * règlements des achats à crédit (Commerçant / Immo) et répartition par mode.
+ * Rapport du jour : factures de vente du jour, versements encaissés
+ * et répartition par mode.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const dayStart = new Date(`${date}T00:00:00.000Z`);
     const dayEnd = new Date(`${date}T23:59:59.999Z`);
 
-    const [invoices, proformaCount, paymentsRaw, creditPaymentsRaw] = await Promise.all([
+    const [invoices, proformaCount, paymentsRaw] = await Promise.all([
       db.invoice.findMany({
         where: { type: "VENTE", date: { gte: dayStart, lte: dayEnd } },
         include: { items: true },
@@ -33,11 +33,6 @@ export async function GET(request: NextRequest) {
       db.payment.findMany({
         where: { paidAt: { gte: dayStart, lte: dayEnd } },
         include: { invoice: { select: { number: true, clientName: true } } },
-        orderBy: { paidAt: "asc" },
-      }),
-      db.creditPayment.findMany({
-        where: { paidAt: { gte: dayStart, lte: dayEnd } },
-        include: { purchase: { select: { number: true, tier: true, destination: true } } },
         orderBy: { paidAt: "asc" },
       }),
     ]);
@@ -57,11 +52,10 @@ export async function GET(request: NextRequest) {
     }
 
     const receivedTotal = paymentsRaw.reduce((s, p) => s + p.amount, 0);
-    const creditPaidTotal = creditPaymentsRaw.reduce((s, p) => s + p.amount, 0);
 
-    // Répartition des encaissements du jour (factures + crédit) par mode
+    // Répartition des encaissements du jour par mode
     const methodMap = new Map<string, { amount: number; count: number }>();
-    for (const p of [...paymentsRaw, ...creditPaymentsRaw]) {
+    for (const p of paymentsRaw) {
       const entry = methodMap.get(p.method) ?? { amount: 0, count: 0 };
       entry.amount += p.amount;
       entry.count += 1;
@@ -85,7 +79,6 @@ export async function GET(request: NextRequest) {
         totalTTC: Math.round(totalTTC),
         vatTotal: Math.round(totalTTC - totalHT),
         receivedTotal: Math.round(receivedTotal),
-        creditPaidTotal: Math.round(creditPaidTotal),
         paidCount,
         partialCount,
         unpaidCount,
@@ -105,16 +98,6 @@ export async function GET(request: NextRequest) {
         note: p.note,
         invoiceNumber: p.invoice?.number ?? "—",
         clientName: p.invoice?.clientName ?? "Client comptoir",
-      })),
-      creditPayments: creditPaymentsRaw.map((p) => ({
-        id: p.id,
-        amount: p.amount,
-        method: p.method,
-        paidAt: p.paidAt.toISOString(),
-        note: p.note,
-        number: p.purchase?.number ?? "—",
-        tier: p.purchase?.tier ?? "—",
-        destination: (p.purchase?.destination ?? "COMMERCANT") as "COMMERCANT" | "IMMO",
       })),
       byMethod,
     };

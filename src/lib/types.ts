@@ -37,29 +37,6 @@ export interface CategoryWithCount extends Category {
   productCount?: number;
 }
 
-export interface Tenant {
-  id: string;
-  name: string;
-  phone?: string | null;
-  building: string;
-  unit?: string | null;
-  monthlyRent: number;
-  notes?: string | null;
-  createdAt: string;
-  rents: Rent[];
-}
-
-export interface Rent {
-  id: string;
-  tenantId: string;
-  month: string; // AAAA-MM
-  amount: number;
-  status: "PAYE" | "NON_PAYE";
-  paidAt?: string | null;
-  notes?: string | null;
-  createdAt: string;
-}
-
 export interface InvoiceItem {
   id?: string;
   productId?: string | null;
@@ -105,35 +82,7 @@ export interface Payment {
   createdAt: string;
 }
 
-// ─── Achats à crédit (factures / proformas transférées) ─────────────────────
-
-export interface CreditPayment {
-  id: string;
-  purchaseId: string;
-  amount: number;
-  method: string;
-  paidAt: string;
-  note?: string | null;
-  createdAt: string;
-}
-
-export interface CreditPurchase {
-  id: string;
-  destination: "COMMERCANT" | "IMMO";
-  sourceType: "VENTE" | "PROFORMA";
-  sourceId: string;
-  number: string;
-  tier: string;
-  total: number;
-  amountPaid: number;
-  dueDate?: string | null;
-  note?: string | null;
-  createdAt: string;
-  payments?: CreditPayment[];
-  /** Statuts du document source (facture / proforma d'origine) */
-  sourceDeliveryStatus?: string | null;
-  sourcePaymentStatus?: string | null;
-}
+// ─── Achats (factures d'achat) ─────────────────────────────────────────────
 
 export interface PurchaseItem {
   id?: string;
@@ -246,8 +195,6 @@ export interface DashboardStats {
   today: DashboardToday;
   /** Répartition des factures de vente par statut de paiement */
   statusCounts: { PAYE: number; PARTIEL: number; NON_PAYE: number };
-  /** Achats à crédit (Commerçant + Immo) */
-  credit: { count: number; total: number; paid: number; reste: number };
 }
 
 export interface DashboardToday {
@@ -275,17 +222,6 @@ export interface DailyPaymentRow {
   clientName: string;
 }
 
-export interface DailyCreditPaymentRow {
-  id: string;
-  amount: number;
-  method: string;
-  paidAt: string;
-  note?: string | null;
-  number: string;
-  tier: string;
-  destination: "COMMERCANT" | "IMMO";
-}
-
 export interface DailyReport {
   date: string;
   summary: {
@@ -296,15 +232,12 @@ export interface DailyReport {
     vatTotal: number;
     /** Somme des versements factures encaissés ce jour */
     receivedTotal: number;
-    /** Somme des règlements crédit (Commerçant + Immo) ce jour */
-    creditPaidTotal: number;
     paidCount: number;
     partialCount: number;
     unpaidCount: number;
   };
   invoices: Invoice[];
   payments: DailyPaymentRow[];
-  creditPayments: DailyCreditPaymentRow[];
   byMethod: { method: string; label: string; amount: number; count: number }[];
 }
 

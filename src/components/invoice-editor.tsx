@@ -3,13 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Building2,
-  CheckCircle2,
-  CreditCard,
   Loader2,
   Plus,
   Save,
-  Store,
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,8 +41,6 @@ import {
   itemToApi,
 } from "@/components/items-editor";
 
-type Destination = "NONE" | "COMMERCANT" | "IMMO";
-
 interface InvoiceEditorProps {
   open: boolean;
   onClose: () => void;
@@ -55,8 +49,6 @@ interface InvoiceEditorProps {
   invoice: Invoice | null; // null = création
   clients: Client[];
   products: Product[];
-  /** La facture en cours d'édition est déjà classée à crédit (destination). */
-  alreadyTransferred?: "COMMERCANT" | "IMMO" | null;
 }
 
 interface FormState {
@@ -448,9 +440,8 @@ function QuickProductDialog({
 
 /**
  * Éditeur de facture / proforma en PAGE PLEIN ÉCRAN — mise en page COMPACTE
- * 2 colonnes : articles + totaux à gauche, client/paramètres/crédit à droite.
+ * 2 colonnes : articles + totaux à gauche, client/paramètres à droite.
  * Recherche de produits, création rapide de client et de produit intégrées.
- * Propose le classement en achat à crédit (Commerçant ou Immo) dès la création.
  */
 export function InvoiceEditor({
   open,
@@ -460,7 +451,6 @@ export function InvoiceEditor({
   invoice,
   clients,
   products,
-  alreadyTransferred = null,
 }: InvoiceEditorProps) {
   const { toast } = useToast();
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -474,12 +464,6 @@ export function InvoiceEditor({
   useEffect(() => setLocalClients(clients), [clients]);
   useEffect(() => setLocalProducts(products), [products]);
 
-  // Classement crédit (à la création uniquement)
-  const [destination, setDestination] = useState<Destination>("NONE");
-  const [creditTier, setCreditTier] = useState("");
-  const [creditDueDate, setCreditDueDate] = useState("");
-  const [creditNote, setCreditNote] = useState("");
-
   // Dialogues de création rapide
   const [clientDialog, setClientDialog] = useState(false);
   const [productDialog, setProductDialog] = useState(false);
@@ -488,10 +472,6 @@ export function InvoiceEditor({
   useEffect(() => {
     if (open) {
       setForm(invoice ? fromInvoice(invoice) : defaultForm());
-      setDestination("NONE");
-      setCreditTier("");
-      setCreditDueDate("");
-      setCreditNote("");
     }
   }, [open, invoice]);
 
@@ -563,36 +543,9 @@ export function InvoiceEditor({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur d'enregistrement");
 
-      // Classement direct en achat à crédit (création uniquement)
-      if (!isEdit && destination !== "NONE") {
-        const transferRes = await fetch("/api/credit-purchases", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sourceId: json.id,
-            destination,
-            tier: creditTier.trim() || form.clientName.trim() || "Client comptoir",
-            dueDate: creditDueDate || form.dueDate || undefined,
-            note: creditNote.trim() || undefined,
-          }),
-        });
-        const transferJson = await transferRes.json();
-        if (!transferRes.ok) {
-          toast({
-            title: "Facture créée, classement refusé",
-            description: transferJson.error ?? "Le transfert en achat à crédit a échoué.",
-            variant: "destructive",
-          });
-        }
-      }
-
       toast({
         title: isEdit ? "Document modifié" : "Document enregistré",
-        description: `N° ${json.number} — ${formatMoney(json.totalTTC)}${
-          !isEdit && destination !== "NONE"
-            ? ` — classé à crédit dans ${destination === "COMMERCANT" ? "Commerçant" : "Immo"}`
-            : ""
-        }`,
+        description: `N° ${json.number} — ${formatMoney(json.totalTTC)}`,
       });
       onSaved();
       onClose();
@@ -608,32 +561,6 @@ export function InvoiceEditor({
   };
 
   if (!open) return null;
-
-  const destinationOptions: {
-    value: Destination;
-    label: string;
-    hint: string;
-    icon: typeof Store;
-  }[] = [
-    {
-      value: "NONE",
-      label: "Vente normale",
-      hint: "Aucun classement crédit",
-      icon: CheckCircle2,
-    },
-    {
-      value: "COMMERCANT",
-      label: "Commerçant",
-      hint: "Crédit — onglet Commerçant",
-      icon: Store,
-    },
-    {
-      value: "IMMO",
-      label: "Immo",
-      hint: "Crédit — onglet Immo",
-      icon: Building2,
-    },
-  ];
 
   const docLabel = isProforma ? "proforma" : "facture";
 
@@ -663,7 +590,7 @@ export function InvoiceEditor({
               <p className="hidden text-xs text-muted-foreground sm:block">
                 {isProforma
                   ? "Devis prévisionnel — convertissable en facture définitive."
-                  : "Articles, client, paiement et classement crédit."}
+                  : "Articles, client, paiement et paramètres."}
               </p>
             </div>
           </div>
@@ -889,113 +816,6 @@ export function InvoiceEditor({
               )}
             </CardContent>
           </Card>
-
-          {/* Classement du crédit (création uniquement) */}
-          {!isEdit && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CreditCard className="h-4 w-4 text-primary" aria-hidden />
-                  Classement du crédit
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div
-                  className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3"
-                  role="radiogroup"
-                  aria-label="Classement du crédit"
-                >
-                  {destinationOptions.map((opt) => {
-                    const Icon = opt.icon;
-                    const active = destination === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => setDestination(opt.value)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-xl border p-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          active
-                            ? "border-primary bg-primary/10 ring-1 ring-primary"
-                            : "bg-card hover:bg-accent"
-                        )}
-                      >
-                        <Icon
-                          className={cn(
-                            "h-4 w-4 shrink-0",
-                            active ? "text-primary" : "text-muted-foreground"
-                          )}
-                          aria-hidden
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-xs font-bold">{opt.label}</span>
-                          <span className="block truncate text-[10px] leading-tight text-muted-foreground">
-                            {opt.hint}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {destination !== "NONE" && (
-                  <div className="grid gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="credit-tier">
-                        {destination === "COMMERCANT" ? "Commerçant / fournisseur" : "Bailleur / entreprise"}
-                      </Label>
-                      <Input
-                        id="credit-tier"
-                        value={creditTier}
-                        onChange={(e) => setCreditTier(e.target.value)}
-                        placeholder={form.clientName || "Ex : SENELEC, quincaillerie Ndiaye…"}
-                        className="h-8"
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="credit-due" className="text-xs">
-                          Échéance
-                        </Label>
-                        <Input
-                          id="credit-due"
-                          type="date"
-                          value={creditDueDate}
-                          onChange={(e) => setCreditDueDate(e.target.value)}
-                          className="h-8"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="credit-note" className="text-xs">
-                          Note
-                        </Label>
-                        <Input
-                          id="credit-note"
-                          value={creditNote}
-                          onChange={(e) => setCreditNote(e.target.value)}
-                          placeholder="Achat à crédit"
-                          className="h-8"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Document déjà classé à crédit */}
-          {isEdit && alreadyTransferred && (
-            <div className="flex items-center gap-2 rounded-xl border border-gold/50 bg-gold-soft/40 px-4 py-3 text-sm">
-              <CreditCard className="h-4 w-4 text-gold" aria-hidden />
-              <span>
-                Déjà classé à crédit dans{" "}
-                <strong>{alreadyTransferred === "COMMERCANT" ? "Commerçant" : "Immo"}</strong>.
-              </span>
-            </div>
-          )}
 
           {/* Notes */}
           <Card>

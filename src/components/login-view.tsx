@@ -10,7 +10,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import {
   AlertTriangle,
   ArrowRight,
-  Building2,
   Eye,
   EyeOff,
   FileText,
@@ -45,7 +44,6 @@ const itemV: Variants = {
 const FEATURES = [
   { icon: FileText, label: "Factures & proformas PDF" },
   { icon: Package, label: "Produits, stock & réappro" },
-  { icon: Building2, label: "Gestion locative immo" },
   { icon: ShieldCheck, label: "Accès sécurisé par rôles" },
 ];
 
@@ -149,7 +147,7 @@ export function LoginView({
             </h1>
             <p className="mt-4 flex items-center gap-2 text-base text-white/85 xl:text-lg">
               <Sparkles className="h-4 w-4 shrink-0 text-gold" aria-hidden />
-              {settings?.tagline ?? "Facturation • Stock • Immobilier"}
+              {settings?.tagline ?? "Facturation • Stock • Gestion"}
             </p>
           </motion.div>
 
@@ -180,7 +178,6 @@ export function LoginView({
           <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
           <span>Gestion</span>
           <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
-          <span>Immobilier</span>
         </motion.div>
       </aside>
 

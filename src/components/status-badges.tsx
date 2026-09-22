@@ -6,7 +6,6 @@ import {
   DELIVERY_LABELS,
   ORDER_STATUS_LABELS,
   PAYMENT_LABELS,
-  RENT_STATUS_LABELS,
 } from "@/lib/constants";
 import { prettifyCode, useCategories } from "@/components/categories-provider";
 
@@ -67,17 +66,4 @@ export function CategoryBadge({ category }: { category: string | null | undefine
   );
 }
 
-export function RentStatusBadge({ status }: { status: string }) {
-  const label = RENT_STATUS_LABELS[status] ?? status;
-  return (
-    <Badge
-      className={cn(
-        status === "PAYE"
-          ? "bg-green-100 text-green-800 hover:bg-green-100 border-green-200"
-          : "bg-red-100 text-red-700 hover:bg-red-100 border-red-200"
-      )}
-    >
-      {label}
-    </Badge>
-  );
-}
+

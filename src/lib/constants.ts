@@ -98,20 +98,9 @@ export const AUDIT_ENTITY_LABELS: Record<string, string> = {
   Purchase: "Achat",
   Supplier: "Fournisseur",
   Payment: "Versement",
-  Tenant: "Locataire",
-  Rent: "Loyer",
   User: "Utilisateur",
   Settings: "Paramètres",
   Stock: "Stock",
-};
-
-// ─── Immobilier (loyers) ────────────────────────────────────────────────────
-
-export const RENT_STATUSES = ["PAYE", "NON_PAYE"] as const;
-
-export const RENT_STATUS_LABELS: Record<string, string> = {
-  PAYE: "Payé",
-  NON_PAYE: "Non payé",
 };
 
 const MONTH_NAMES = [
