@@ -618,3 +618,26 @@ Stage Summary:
 - Les modules « Commerçant — Achats à crédit » et « Immo — Achats à crédit » ainsi que la gestion locative immobilière (locataires/loyers/quittances) sont entièrement supprimés : UI, API, schéma Prisma, seeds, sauvegarde/restauration, PDF.
 - Les factures/proformas retrouvent un flux simple : plus de transfert à crédit. La fonctionnalité Paiements multiples (versements par facture) est conservée.
 - Application vérifiée de bout en bout dans le navigateur après suppression.
+
+---
+Task ID: 20
+Agent: Z.ai Code (principal)
+Task: Intégrer dans 2mails le CRM Unifié (adaptation du prompt « crm-unifie » de l'utilisateur) — onglets de suivi des QR codes qrtags.pro / qrbags.com activés, perdus, retrouvés, scannés — SANS rien supprimer et SANS créer de projet séparé.
+
+Work Log:
+- Adaptation du prompt utilisateur : pas de projet « crm-unifie » séparé ni de PostgreSQL — intégration directe dans 2mails (Next.js 16, Prisma SQLite, auth existante, sidebar existante). Aucune fonctionnalité existante modifiée ou supprimée.
+- prisma/schema.prisma : ajout de 4 modèles préfixés Crm (évite le conflit avec Client de la facturation) : CrmPlatform (name QRTAGS|QRBAGS unique, label, apiUrl, apiKey, webhookSecret, isActive, lastSyncAt), CrmItem (platformId+externalId unique, code, type TAG|BAGAGE, status ACTIVE|LOST|FOUND|SUSPENDED|INACTIVE, ownerName/Phone/Email, clientId → CrmClient, lastScanAt, lastScanPlace, scanCount, raw JSON, index platformId/status/type), CrmActivity (platform, itemId, action SCAN|ACTIVATION|LOST|FOUND|SUSPENDED|SYNC|WEBHOOK_ERROR|UPDATED, details, timestamp indexé), CrmClient (name, email, phone, totalItems, status, notes). bun run db:push OK.
+- src/lib/crm-api.ts : couche d'intégration API — getPlatformConfig (env QRTAGS_API_URL/QRTAGS_API_KEY/QRBAGS_API_URL/QRBAGS_API_KEY en priorité, sinon base), fetchItemsFromPlatform (GET {apiUrl}/api/admin/items, Bearer, normalisation tolérante), upsertCrmItem, reconcileCrmClients (rattachement auto par téléphone/e-mail + recalcul totalItems), syncPlatform, syncAllPlatforms, ensurePlatformsSeeded.
+- API routes (namespace /api/crm) : webhooks (POST — validation secret X-Webhook-Secret/Bearer/query, événements item_activated/item_scanned/item_lost/item_found/item_suspended + alias, upsert item + ActivityLog, GET doc) ; sync (POST, admin, une ou toutes plateformes) ; items (GET filtres platform/status/type/q) ; stats (GET compteurs par statut/plateforme, scans du jour, activité récente, derniers événements) ; activity (GET flux limité) ; clients (GET/POST) ; clients/[id] (PUT/DELETE admin) ; platforms (GET clés masquées, PUT admin).
+- Composants src/components/crm/ : crm-shared.tsx (formatRelativeFr, ItemStatusBadge, ACTION_META), crm-dashboard-view.tsx (vue d'ensemble : 4 stat cards, cartes plateformes avec bouton Config (dialog apiUrl/apiKey/webhookSecret/isActive admin), encart webhook, derniers événements + flux d'activité polling 30 s, bouton Synchroniser maintenant), crm-items-view.tsx (tableau items filtrable, compteurs rapides, sync par plateforme, polling 30 s, réutilisé par les 2 onglets), crm-clients-view.tsx (CRUD clients CRM).
+- app-shell.tsx : ViewId + « crm », « crm-qrbags », « crm-qrtags », « crm-clients » ; nouvelle section sidebar « CRM Unifié » (Globe2/Luggage/ScanLine/Contact) placée après Pilotage ; mapping des vues. L'onglet existant « QR & Étiquettes » (qrtags) est conservé sans conflit.
+- Correction : icône Config inexistante dans lucide-react → Settings2.
+- Tests API (curl) : webhooks ACTIVATION (→ ACTIVE), LOST (→ LOST), SCAN (→ scanCount+1, lieu), secret invalide → 401 ; stats totals items=2, scansToday=1, byStatus ACTIVE=1/LOST=1 ; items filtrés OK ; plateforme non authentifiée → 401.
+- Tests navigateur (agent-browser) : login admin, sidebar avec les 4 onglets, vue CRM (stats + cartes plateformes + encart webhook + événements), QR Bags (VOL25-MB8K2X Perdu — Aéroport Blaise Diagne), QR Tags (HAJJ25-A1B2C3 Actif — HLM Grand Yoff), création client « Fatou Ndiaye » (dialog + table), mobile iPhone 14 OK, 0 erreur console, lint 0 erreur.
+- Redémarrage du serveur de dev requis après db:push (client Prisma rechargé) ; redémarrage via bash -c setsid nohup.
+
+Stage Summary:
+- Le CRM Unifié est intégré à 2mails en tant que 4 nouveaux onglets (CRM Unifié, QR Bags, QR Tags, Clients CRM) : suivi centralisé des items des plateformes qrtags.pro et qrbags.com alimenté par webhooks sécurisés (POST /api/crm/webhooks avec X-Webhook-Secret) et synchronisation manuelle (GET {apiUrl}/api/admin/items).
+- Aucune donnée existante modifiée ; le déploiement Coolify existant fonctionne tel quel (prisma db push crée les nouvelles tables au démarrage du conteneur).
+- Configuration à faire en production : bouton « Config » dans l'onglet CRM (admin) pour renseigner URL API + clé API de chaque plateforme, définir le secret webhook, puis l'entrer aussi dans l'admin de qrtags.pro/qrbags.com avec l'URL {domaine}/api/crm/webhooks.
+- En attente : 2ᵉ prompte de l'utilisateur.

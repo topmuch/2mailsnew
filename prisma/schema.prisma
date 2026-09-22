@@ -282,6 +282,76 @@ model CalendarEvent {
   createdAt   DateTime @default(now())
 }
 
+// ─── CRM Unifié (synchro qrtags.pro + qrbags.com) ───────────────────────────
+// Cache local des items/événements des deux plateformes, alimenté par
+// webhooks (/api/crm/webhooks) et synchronisation manuelle (/api/crm/sync).
+
+model CrmPlatform {
+  id            String    @id @default(cuid())
+  name          String    @unique // QRTAGS | QRBAGS
+  label         String    @default("") // ex. « qrtags.pro », « qrbags.com »
+  apiUrl        String    @default("") // URL de base de l'API de la plateforme
+  apiKey        String    @default("") // clé Bearer pour appeler l'API de la plateforme
+  webhookSecret String    @default("") // secret partagé pour valider les webhooks entrants
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  items CrmItem[]
+}
+
+model CrmItem {
+  id            String      @id @default(cuid())
+  platformId    String
+  platform      CrmPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  externalId    String // ID du tag/bagage sur la plateforme source
+  code          String      @default("") // référence lisible (ex. HAJJ25-ABC123)
+  type          String      @default("TAG") // TAG | BAGAGE
+  status        String      @default("ACTIVE") // ACTIVE | LOST | FOUND | SUSPENDED | INACTIVE
+  ownerName     String?
+  ownerPhone    String?
+  ownerEmail    String?
+  clientId      String? // lien optionnel vers un client CRM local
+  lastScanAt    DateTime?
+  lastScanPlace String?
+  scanCount     Int         @default(0)
+  raw           String? // JSON brut renvoyé par la plateforme
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  client CrmClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@unique([platformId, externalId])
+  @@index([platformId])
+  @@index([status])
+  @@index([type])
+}
+
+model CrmActivity {
+  id        String    @id @default(cuid())
+  platform  String // QRTAGS | QRBAGS
+  itemId    String? // lien optionnel vers l'item concerné
+  action    String // SCAN | ACTIVATION | LOST | FOUND | SUSPENDED | SYNC | WEBHOOK_ERROR
+  details   String    @default("")
+  timestamp DateTime  @default(now())
+
+  @@index([timestamp])
+  @@index([platform])
+}
+
+model CrmClient {
+  id         String    @id @default(cuid())
+  name       String
+  email      String? // ex. contact client CRM (pas de contrainte unique : sync tolérante)
+  phone      String?
+  totalItems Int       @default(0) // nombre d'items liés (recalculé à la synchro)
+  status     String    @default("ACTIVE") // ACTIVE | INACTIVE
+  notes      String?
+  createdAt  DateTime  @default(now())
+
+  items CrmItem[]
+}
+
 // ─── QR Tags (historique QRtag.net + QRBags) ────────────────────────────────
 
 model QrLookup {

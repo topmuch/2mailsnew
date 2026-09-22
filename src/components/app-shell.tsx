@@ -22,17 +22,21 @@ import {
   CalendarDays,
   ChevronDown,
   ClipboardList,
+  Contact,
   FileSignature,
   FileText,
+  Globe2,
   History,
   KeyRound,
   LayoutDashboard,
   Loader2,
   LogOut,
+  Luggage,
   Mail,
   Menu,
   Package,
   QrCode,
+  ScanLine,
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
@@ -57,6 +61,9 @@ import { LoginView } from "@/components/login-view";
 import MailView from "@/components/mail-view";
 import CalendarView from "@/components/calendar-view";
 import QrTagsView from "@/components/qr-view";
+import CrmDashboardView from "@/components/crm/crm-dashboard-view";
+import CrmItemsView from "@/components/crm/crm-items-view";
+import CrmClientsView from "@/components/crm/crm-clients-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useSettingsStore } from "@/lib/settings-store";
 import { authFetch, clearSession, getCachedUser, verifySession } from "@/lib/auth-client";
@@ -73,6 +80,10 @@ type ViewId =
   | "calendrier"
   | "mails"
   | "qrtags"
+  | "crm"
+  | "crm-qrbags"
+  | "crm-qrtags"
+  | "crm-clients"
   | "achats"
   | "fournisseurs"
   | "produits"
@@ -93,6 +104,11 @@ const NAV: {
   { id: "dashboard", label: "Tableau de bord", short: "Dashboard", icon: LayoutDashboard, section: "Pilotage" },
   { id: "rapports", label: "Rapports de vente", short: "Rapports", icon: BarChart3, section: "Pilotage" },
   { id: "calendrier", label: "Calendrier", short: "Calendrier", icon: CalendarDays, section: "Pilotage" },
+  // ─── CRM Unifié (qrtags.pro + qrbags.com) ───
+  { id: "crm", label: "CRM — Vue d'ensemble", short: "CRM Unifié", icon: Globe2, section: "CRM Unifié" },
+  { id: "crm-qrbags", label: "Suivi QR Bags (qrbags.com)", short: "QR Bags", icon: Luggage, section: "CRM Unifié" },
+  { id: "crm-qrtags", label: "Suivi QR Tags (qrtags.pro)", short: "QR Tags", icon: ScanLine, section: "CRM Unifié" },
+  { id: "crm-clients", label: "Clients CRM", short: "Clients CRM", icon: Contact, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
   { id: "qrtags", label: "QR & Étiquettes", short: "QR Tags", icon: QrCode, section: "Communication" },
   // ─── Ventes ───
@@ -474,6 +490,10 @@ export function AppShell() {
               {view === "clients" && <ClientsView />}
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
+              {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
+              {view === "crm-qrbags" && <CrmItemsView platform="QRBAGS" />}
+              {view === "crm-qrtags" && <CrmItemsView platform="QRTAGS" />}
+              {view === "crm-clients" && <CrmClientsView />}
               {view === "mails" && <MailView />}
               {view === "qrtags" && <QrTagsView />}
               {view === "produits" && <ProductsView />}

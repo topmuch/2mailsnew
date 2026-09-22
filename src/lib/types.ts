@@ -393,3 +393,78 @@ export interface QrBagsResult {
   sourceUrl: string; // page officielle de suivi
   message: string;
 }
+
+// ─── CRM Unifié (sync qrtags.pro / qrbags.com) ──────────────────────────────
+
+export interface CrmItem {
+  id: string;
+  platformId: string;
+  platform: { name: string; label: string };
+  externalId: string;
+  code: string;
+  type: string; // TAG | BAGAGE
+  status: string; // ACTIVE | LOST | FOUND | SUSPENDED | INACTIVE
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  clientId: string | null;
+  client?: { id: string; name: string } | null;
+  lastScanAt: string | null;
+  lastScanPlace: string | null;
+  scanCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmActivity {
+  id: string;
+  platform: string; // QRTAGS | QRBAGS
+  itemId: string | null;
+  action: string; // SCAN | ACTIVATION | LOST | FOUND | SUSPENDED | SYNC | WEBHOOK_ERROR | UPDATED
+  details: string;
+  timestamp: string;
+  item?: { id: string; code: string; externalId: string; status: string; type: string } | null;
+}
+
+export interface CrmClientDto {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  totalItems: number;
+  status: string; // ACTIVE | INACTIVE
+  notes: string | null;
+  createdAt: string;
+  items?: Array<{ id: string; status: string }>;
+}
+
+export interface CrmPlatformDto {
+  id: string;
+  name: string; // QRTAGS | QRBAGS
+  label: string;
+  apiUrl?: string;
+  apiKey?: string;
+  hasApiKey?: boolean;
+  webhookSecret?: string;
+  hasWebhookSecret?: boolean;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  itemCount?: number;
+}
+
+export interface CrmStats {
+  platforms: CrmPlatformDto[];
+  byStatus: Record<string, number>;
+  totals: {
+    items: number;
+    scansToday: number;
+    activitiesToday: number;
+  };
+  recentActivity: CrmActivity[];
+  lastEvents: CrmActivity[];
+}
+
+export interface CrmSyncResult {
+  results: Array<{ platform: string; total: number; created: number; updated: number }>;
+  errors: Array<{ platform: string; error: string }>;
+}
