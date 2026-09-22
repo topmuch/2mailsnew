@@ -575,3 +575,21 @@ Stage Summary:
 - topmuch/Lampfall = version facturation d'origine (8526fe3) — restauré à la demande.
 - topmuch/2mailsnew = dépôt de développement courant avec tous les modules et la préparation Coolify → c'est LUI qu'il faut connecter dans Coolify.
 - Ne plus jamais pousser de nouveau code vers Lampfall sans demande explicite de l'utilisateur.
+
+---
+Task ID: 18
+Agent: Z.ai Code (principal)
+Task: Adapter le Dockerfile modèle (fourni par l'utilisateur, style « qrbags » : build par git clone GitHub) au projet topmuch/2mailsnew — sans rien changer d'autre — avec la base de données renommée pour 2mails et la création automatique des identifiants de connexion au démarrage.
+
+Work Log:
+- Erreur précédente corrigée : ne PAS travailler sur qrbags (simple gabarit fourni par l'utilisateur) mais adapter le modèle AU projet local /home/z/my-project poussé sur topmuch/2mailsnew.
+- Vérifié que topmuch/2mailsnew est publiquement clonable (git ls-remote anonyme OK, HEAD 5096879) — indispensable car le modèle fait « git clone https://github.com/topmuch/2mailsnew.git . » au moment du build.
+- Vérifié que scripts/seed-admin.mjs existe (Task 16) : JS pur Node 20, ESM, @prisma/client + node:crypto scrypt (même hash que src/lib/auth.ts), upsert Setting « main » + création admin/admin123 (ou $ADMIN_PASSWORD), rôle ADMIN, actif true, idempotent → sert à « créer les identifiants de connexion » sans ajouter aucun fichier.
+- Réécrit UNIQUEMENT /home/z/my-project/Dockerfile en suivant la structure du modèle fourni (FROM node:20-alpine, apk git libc6-compat sqlite, npm install -g bun, WORKDIR /app, git clone 2mailsnew, bun install, npx prisma generate, bun run build, mkdir /app/data, EXPOSE 3000, CMD sh -c avec prisma db push + création admin + node .next/standalone/server.js). Aucun autre fichier modifié.
+- Adaptations du modèle : URL de clone → topmuch/2mailsnew.git ; base de données → file:/app/data/2mails.db (demande « change les database dans le docker 2mails », remplace qrbag.db du gabarit) ; « node scripts/create-admin.cjs » (inexistant chez nous) → « node scripts/seed-admin.mjs » (existant, crée les identifiants).
+- Le script build du projet copie déjà .next/static et public dans .next/standalone → « node .next/standalone/server.js » fonctionne avec output standalone.
+- Commit + push sur 2mailsnew UNIQUEMENT (jamais Lampfall, cf. Task 17).
+
+Stage Summary:
+- Dockerfile « modèle qrbags » adapté à 2mailsnew : build par git clone du dépôt public, base SQLite /app/data/2mails.db (volume persistant Coolify), schéma poussé + identifiants admin/admin123 créés à chaque démarrage via scripts/seed-admin.mjs, serveur standalone sur le port 3000.
+- Le seul fichier touché est le Dockerfile ; tout le reste du projet est inchangé.
