@@ -447,9 +447,34 @@ export interface CrmPlatformDto {
   hasApiKey?: boolean;
   webhookSecret?: string;
   hasWebhookSecret?: boolean;
+  estimatedPackPrice?: number;
   isActive: boolean;
   lastSyncAt: string | null;
   itemCount?: number;
+}
+
+export interface CrmPlatformStat {
+  id: string;
+  name: string; // QRTAGS | QRBAGS
+  label: string;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  items: number;
+  activationsToday: number;
+  scansToday: number;
+  newItemsToday: number; // ≈ packs vendus aujourd'hui
+  found: number;
+  lost: number;
+  successRate: number | null; // % retrouvés
+  estimatedPackPrice: number; // FCFA par pack
+  estimatedRevenue: number; // FCFA (newItemsToday × prix pack)
+  activitiesToday: number;
+}
+
+export interface CrmPieSlice {
+  name: string; // QRTAGS | QRBAGS
+  label: string;
+  value: number; // événements aujourd'hui
 }
 
 export interface CrmStats {
@@ -459,7 +484,15 @@ export interface CrmStats {
     items: number;
     scansToday: number;
     activitiesToday: number;
+    activationsToday?: number;
+    found?: number;
+    lost?: number;
+    successRate?: number | null;
+    estimatedRevenue?: number;
+    newItemsToday?: number;
   };
+  platformStats?: CrmPlatformStat[];
+  pieData?: CrmPieSlice[];
   recentActivity: CrmActivity[];
   lastEvents: CrmActivity[];
 }

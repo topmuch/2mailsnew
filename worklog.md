@@ -641,3 +641,25 @@ Stage Summary:
 - Aucune donnée existante modifiée ; le déploiement Coolify existant fonctionne tel quel (prisma db push crée les nouvelles tables au démarrage du conteneur).
 - Configuration à faire en production : bouton « Config » dans l'onglet CRM (admin) pour renseigner URL API + clé API de chaque plateforme, définir le secret webhook, puis l'entrer aussi dans l'admin de qrtags.pro/qrbags.com avec l'URL {domaine}/api/crm/webhooks.
 - En attente : 2ᵉ prompte de l'utilisateur.
+
+---
+Task ID: 21
+Agent: Z.ai Code (principal)
+Task: Adapter le « Prompt 2 » (Dashboard Unifié & Consommation d'API) au CRM déjà intégré dans 2mails — enrichir l'onglet « CRM Unifié » existant avec les StatsCard, ActivityFeed, SyncButton, camembert de répartition, skeletons — sans rien supprimer.
+
+Work Log:
+- Adaptation : pas de page app/dashboard séparée ni de Server Component isolé — le « Tableau de Bord Unifié » vit dans l'onglet CRM existant (crm-dashboard-view.tsx) et consomme la couche API locale /api/crm/stats (webhooks + sync agrégés en base).
+- prisma/schema.prisma : CrmPlatform.estimatedPackPrice Float @default(0) ajouté (prix estimé d'un pack en FCFA pour la carte « Revenu estimé ») → bun run db:push OK (additif).
+- API /api/crm/stats enrichie (additif) : platformStats par plateforme (items, activationsToday, scansToday, newItemsToday ≈ packs vendus, found, lost, successRate, estimatedPackPrice, estimatedRevenue = newItemsToday × prix pack, activitiesToday), pieData (répartition QRTAGS/QRBAGS de l'activité du jour), totals étendus (activationsToday, found, lost, successRate, estimatedRevenue, newItemsToday). Tous les champs historiques conservés.
+- API /api/crm/platforms : PUT accepte estimatedPackPrice ; GET/PUT le renvoient.
+- src/lib/crm-format.ts (adaptation de lib/api.ts du prompt) : formatFcfa, formatNumber, formatTodayLong, dominantTone (QRTags dominant → or, QRBags dominant → bleu, égalité → vert), platformSubValue (« QRTags : 12 | QRBags : 8 »), sumPlatforms, pieColor, pieTotal.
+- Composants : stats-card.tsx (StatsCard : titre, valeur, subValue, icône, trend, bordure gauche colorée or/bleu/vert + StatsCardSkeleton), activity-feed.tsx (flux des derniers webhooks, icône par plateforme — Luggage bleu QRBags / QrCode or QRTags, indicateur « ● LIVE » vert clignotant si webhook < 1 min avec re-render 15 s, état vide « Aucune activité aujourd'hui »), sync-button.tsx (Synchroniser maintenant / par plateforme).
+- crm-dashboard-view.tsx enrichi : en-tête « CRM Unifié — Tableau de Bord » + date du jour longue + SyncButton ; 4 StatsCards (Total activations, Total scans, Objets retrouvés + taux de succès, Revenu estimé avec packs vendus) avec sous-valeurs par plateforme ; cartes plateformes conservées + mini-stats du jour ; encart webhook conservé ; camembert répartition (recharts via ChartContainer shadcn, innerRadius, Cell or/bleu, labels, état vide) ; carte Activations/Pertes/Retrouvailles conservée ; ActivityFeed intégré ; skeletons de chargement complets ; Config dialog + champ « Prix estimé d'un pack (FCFA) ».
+- Corrections : Cell recharts (au lieu de span), Button shadcn dans le dialog, classe capitalize-first inexistante → first-letter:uppercase, icône Config → Settings2 (Task 20).
+- Tests curl : stats enrichies OK (activationsToday=1, scansToday, pieData QRBAGS=2/QRTAGS=2), PUT estimatedPackPrice=5000 sur QRBAGS → revenu estimé total 5 000 FCFA (1 item du jour × 5 000).
+- Tests navigateur : 4 StatsCards avec bonnes bordures colorées (bleu quand QRBags domine, or quand QRTags domine, vert global), sous-valeurs « QRTags : 0 | QRBags : 1 », camembert rendu (donut or/bleu avec labels), mini-stats par plateforme, webhook frais → flux mis à jour « à l'instant » + badge « ● LIVE » vert clignotant, compteurs temps réel (scans 1 → 2), 0 erreur console, lint 0 erreur.
+
+Stage Summary:
+- Le « Prompt 2 » est adapté et intégré : le Tableau de Bord Unifié du CRM affiche en temps réel (polling 30 s) les activations, scans, retrouvés (taux de succès), revenu estimé par packs, répartition QRTags/QRBags (camembert) et le flux des webhooks avec indicateur Live — le tout depuis la couche API locale, sans appel direct navigateur → plateformes.
+- Skeleton loaders + états vides gérés ; design vert & or conservé (bleu réservé au code couleur QRBags demandé).
+- Push 2mailsnew uniquement ; Coolify prendra la version automatiquement (db push additif).

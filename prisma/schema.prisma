@@ -287,15 +287,16 @@ model CalendarEvent {
 // webhooks (/api/crm/webhooks) et synchronisation manuelle (/api/crm/sync).
 
 model CrmPlatform {
-  id            String    @id @default(cuid())
-  name          String    @unique // QRTAGS | QRBAGS
-  label         String    @default("") // ex. « qrtags.pro », « qrbags.com »
-  apiUrl        String    @default("") // URL de base de l'API de la plateforme
-  apiKey        String    @default("") // clé Bearer pour appeler l'API de la plateforme
-  webhookSecret String    @default("") // secret partagé pour valider les webhooks entrants
-  isActive      Boolean   @default(true)
-  lastSyncAt    DateTime?
-  createdAt     DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  name               String    @unique // QRTAGS | QRBAGS
+  label              String    @default("") // ex. « qrtags.pro », « qrbags.com »
+  apiUrl             String    @default("") // URL de base de l'API de la plateforme
+  apiKey             String    @default("") // clé Bearer pour appeler l'API de la plateforme
+  webhookSecret      String    @default("") // secret partagé pour valider les webhooks entrants
+  estimatedPackPrice Float     @default(0) // prix estimé d'un pack vendu (FCFA) pour le revenu estimé du dashboard
+  isActive           Boolean   @default(true)
+  lastSyncAt         DateTime?
+  createdAt          DateTime  @default(now())
 
   items CrmItem[]
 }

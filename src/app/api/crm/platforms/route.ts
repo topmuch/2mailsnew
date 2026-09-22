@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         hasApiKey: Boolean(p.apiKey),
         webhookSecret: p.webhookSecret ? "•".repeat(Math.min(p.webhookSecret.length, 12)) : "",
         hasWebhookSecret: Boolean(p.webhookSecret),
+        estimatedPackPrice: p.estimatedPackPrice,
         isActive: p.isActive,
         lastSyncAt: p.lastSyncAt,
       }))
@@ -65,6 +66,10 @@ export async function PUT(request: NextRequest) {
           body.webhookSecret === undefined || mask(body.webhookSecret)
             ? existing.webhookSecret
             : String(body.webhookSecret ?? "").trim(),
+        estimatedPackPrice:
+          body.estimatedPackPrice !== undefined
+            ? Math.max(0, Number(body.estimatedPackPrice) || 0)
+            : existing.estimatedPackPrice,
         isActive: typeof body.isActive === "boolean" ? body.isActive : existing.isActive,
       },
     });
@@ -76,6 +81,7 @@ export async function PUT(request: NextRequest) {
       apiUrl: platform.apiUrl,
       hasApiKey: Boolean(platform.apiKey),
       hasWebhookSecret: Boolean(platform.webhookSecret),
+      estimatedPackPrice: platform.estimatedPackPrice,
       isActive: platform.isActive,
       lastSyncAt: platform.lastSyncAt,
     });
