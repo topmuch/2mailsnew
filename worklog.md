@@ -557,3 +557,21 @@ Stage Summary:
 - Le dépôt est désormais 100 % prêt pour Coolify : "New Resource → Dockerfile", port 3000, stockage persistant /app/data, déployer. Premier démarrage = schéma + admin créés automatiquement.
 - Fichiers : Dockerfile (réécrit), .dockerignore, scripts/docker-entrypoint.sh, scripts/seed-admin.mjs, src/app/api/health/route.ts, docker-compose.yml, .env.example (+ .gitignore !.env.example), COOLIFY.md.
 - Le code est poussé sur les deux dépôts : topmuch/Lampfall (origin, rattrapage Task 15 inclus) et topmuch/2mailsnew (miroir tenu à jour) — Coolify peut pointer sur l'un ou l'autre.
+
+---
+Task ID: 17
+Agent: Z.ai Code (principal)
+Task: Correction de dépôt — restaurer topmuch/Lampfall à son état d'origine ; le nouveau code (Task 15 + Coolify) vit uniquement dans topmuch/2mailsnew.
+
+Work Log:
+- L'utilisateur a signalé une erreur de dépôt : les commits Task 15 (mails/calendrier/QR) et Task 16 (Coolify) ne devaient pas être poussés sur topmuch/Lampfall mais uniquement sur le nouveau dépôt topmuch/2mailsnew.
+- Vérifié ls-remote des deux dépôts : Lampfall et 2mailsnew étaient tous deux à 7c21968.
+- Restauré topmuch/Lampfall par force push : main ramené de 7c21968 → 8526fe3 (état validé Task 14 : app de facturation avec facture/proforma Times New Roman italique, SANS les modules mails/calendrier/QR ni les fichiers Coolify). Vérifié ensuite par ls-remote : refs/heads/main = 8526fe3.
+- topmuch/2mailsnew conservé à 7c21968 : il contient l'intégralité du code (facturation + mails + calendrier + QR + préparation Coolify complète). Diff 8526fe3..7c21968 vérifié : 32 fichiers, +5 046 lignes (Dockerfile, .dockerignore, COOLIFY.md, docker-compose.yml, scripts/, api/health, api/mails*, api/events*, api/qr*, mail-view, calendar-view, qr-view, schema Mail/CalendarEvent/QrLookup, seed-v4, types).
+- Le projet local reste le code complet (7c21968 + ce journal) : toutes les fonctionnalités continuent de fonctionner en développement.
+- Remote nommé « 2mailsnew » ajouté en local pour éviter toute confusion future (origin = Lampfall, conservé pour l'historique).
+
+Stage Summary:
+- topmuch/Lampfall = version facturation d'origine (8526fe3) — restauré à la demande.
+- topmuch/2mailsnew = dépôt de développement courant avec tous les modules et la préparation Coolify → c'est LUI qu'il faut connecter dans Coolify.
+- Ne plus jamais pousser de nouveau code vers Lampfall sans demande explicite de l'utilisateur.
