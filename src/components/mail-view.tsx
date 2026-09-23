@@ -19,6 +19,7 @@ import {
   Star,
   Trash2,
   Undo2,
+  Wand2,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -393,6 +394,26 @@ function MailConfigDialog({
   const set = <K extends keyof ConfigForm>(key: K, value: ConfigForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  /** Pré-remplit les serveurs Gmail (IMAP + SMTP) ; recopie l'email d'un champ à l'autre. */
+  const applyGmailPreset = () => {
+    setForm((f) => ({
+      ...f,
+      smtpHost: "smtp.gmail.com",
+      smtpPort: "465",
+      smtpSecure: true,
+      imapHost: "imap.gmail.com",
+      imapPort: "993",
+      imapUser: f.imapUser || f.smtpUser,
+      smtpUser: f.smtpUser || f.imapUser,
+    }));
+    setTestResults(null);
+    toast({
+      title: "Réglages Gmail appliqués",
+      description:
+        "Renseignez votre adresse Gmail et votre mot de passe d'application (16 caractères), puis Enregistrer.",
+    });
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -467,6 +488,25 @@ function MailConfigDialog({
         </DialogHeader>
 
         <div className="space-y-5 py-1">
+          {/* ─── Raccourci Gmail ─── */}
+          <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900 dark:from-sky-950/50 dark:to-blue-950/40">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Vous utilisez Gmail ?</p>
+              <p className="text-xs text-muted-foreground">
+                Pré-remplit automatiquement les serveurs IMAP et SMTP.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 border-sky-300 text-sky-800 hover:bg-sky-100 hover:text-sky-900 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/50"
+              onClick={applyGmailPreset}
+            >
+              <Wand2 className="h-4 w-4" /> Gmail automatique
+            </Button>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="mailFromName">Nom d&apos;expéditeur</Label>
             <Input
@@ -548,10 +588,17 @@ function MailConfigDialog({
             </div>
             <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
               💡 Gmail : <span className="font-medium">smtp.gmail.com</span> port{" "}
-              <span className="font-medium">587</span> (ou 465 avec TLS direct). Google exige un{" "}
-              <span className="font-medium">mot de passe d&apos;application</span> (16 caractères) :
-              activez la validation en deux étapes puis générez-le sur myaccount.google.com →
-              Sécurité.
+              <span className="font-medium">465</span> avec « TLS direct » coché (ou 587
+              décoché). Google refuse votre mot de passe habituel : utilisez un{" "}
+              <a
+                href="https://myaccount.google.com/apppasswords"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline underline-offset-2"
+              >
+                mot de passe d&apos;application
+              </a>{" "}
+              (16 caractères, après activation de la validation en deux étapes).
             </p>
           </div>
 
@@ -616,10 +663,10 @@ function MailConfigDialog({
             </div>
             <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
               💡 Gmail : <span className="font-medium">imap.gmail.com</span> port{" "}
-              <span className="font-medium">993</span> (SSL/TLS). Utilisez le même{" "}
-              <span className="font-medium">mot de passe d&apos;application</span> que pour le SMTP.
-              Si la synchronisation échoue, cliquez sur « Tester la connexion » pour voir la cause
-              exacte.
+              <span className="font-medium">993</span>. Même adresse et même{" "}
+              <span className="font-medium">mot de passe d&apos;application</span> que pour le
+              SMTP. Après enregistrement, cliquez sur « Tester la connexion » pour voir la cause
+              exacte en cas d&apos;échec.
             </p>
           </div>
 

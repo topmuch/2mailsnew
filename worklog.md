@@ -754,3 +754,20 @@ Stage Summary:
 - Boîte mail = client mail premium pleine page 3 volets (rail/liste/lecture) clair & sombre, footer toujours visible, sidebar à défilement interne uniquement sur cette vue.
 - Problème IMAP outillé : bouton « Tester la connexion » montrant la cause exacte (identifiants, mot de passe d'application Gmail, hôte, port bloqué, TLS), messages d'erreur de sync en français clair, connexion IMAP durcie (TLS tolérant + timeouts) — la config locale étant vide, l'utilisateur doit relancer le test sur son instance : si Gmail, utiliser un mot de passe d'application (pas le mot de passe du compte).
 - Aucune fonctionnalité retirée ; push sur topmuch/2mailsnew uniquement (Coolify prendra la version automatiquement).
+
+---
+Task ID: 25
+Agent: Z.ai Code (principal)
+Task: Aide à la configuration Gmail — diagnostic du problème IMAP (« j'ai configuré l'email mais ça ne marche pas ») et outillage dédié Gmail.
+
+Work Log:
+- Diagnostic base : la ligne Setting locale est ENTIÈREMENT VIDE (imapHost/smtpHost/imapsUser/smtpPass = "", lastMailSync null) — la configuration de l'utilisateur n'a jamais été enregistrée en local ; cause probable n°1 du « problème IMAP ».
+- Découverte : la route POST /api/mail-settings/test (créée en Task 24 d'après le journal) était ABSENTE du disque — le bouton « Tester la connexion » renvoyait donc 404 « Test impossible ». Route recréée à l'identique (auth requise, test IMAP+SMTP depuis la config enregistrée, renvoie {imap, smtp} = {configured, ok, details}).
+- Nouveau bouton « Gmail automatique » (Wand2) en tête du dialog de configuration : pré-remplit smtp.gmail.com:465 + TLS direct coché + imap.gmail.com:993, et recopie l'email d'un champ utilisateur à l'autre ; bandeau bleuté « Vous utilisez Gmail ? ».
+- Conseils Gmail enrichis dans les deux sections : lien direct https://myaccount.google.com/apppasswords, mention explicite « Google refuse votre mot de passe habituel », port 465 avec TLS direct (ou 587 décoché).
+- PUT /api/mail-settings : passField nettoie désormais les mots de passe d'application Gmail (compactage des espaces si exactement 16 caractères alphanumériques — format d'affichage « abcd efgh ijkl mnop » de Google) ; les autres mots de passe restent inchangés.
+- Tests navigateur (desktop 1280) : connexion admin, vue Boîte mail, dialog config, clic « Gmail automatique » (champs correctement pré-remplis, TLS coché), « Tester la connexion » renvoie un diagnostic lisible (« IMAP non configuré (hôte, utilisateur ou mot de passe manquant) ») au lieu du 404 ; 0 erreur console ; lint 0 erreur. Base non modifiée (aucun Enregistrer sur config de test).
+
+Stage Summary:
+- La config mail étant vide en local, l'utilisateur doit (1) créer un mot de passe d'application Google (2FA obligatoire), (2) cliquer « Gmail automatique », (3) saisir son adresse Gmail + le mot de passe d'application dans les champs SMTP et IMAP, (4) Enregistrer puis Tester la connexion — le bouton montre maintenant la cause exacte en cas d'échec.
+- Correctifs durables : route de test restaurée, préréglage Gmail en 1 clic, mots de passe d'application tolérants aux espaces, guides intégrés dans le dialog.

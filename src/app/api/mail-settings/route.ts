@@ -42,10 +42,16 @@ const numField = (value: unknown, fallback: number): number => {
   return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback;
 };
 
-/** Mot de passe : vide ou absent → conserver l'ancien. */
+/**
+ * Mot de passe : vide ou absent → conserver l'ancien.
+ * Les mots de passe d'application Gmail s'affichent au format « abcd efgh ijkl mnop » :
+ * les espaces sont retirés automatiquement (16 caractères alphanumériques exactement).
+ */
 const passField = (value: unknown, fallback: string): string => {
   const s = typeof value === "string" ? value.trim() : "";
-  return s ? s : fallback;
+  if (!s) return fallback;
+  const compact = s.replace(/\s+/g, "");
+  return /^[a-zA-Z0-9]{16}$/.test(compact) ? compact : s;
 };
 
 // ─── GET : configuration de la boîte (sans mots de passe) ───────────────────
