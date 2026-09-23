@@ -76,15 +76,15 @@
   --chart-3: oklch(0.6 0.19 25);
   --chart-4: oklch(0.44 0.06 258);
   --chart-5: oklch(0.64 0.1 265);
-  /* Sidebar navy bleuté façon panneau admin */
-  --sidebar: oklch(0.32 0.035 258);
-  --sidebar-foreground: oklch(0.93 0.01 240);
-  --sidebar-primary: oklch(0.63 0.105 213);
-  --sidebar-primary-foreground: oklch(0.99 0.005 210);
-  --sidebar-accent: oklch(0.38 0.04 258);
-  --sidebar-accent-foreground: oklch(0.97 0.01 240);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.7 0.115 210);
+  /* Sidebar bleu marque #1F3FBF, écriture blanche (demande utilisateur) */
+  --sidebar: #1f3fbf;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #3a5ce8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 14%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 20%);
+  --sidebar-ring: #8fa6f5;
 }
 
 /* ─── Thème sombre : nuit bleutée, cyan lumineux ────────────────────────── */
@@ -115,14 +115,15 @@
   --chart-3: oklch(0.68 0.18 25);
   --chart-4: oklch(0.62 0.055 258);
   --chart-5: oklch(0.7 0.1 265);
-  --sidebar: oklch(0.185 0.03 260);
-  --sidebar-foreground: oklch(0.93 0.012 240);
-  --sidebar-primary: oklch(0.72 0.115 210);
-  --sidebar-primary-foreground: oklch(0.99 0.005 210);
-  --sidebar-accent: oklch(0.26 0.04 260);
-  --sidebar-accent-foreground: oklch(0.96 0.01 240);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.72 0.115 210);
+  /* Sidebar bleu marque (version nuit légèrement plus profonde), écriture blanche */
+  --sidebar: #1b36ac;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #3a5ce8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 12%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 16%);
+  --sidebar-ring: #7e96f0;
 }
 
 @layer base {
@@ -224,9 +225,9 @@
   box-shadow: 0 1px 4px oklch(0.3 0.06 250 / 50%), inset 0 0.5px 0 oklch(1 0 0 / 60%);
 }
 
-/* Onglet actif de la navigation : liseré cyan latéral */
+/* Onglet actif de la navigation : liseré blanc latéral sur pilule bleu vif */
 .nav-luxe-active {
-  box-shadow: inset 3px 0 0 0 oklch(0.8 0.1 210);
+  box-shadow: inset 3px 0 0 0 #ffffff;
 }
 
 /* Ombre douce bleutée */

@@ -829,3 +829,19 @@ Stage Summary:
 - Emails HTML (newsletters, devis fournisseurs…) affichés en rendu premium : images externes, tableaux, listes, titres — scripts neutralisés doublement (serveur + client).
 - L'email consulté est clairement identifiable : fond bleu + barre latérale + textes bleus.
 - Commit + push topmuch/2mailsnew uniquement ; redeploy Coolify nécessaire pour production.
+
+---
+Task ID: 29
+Agent: Z.ai Code (principal)
+Task: Sidebar trop sombre selon l'utilisateur → appliquer le bleu vif de la pièce jointe (#1F3FBF) avec écriture blanche.
+
+Work Log:
+- globals.css : tokens sidebar refondus en hex exact — clair : --sidebar #1f3fbf (échantillon demandé), sombre : #1b36ac (variante nuit du même bleu) ; --sidebar-foreground #ffffff (blanc pur) ; pilule active --sidebar-primary #3a5ce8 + texte blanc ; hover --sidebar-accent blanc 14%/12% ; bordures blanches translucides (20%/16%) ; ring #8fa6f5/#7e96f0. (Une 1re passe en oklch converti à la main donnait une teinte légèrement décalée → remplacée par le hex exact, vérifié au computed style rgb(31,63,191).)
+- nav-luxe-active : liseré latéral cyan → blanc pur.
+- app-shell.tsx : titres de section /45 → /60, items inactifs /85 → /90 (lisibilité sur bleu saturé) ; menu utilisateur (haut de page) qui reposait sur bg-sidebar-accent/60 devenu invisible → pilule bleu marque solide bg-sidebar + hover bg-sidebar-primary ; avatar dégradé cyan/slate → blanc 25% + ring blanc 30% ; libellé rôle cyan-300 → blanc/80.
+- Zéros changement fonctionnel : NAV, routes, vues et données intacts (règle « n'adapte que le style »).
+- Vérifié au navigateur : computed style aside = rgb(31,63,191)/blanc ; mode sombre = rgb(27,54,172) ; pilule active = rgb(58,92,232)/blanc + liseré ; header mobile, sheet hamburger, footer collant tous bleu marque + écriture blanche ; navigation Dashboard→Factures→Boîte mail OK ; 0 erreur console ; lint 0 erreur.
+
+Stage Summary:
+- Sidebar (desktop, sheet mobile, header mobile, footer, menu compte) unifiée sur le bleu #1F3FBF avec écriture blanche, mode sombre en #1B36AC — fidèle à la pièce jointe.
+- Aucune régression fonctionnelle ; commit + push topmuch/2mailsnew uniquement (jamais Lamp Fall).

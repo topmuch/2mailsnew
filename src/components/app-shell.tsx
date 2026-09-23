@@ -169,7 +169,7 @@ function NavItems({
     <nav className={cn("space-y-4", className)} aria-label="Navigation principale">
       {sections.map((section) => (
         <div key={section.title}>
-          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/45">
+          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/60">
             {section.title}
           </p>
           <div className="space-y-1">
@@ -186,7 +186,7 @@ function NavItems({
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all text-left",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-bold nav-luxe-active"
-                      : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
@@ -307,18 +307,18 @@ function UserMenu({ user, onLogout }: { user: AuthUser; onLogout: () => void }) 
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2.5 rounded-full border border-sidebar-border bg-sidebar-accent/60 py-1 pl-1 pr-2.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+            className="flex items-center gap-2.5 rounded-full border border-sidebar-border bg-sidebar py-1 pl-1 pr-2.5 text-sidebar-foreground shadow-sm transition-colors hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
             aria-label="Menu du compte"
           >
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-600 to-slate-700 text-xs font-bold text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold text-white ring-1 ring-white/30"
               aria-hidden
             >
               {initials}
             </span>
             <span className="hidden sm:block text-left leading-tight">
               <span className="block max-w-32 truncate text-xs font-semibold">{user.name}</span>
-              <span className="block text-[10px] text-cyan-300">
+              <span className="block text-[10px] text-white/80">
                 {user.role === "ADMIN" ? "Administrateur" : "Employé"}
               </span>
             </span>
