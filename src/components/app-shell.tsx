@@ -19,6 +19,8 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import {
   ArrowLeftRight,
   BarChart3,
+  Bot,
+  CalendarClock,
   CalendarDays,
   ChevronDown,
   ClipboardList,
@@ -29,6 +31,7 @@ import {
   History,
   KeyRound,
   LayoutDashboard,
+  ListChecks,
   Loader2,
   LogOut,
   Luggage,
@@ -64,6 +67,9 @@ import QrTagsView from "@/components/qr-view";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
+import CrmAutomationsView from "@/components/crm/crm-automations-view";
+import CrmTasksView from "@/components/crm/crm-tasks-view";
+import CrmCoachView from "@/components/crm/crm-coach-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useSettingsStore } from "@/lib/settings-store";
 import { authFetch, clearSession, getCachedUser, verifySession } from "@/lib/auth-client";
@@ -84,6 +90,9 @@ type ViewId =
   | "crm-qrbags"
   | "crm-qrtags"
   | "crm-clients"
+  | "crm-automations"
+  | "crm-tasks"
+  | "crm-coach"
   | "achats"
   | "fournisseurs"
   | "produits"
@@ -109,6 +118,9 @@ const NAV: {
   { id: "crm-qrbags", label: "Suivi QR Bags (qrbags.com)", short: "QR Bags", icon: Luggage, section: "CRM Unifié" },
   { id: "crm-qrtags", label: "Suivi QR Tags (qrtags.pro)", short: "QR Tags", icon: ScanLine, section: "CRM Unifié" },
   { id: "crm-clients", label: "Clients CRM", short: "Clients CRM", icon: Contact, section: "CRM Unifié" },
+  { id: "crm-tasks", label: "Tâches CRM", short: "Tâches", icon: ListChecks, section: "CRM Unifié" },
+  { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
+  { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
   { id: "qrtags", label: "QR & Étiquettes", short: "QR Tags", icon: QrCode, section: "Communication" },
   // ─── Ventes ───
@@ -494,6 +506,9 @@ export function AppShell() {
               {view === "crm-qrbags" && <CrmItemsView platform="QRBAGS" />}
               {view === "crm-qrtags" && <CrmItemsView platform="QRTAGS" />}
               {view === "crm-clients" && <CrmClientsView />}
+              {view === "crm-tasks" && <CrmTasksView isAdmin={isAdmin} />}
+              {view === "crm-automations" && <CrmAutomationsView isAdmin={isAdmin} />}
+              {view === "crm-coach" && <CrmCoachView isAdmin={isAdmin} />}
               {view === "mails" && <MailView />}
               {view === "qrtags" && <QrTagsView />}
               {view === "produits" && <ProductsView />}

@@ -501,3 +501,63 @@ export interface CrmSyncResult {
   results: Array<{ platform: string; total: number; created: number; updated: number }>;
   errors: Array<{ platform: string; error: string }>;
 }
+
+// ─── CRM Automatisations (rapports, coach, rappels, tâches) ─────────────────
+
+export interface CrmTask {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: "TODO" | "IN_PROGRESS" | "DONE";
+  priority: "LOW" | "MEDIUM" | "HIGH";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmCoachMessage {
+  id: string;
+  timeSlot: "11h" | "14h" | "17h";
+  category: "BUSINESS" | "MINDSET" | "CLOSING";
+  content: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CrmSentMessage {
+  id: string;
+  type: "REPORT_MORNING" | "REPORT_EVENING" | "COACH" | "REMINDER" | "TEST";
+  subject: string;
+  content: string;
+  channel: string;
+  status: "SENT" | "FAILED" | "SKIPPED";
+  error: string | null;
+  sentAt: string;
+}
+
+export interface CrmAutomationConfig {
+  ownerName: string;
+  recipientEmail: string;
+  reportMorningEnabled: boolean;
+  reportMorningTime: string;
+  reportEveningEnabled: boolean;
+  reportEveningTime: string;
+  coachEnabled: boolean;
+  coach11Enabled: boolean;
+  coach14Enabled: boolean;
+  coach17Enabled: boolean;
+  remindersEnabled: boolean;
+  dailyGoal: string;
+}
+
+export interface CrmAutomationStatus {
+  schedulerRunning: boolean;
+  businessHoursNow: boolean;
+  now: string;
+  smtpConfigured: boolean;
+  recipientConfigured: boolean;
+  sentToday: number;
+  failedToday: number;
+  lastSentAt: string | null;
+  seededCoachMessages: number;
+}

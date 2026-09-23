@@ -353,6 +353,68 @@ model CrmClient {
   items CrmItem[]
 }
 
+// ─── CRM Automatisations (rapports quotidiens, coach virtuel, rappels RDV) ──
+// Planifiés par le scheduler interne (node-cron, démarré via instrumentation).
+// Arrêt automatique le samedi à partir de 13h + dimanche (isBusinessHours).
+
+model CrmTask {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("TODO") // TODO | IN_PROGRESS | DONE
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
+}
+
+model CrmCoachMessage {
+  id        String   @id @default(cuid())
+  timeSlot  String // "11h" | "14h" | "17h"
+  category  String @default("BUSINESS") // BUSINESS | MINDSET | CLOSING
+  content   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([timeSlot])
+}
+
+model CrmSentMessage {
+  id        String   @id @default(cuid())
+  type      String // REPORT_MORNING | REPORT_EVENING | COACH | REMINDER | TEST
+  subject   String   @default("")
+  content   String   @default("") // extrait ou contenu complet envoyé
+  channel   String   @default("EMAIL") // EMAIL | WHATSAPP
+  dedupeKey String? // clé d'idempotence (1 envoi max par créneau/jour/événement)
+  status    String   @default("SENT") // SENT | FAILED | SKIPPED
+  error     String?
+  sentAt    DateTime @default(now())
+
+  @@unique([type, dedupeKey])
+  @@index([sentAt])
+  @@index([type])
+}
+
+model CrmAutomationConfig {
+  id                   String   @id @default("main")
+  ownerName            String   @default("Monsieur Diop") // personnalisation coach
+  recipientEmail       String   @default("") // vide → e-mail de la société (Setting)
+  reportMorningEnabled Boolean  @default(true)
+  reportMorningTime    String   @default("08:30") // HH:mm
+  reportEveningEnabled Boolean  @default(true)
+  reportEveningTime    String   @default("19:00") // HH:mm
+  coachEnabled         Boolean  @default(true)
+  coach11Enabled       Boolean  @default(true)
+  coach14Enabled       Boolean  @default(true)
+  coach17Enabled       Boolean  @default(true)
+  remindersEnabled     Boolean  @default(true)
+  dailyGoal            String   @default("") // objectif du jour (vide → objectif aléatoire)
+  updatedAt            DateTime @updatedAt
+}
+
 // ─── QR Tags (historique QRtag.net + QRBags) ────────────────────────────────
 
 model QrLookup {
