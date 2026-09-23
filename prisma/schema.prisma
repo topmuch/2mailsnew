@@ -261,6 +261,7 @@ model Mail {
   to        String
   subject   String   @default("")
   body      String   @default("")
+  bodyHtml  String   @default("") // HTML assaini du message (rendu premium avec images)
   messageId String? // identifiant serveur (dédoublonnage IMAP)
   read      Boolean  @default(false)
   starred   Boolean  @default(false)

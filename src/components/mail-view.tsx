@@ -179,7 +179,8 @@ function MailListItem({
       }}
       className={cn(
         "group relative flex w-full cursor-pointer items-start gap-3 border-b border-border/50 px-3 py-3 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/60 focus-visible:bg-muted/60 sm:px-4",
-        active && "bg-primary/[0.06] shadow-[inset_2px_0_0_0] shadow-primary",
+        // Email en lecture : surlignage bleu marqué (fond + barre latérale + textes colorés)
+        active && "bg-primary/[0.14] shadow-[inset_3px_0_0_0] shadow-primary",
         !mail.read && !active && "bg-sky-500/[0.04] hover:bg-sky-500/[0.07] dark:bg-sky-400/[0.05]"
       )}
     >
@@ -196,14 +197,14 @@ function MailListItem({
           {!mail.read && (
             <span className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-sm" aria-hidden="true" />
           )}
-          <span className={cn("truncate text-sm", mail.read ? "font-medium" : "font-bold")}>
+          <span className={cn("truncate text-sm", mail.read ? "font-medium" : "font-bold", active && "text-primary")}>
             {party || "(inconnu)"}
           </span>
           <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
             {relativeTimeFr(mail.sentAt)}
           </span>
         </div>
-        <p className={cn("truncate text-sm", mail.read ? "text-foreground/85" : "font-semibold text-foreground")}>
+        <p className={cn("truncate text-sm", mail.read ? "text-foreground/85" : "font-semibold text-foreground", active && "text-primary")}>
           {mail.subject || "(sans objet)"}
         </p>
         <div className="flex items-center gap-1.5">
@@ -246,6 +247,16 @@ function MailListItem({
 
 // ─── Panneau de lecture (desktop + overlay mobile) ──────────────────────────
 
+/** Second filet de sécurité côté client avant injection du HTML de l'email. */
+function clientSanitizeHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, " ")
+    .replace(/<(iframe|object|embed|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<img[^>]*\ssrc\s*=\s*["']?cid:[^"'\s>]*["']?[^>]*>/gi, " ")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "");
+}
+
 function ReadPane({
   mail,
   onReply,
@@ -257,6 +268,31 @@ function ReadPane({
   onDelete: (mail: Mail) => void;
   onRestore: (mail: Mail) => void;
 }) {
+  // Détail complet (avec bodyHtml) chargé à l'ouverture — la liste l'omet pour rester légère
+  const [detail, setDetail] = useState<Mail | null>(null);
+  const [detailFailed, setDetailFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    // NB : le parent remonte ce composant avec key={mail.id} — état initial déjà propre
+    authFetch(`/api/mails/${mail.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled) return;
+        if (json?.mail) setDetail(json.mail as Mail);
+        else setDetailFailed(true);
+      })
+      .catch(() => {
+        if (!cancelled) setDetailFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mail.id]);
+
+  const html = detail?.bodyHtml?.trim() || "";
+  const plain = detail?.body ?? mail.body;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -295,7 +331,17 @@ function ReadPane({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{mail.body || "(message vide)"}</p>
+        {html ? (
+          // HTML de l'email (assaini côté serveur ET client) : images, tableaux, liens conservés
+          <div
+            className="text-sm leading-relaxed [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_li]:ml-4 [&_ol]:list-decimal [&_ol]:pl-2 [&_p]:my-2 [&_strong]:font-semibold [&_table]:border-collapse [&_table]:max-w-full [&_td]:border [&_td]:border-border/50 [&_td]:p-1.5 [&_td]:align-top [&_th]:border [&_th]:border-border/50 [&_th]:p-1.5 [&_th]:text-left [&_th]:font-semibold [&_ul]:list-disc [&_ul]:pl-2"
+            dangerouslySetInnerHTML={{ __html: clientSanitizeHtml(html) }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {plain || (detailFailed ? "(contenu indisponible)" : "(message vide)")}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t bg-muted/30 p-3">
         <Button size="sm" onClick={() => onReply(mail)} className="gap-1.5">

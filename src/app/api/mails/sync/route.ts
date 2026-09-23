@@ -3,13 +3,15 @@ import imapflowModule from "imapflow";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { describeMailError } from "@/lib/mail-diagnostics";
+import { extractMailContent } from "@/lib/mail-mime";
 
 // imapflow v2 expose la classe via l'export par défaut :
 // `import imapflowModule from "imapflow"` → { ImapFlow, AuthenticationFailure }
 const { ImapFlow } = imapflowModule;
 
 const MAX_MESSAGES = 50;
-const MAX_BODY_LENGTH = 100_000;
+/** Maximum d'anciens mails vides re-complétés par synchronisation (hors quota du jour). */
+const MAX_BACKFILL = 20;
 
 /**
  * Limite quotidienne d'importation (anti-saturation de la boîte) :
@@ -21,98 +23,6 @@ async function importedTodayCount(): Promise<number> {
   return db.mail.count({
     where: { direction: "IN", createdAt: { gte: startOfDay } },
   });
-}
-
-// ─── Extraction du texte d'un message brut (MIME) ───────────────────────────
-
-function decodeQuotedPrintable(input: string): string {
-  const cleaned = input.replace(/=\r?\n/g, "");
-  const bytes: number[] = [];
-  for (let i = 0; i < cleaned.length; i += 1) {
-    const hex = cleaned.slice(i + 1, i + 3);
-    if (cleaned[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(hex)) {
-      bytes.push(parseInt(hex, 16));
-      i += 2;
-    } else {
-      bytes.push(cleaned.charCodeAt(i) & 0xff);
-    }
-  }
-  return new TextDecoder("utf-8").decode(new Uint8Array(bytes));
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function decodePart(body: string, encoding: string, isHtml: boolean): string {
-  let text = body;
-  if (encoding === "base64") {
-    text = Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf-8");
-  } else if (encoding === "quoted-printable") {
-    text = decodeQuotedPrintable(body);
-  }
-  return isHtml ? stripHtml(text) : text.trim();
-}
-
-/**
- * Extrait un texte lisible du message source brut :
- * gère les cas courants (multipart 1..n, base64, quoted-printable, HTML).
- */
-function extractTextFromSource(source: Buffer | undefined): string {
-  if (!source || source.length === 0) return "";
-
-  const raw = source.toString("utf-8");
-  const sep = raw.indexOf("\r\n\r\n");
-  const headerBlock = (sep >= 0 ? raw.slice(0, sep) : "").toLowerCase();
-  const body = sep >= 0 ? raw.slice(sep + 4) : raw;
-
-  const typeHeader = /content-type:\s*([^\r\n]+(?:\r?\n\s+[^\r\n]+)*)/.exec(headerBlock)?.[1] ?? "";
-  const encoding = /content-transfer-encoding:\s*([^\r\n]+)/.exec(headerBlock)?.[1]?.trim() ?? "";
-
-  if (typeHeader.includes("multipart/")) {
-    const boundary = /boundary="?([^"\r\n;]+)"?/.exec(typeHeader)?.[1];
-    if (boundary) {
-      let plain = "";
-      let html = "";
-      for (const chunk of body.split(`--${boundary}`)) {
-        const trimmed = chunk.trim();
-        if (!trimmed || trimmed === "--") continue;
-        const nestedType =
-          (/content-type:\s*([^\r\n]+)/.exec(trimmed.toLowerCase())?.[1] ?? "").trim();
-        const nested = extractTextFromSource(Buffer.from(trimmed));
-        if (!nested) continue;
-        if (nestedType.includes("text/html")) {
-          if (!html) html = nested;
-        } else if (!plain) {
-          plain = nested;
-        }
-      }
-      return (plain || html).slice(0, MAX_BODY_LENGTH);
-    }
-  }
-
-  if (typeHeader.includes("text/html")) {
-    return decodePart(body, encoding, true).slice(0, MAX_BODY_LENGTH);
-  }
-  if (typeHeader && !typeHeader.includes("text/")) {
-    // Pièce jointe ou contenu binaire : pas de texte exploitable
-    return "";
-  }
-  return decodePart(body, encoding, false).slice(0, MAX_BODY_LENGTH);
 }
 
 // ─── POST : synchronisation IMAP de la boîte de réception ───────────────────
@@ -143,6 +53,7 @@ export async function POST(request: NextRequest) {
     if (remaining === 0) {
       return NextResponse.json({
         imported: 0,
+        backfilled: 0,
         total: null,
         limit: dailyLimit,
         importedToday: alreadyToday,
@@ -201,7 +112,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Un seul findMany pour le dédoublonnage (évite N requêtes)
+        // Un seul findMany : dédoublonnage + détection des corps vides à re-compléter
         const ids = [
           ...new Set(
             messages
@@ -212,28 +123,57 @@ export async function POST(request: NextRequest) {
         const existingRows = ids.length
           ? await db.mail.findMany({
               where: { messageId: { in: ids } },
-              select: { messageId: true },
+              select: { messageId: true, body: true },
             })
           : [];
+        // messageId des mails déjà importés mais au corps vide (ancien extracteur)
+        const emptyBodyIds = new Set(
+          existingRows.filter((row) => !row.body.trim()).map((row) => row.messageId)
+        );
         const existing = new Set(existingRows.map((row) => row.messageId));
         const seenInBatch = new Set<string>();
+        let backfilled = 0;
 
         for (const msg of messages) {
-          if (imported >= maxImport) break; // quota quotidien respecté
-          if (!msg.uid) continue;
-          if (!msg.messageId || existing.has(msg.messageId) || seenInBatch.has(msg.messageId)) {
+          if (!msg.uid || !msg.messageId) continue;
+
+          if (existing.has(msg.messageId) || seenInBatch.has(msg.messageId)) {
+            // Déjà importé : si le corps était vide, on le re-complète avec le
+            // nouvel extracteur (texte + HTML/images) — hors quota du jour.
+            if (
+              emptyBodyIds.has(msg.messageId) &&
+              !seenInBatch.has(msg.messageId) &&
+              backfilled < MAX_BACKFILL
+            ) {
+              seenInBatch.add(msg.messageId);
+              const full = await client.fetchOne(
+                String(msg.uid),
+                { source: true, uid: true },
+                { uid: true }
+              );
+              const content = extractMailContent(full?.source);
+              if (content.text || content.html) {
+                await db.mail.updateMany({
+                  where: { messageId: msg.messageId, folder: "INBOX" },
+                  data: { body: content.text, bodyHtml: content.html },
+                });
+                backfilled += 1;
+              }
+            }
             continue;
           }
+
+          // Quota du jour pour les NOUVEAUX messages uniquement
+          if (imported >= maxImport) break;
           seenInBatch.add(msg.messageId);
 
-          // Corps : source brute décodée en texte simple
+          // Corps : texte lisible + HTML assaini (images externes conservées)
           const full = await client.fetchOne(
             String(msg.uid),
             { source: true, uid: true },
             { uid: true }
           );
-          const body =
-            full && typeof full === "object" ? extractTextFromSource(full.source) : "";
+          const content = extractMailContent(full?.source);
 
           await db.mail.create({
             data: {
@@ -243,7 +183,8 @@ export async function POST(request: NextRequest) {
               fromName: msg.fromName,
               to: setting.imapUser,
               subject: msg.subject,
-              body,
+              body: content.text,
+              bodyHtml: content.html,
               messageId: msg.messageId,
               read: false,
               sentAt: msg.date,
@@ -251,6 +192,23 @@ export async function POST(request: NextRequest) {
           });
           imported += 1;
         }
+
+        await client.logout();
+
+        await db.setting.update({
+          where: { id: setting.id },
+          data: { lastMailSync: new Date() },
+        });
+
+        const importedToday = alreadyToday + imported;
+        return NextResponse.json({
+          imported,
+          backfilled,
+          total,
+          limit: dailyLimit,
+          importedToday,
+          limitReached: importedToday >= dailyLimit,
+        });
       }
 
       await client.logout();
@@ -260,13 +218,13 @@ export async function POST(request: NextRequest) {
         data: { lastMailSync: new Date() },
       });
 
-      const importedToday = alreadyToday + imported;
       return NextResponse.json({
         imported,
+        backfilled: 0,
         total,
         limit: dailyLimit,
-        importedToday,
-        limitReached: importedToday >= dailyLimit,
+        importedToday: alreadyToday,
+        limitReached: alreadyToday >= dailyLimit,
       });
     } catch (error) {
       // Ferme proprement la connexion en cas d'échec IMAP

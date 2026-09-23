@@ -807,3 +807,25 @@ Stage Summary:
 - Boîte anti-saturation : max 15 mails reçus importés/jour (réglable 1..500 dans Configuration), quota remis à zéro chaque matin, messages clairs à l'utilisateur.
 - Suppression : par ligne (poubelle au survol/toujours visible mobile), en masse par dossier avec confirmation, corbeille vidable définitivement — flux corbeille/restaurer inchangés.
 - Commit + push topmuch/2mailsnew uniquement.
+
+---
+Task ID: 28
+Agent: Z.ai Code (principal)
+Task: 3 problèmes mail — 1) certains emails affichent « (message vide) » ; 2) images des emails non affichées ; 3) email en cours de lecture impossible à distinguer dans la liste.
+
+Work Log:
+- Nouveau src/lib/mail-mime.ts : parseur MIME robuste — normalisation LF/CRLF, en-têtes pliés, multipart imbriqué (alternative/mixed/related, profondeur 8), base64 et quoted-printable décodés en OCTETS puis charset via TextDecoder (iso-8859-1/windows-1252/gbk… fallback utf-8), message/rfc822 traité, pièces jointes ignorées ; sanitizeHtml (scripts/styles/iframes/formulaires/handlers on*/javascript:/images cid: supprimés, images http(s) conservées) ; stripHtml enrichi (entités nommées + numériques) ; extractMailContent → {text, html} ; testé sur 4 MIME synthétiques (base64 iso-8859-1, QP utf-8 avec accents/€, 8bit headers pliés, nested mixed>alternative) : tous OK.
+- Schema : Mail.bodyHtml String @default("") — db:push OK + redémarrage serveur.
+- Sync réécrite : nouveau mail → create avec body (texte) + bodyHtml (HTML assaini) ; DÉDUPLICATION + BACKFILL : les mails déjà importés au corps vide (ancien extracteur) sont re-complétés depuis la source IMAP (updateMany body+bodyHtml, max 20/sync, hors quota quotidien) → les anciens « (message vide) » se réparent à la prochaine Synchroniser ; réponse enrichie {backfilled}.
+- GET /api/mails (liste) : omit bodyHtml (payload léger) ; le détail GET /api/mails/[id] fournit bodyHtml.
+- types.ts : Mail.bodyHtml?: string.
+- mail-view.tsx ReadPane : charge le détail (authFetch /api/mails/[id]) à l'ouverture ; si bodyHtml → rendu HTML via dangerouslySetInnerHTML + clientSanitizeHtml (2e filet) + classes tailwind arbitraires ([&_img]:max-w-full rounded, tableaux bordés, liens primary, listes, blockquotes) sinon texte brut ; fallback « (contenu indisponible) » si détail KO ; fix lint setState-synchrone-dans-effet (le parent remonte avec key).
+- MailListItem : email actif = surlignage bleu MARQUÉ — fond bg-primary/[0.14] + barre latérale 3px shadow-primary + expéditeur et objet en text-primary (au lieu de 0.06 presque invisible).
+- Tests : MIME synthétiques OK ; navigateur — mail HTML de test (titre coloré, liste, tableau, image externe Google valide) rendu intégralement, image chargée, surlignage bleu net du mail en lecture ; lint 0 erreur ; mail de test supprimé ensuite.
+- Limite : images cid: (embarquées en pièce jointe) volontairement retirées — non résolubles sans stocker les pièces jointes ; les images externes (cas écrasant majorité) s'affichent.
+
+Stage Summary:
+- Les « (message vide) » se corrigent automatiquement : prochaine Synchroniser → jusqu'à 20 anciens mails re-complétés par sync (texte + HTML), sans consommer le quota de 15 nouveaux/jour.
+- Emails HTML (newsletters, devis fournisseurs…) affichés en rendu premium : images externes, tableaux, listes, titres — scripts neutralisés doublement (serveur + client).
+- L'email consulté est clairement identifiable : fond bleu + barre latérale + textes bleus.
+- Commit + push topmuch/2mailsnew uniquement ; redeploy Coolify nécessaire pour production.

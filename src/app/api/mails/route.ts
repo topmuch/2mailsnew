@@ -35,9 +35,10 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Les compteurs portent sur TOUS les dossiers, pas sur le dossier filtré
+    // Les compteurs portent sur TOUS les dossiers, pas sur le dossier filtré.
+    // La liste omet bodyHtml (lourd) : le panneau de lecture charge le détail à l'ouverture.
     const [mails, inbox, unread, sent, trash] = await Promise.all([
-      db.mail.findMany({ where, orderBy: { sentAt: "desc" }, take: 200 }),
+      db.mail.findMany({ where, orderBy: { sentAt: "desc" }, take: 200, omit: { bodyHtml: true } }),
       db.mail.count({ where: { folder: "INBOX" } }),
       db.mail.count({ where: { folder: "INBOX", read: false } }),
       db.mail.count({ where: { folder: "SENT" } }),

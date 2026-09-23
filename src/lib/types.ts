@@ -319,6 +319,8 @@ export interface Mail {
   to: string;
   subject: string;
   body: string;
+  /** HTML assaini du message (présent uniquement sur le détail GET /api/mails/[id]). */
+  bodyHtml?: string;
   messageId: string | null;
   read: boolean;
   starred: boolean;
