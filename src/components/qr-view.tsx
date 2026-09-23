@@ -36,7 +36,7 @@ import type { QrBagsResult, QrLookup, QrTagResult } from "@/lib/types";
 type QrTagResultWithDataUrl = QrTagResult & { dataUrl: string | null };
 
 const REF_REGEX = /^(HAJJ|VOL)\d{2}-[A-Z0-9]{6}$/;
-const DEFAULT_URL = "https://etslampfall.sn";
+const DEFAULT_URL = "https://2mails.sn";
 
 /** Date relative en français ("il y a 3 min", "il y a 2 h", "il y a 4 j", date sinon). */
 function formatRelativeFr(iso: string): string {

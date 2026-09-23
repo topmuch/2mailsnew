@@ -27,6 +27,7 @@ import {
   Contact,
   FileSignature,
   FileText,
+  FolderKanban,
   Globe2,
   History,
   KeyRound,
@@ -38,12 +39,12 @@ import {
   Mail,
   Menu,
   Package,
-  QrCode,
   ScanLine,
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
   Truck,
+  UserPlus,
   Users2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,13 +64,14 @@ import { SettingsView } from "@/components/settings-view";
 import { LoginView } from "@/components/login-view";
 import MailView from "@/components/mail-view";
 import CalendarView from "@/components/calendar-view";
-import QrTagsView from "@/components/qr-view";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
 import CrmAutomationsView from "@/components/crm/crm-automations-view";
 import CrmTasksView from "@/components/crm/crm-tasks-view";
 import CrmCoachView from "@/components/crm/crm-coach-view";
+import CrmLeadsView from "@/components/crm/crm-leads-view";
+import CrmProjectsView from "@/components/crm/crm-projects-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useSettingsStore } from "@/lib/settings-store";
 import { authFetch, clearSession, getCachedUser, verifySession } from "@/lib/auth-client";
@@ -85,13 +87,14 @@ type ViewId =
   | "rapports"
   | "calendrier"
   | "mails"
-  | "qrtags"
   | "crm"
   | "crm-qrbags"
   | "crm-qrtags"
   | "crm-clients"
-  | "crm-automations"
+  | "crm-leads"
   | "crm-tasks"
+  | "crm-projects"
+  | "crm-automations"
   | "crm-coach"
   | "achats"
   | "fournisseurs"
@@ -113,16 +116,17 @@ const NAV: {
   { id: "dashboard", label: "Tableau de bord", short: "Dashboard", icon: LayoutDashboard, section: "Pilotage" },
   { id: "rapports", label: "Rapports de vente", short: "Rapports", icon: BarChart3, section: "Pilotage" },
   { id: "calendrier", label: "Calendrier", short: "Calendrier", icon: CalendarDays, section: "Pilotage" },
-  // ─── CRM Unifié (qrtags.pro + qrbags.com) ───
+  // ─── CRM Unifié (qrtags.pro + qrbags.com + pipeline commercial) ───
   { id: "crm", label: "CRM — Vue d'ensemble", short: "CRM Unifié", icon: Globe2, section: "CRM Unifié" },
-  { id: "crm-qrbags", label: "Suivi QR Bags (qrbags.com)", short: "QR Bags", icon: Luggage, section: "CRM Unifié" },
-  { id: "crm-qrtags", label: "Suivi QR Tags (qrtags.pro)", short: "QR Tags", icon: ScanLine, section: "CRM Unifié" },
+  { id: "crm-leads", label: "Leads (pipeline commercial)", short: "Leads", icon: UserPlus, section: "CRM Unifié" },
   { id: "crm-clients", label: "Clients CRM", short: "Clients CRM", icon: Contact, section: "CRM Unifié" },
   { id: "crm-tasks", label: "Tâches CRM", short: "Tâches", icon: ListChecks, section: "CRM Unifié" },
+  { id: "crm-projects", label: "Projets (dossiers clients)", short: "Projets", icon: FolderKanban, section: "CRM Unifié" },
+  { id: "crm-qrbags", label: "Suivi QR Bags (qrbags.com)", short: "QR Bags", icon: Luggage, section: "CRM Unifié" },
+  { id: "crm-qrtags", label: "Suivi QR Tags (qrtags.pro)", short: "QR Tags", icon: ScanLine, section: "CRM Unifié" },
   { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
   { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
-  { id: "qrtags", label: "QR & Étiquettes", short: "QR Tags", icon: QrCode, section: "Communication" },
   // ─── Ventes ───
   { id: "factures", label: "Factures", short: "Factures", icon: FileText, section: "Ventes" },
   { id: "proforma", label: "Factures proforma", short: "Proforma", icon: FileSignature, section: "Ventes" },
@@ -202,12 +206,12 @@ function CompanyLogo({ size = 40 }: { size?: number }) {
   const settings = useSettingsStore((s) => s.settings);
   if (settings?.logo) {
      
-    return <img src={settings.logo} alt="Logo de la société" className="object-contain rounded-lg bg-white p-1" style={{ height: size * 0.9, width: size }} />;
+    return <img src={settings.logo} alt="Logo 2mails" className="object-contain rounded-lg bg-white p-1" style={{ height: size * 0.9, width: size }} />;
   }
   return (
     <Image
-      src="/logo-green.png"
-      alt="Logo Lampe Fall"
+      src="/logo-2mails.png"
+      alt="Logo 2mails"
       width={size}
       height={Math.round(size * 0.854)}
       className="object-contain rounded-lg bg-white p-1"
@@ -405,7 +409,7 @@ export function AppShell() {
   }
 
   const isAdmin = user.role === "ADMIN";
-  const companyName = settings?.nomSociete ?? "LAMPE FALL";
+  const companyName = settings?.nomSociete ?? "2MAILS";
   const companyTagline = settings?.tagline ?? "";
 
   return (
@@ -509,8 +513,9 @@ export function AppShell() {
               {view === "crm-tasks" && <CrmTasksView isAdmin={isAdmin} />}
               {view === "crm-automations" && <CrmAutomationsView isAdmin={isAdmin} />}
               {view === "crm-coach" && <CrmCoachView isAdmin={isAdmin} />}
+              {view === "crm-leads" && <CrmLeadsView isAdmin={isAdmin} />}
+              {view === "crm-projects" && <CrmProjectsView isAdmin={isAdmin} />}
               {view === "mails" && <MailView />}
-              {view === "qrtags" && <QrTagsView />}
               {view === "produits" && <ProductsView />}
               {view === "mouvements" && <StockMovementsView />}
               {view === "utilisateurs" && (isAdmin ? <UsersView currentUser={user} /> : <RestrictedCard />)}

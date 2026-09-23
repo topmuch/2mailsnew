@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     try {
       const res = await fetch(imageUrl, {
         signal: AbortSignal.timeout(12000),
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; ETS-LAMP-FALL/1.0)" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; 2MAILS/1.0)" },
         cache: "no-store",
       });
       if (res.ok) {

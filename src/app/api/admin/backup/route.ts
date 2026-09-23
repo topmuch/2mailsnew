@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     const backup = {
       version: 1,
       exportedAt,
-      app: "ETS LAMP FALL — Sauvegarde",
+      app: "2MAILS — Sauvegarde",
       counts,
       data,
     };
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(backup, {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="sauvegarde-lampfall-${date}.json"`,
+        "Content-Disposition": `attachment; filename="sauvegarde-2mails-${date}.json"`,
       },
     });
   } catch (error) {

@@ -83,7 +83,7 @@ export function LoginView({
     }
   };
 
-  const defaultName = settings?.nomSociete ?? "ETS LAMP FALL";
+  const defaultName = settings?.nomSociete ?? "2MAILS";
 
   return (
     /* ─── Écran 16:9 plein cadre : panneau marque + formulaire ─── */
@@ -131,8 +131,8 @@ export function LoginView({
                 />
               ) : (
                 <Image
-                  src="/logo-green.png"
-                  alt="Logo Lampe Fall"
+                  src="/logo-2mails.png"
+                  alt="Logo 2mails"
                   width={128}
                   height={128}
                   className="h-28 w-28 object-contain xl:h-32 xl:w-32"
@@ -205,7 +205,7 @@ export function LoginView({
             {settings?.logo ? (
               <img src={settings.logo} alt="" className="h-11 w-11 object-contain" />
             ) : (
-              <Image src="/logo-green.png" alt="" width={44} height={44} className="h-11 w-11 object-contain" />
+              <Image src="/logo-2mails.png" alt="" width={44} height={44} className="h-11 w-11 object-contain" />
             )}
           </div>
           <div className="min-w-0">

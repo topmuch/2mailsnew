@@ -686,3 +686,25 @@ Stage Summary:
 - Le scheduler tourne dans le process Next.js via instrumentation.ts → fonctionne tel quel sur Coolify (aucun changement Dockerfile) ; les tables sont créées par prisma db push au démarrage du conteneur.
 - Pour activer les envois en production : Paramètres → Boîte mail (SMTP) + Automatisations (e-mail destinataire optionnel) puis boutons de test. En local sans SMTP, les contenus restent générés et journalisés (statut FAILED avec la raison).
 - Push 2mailsnew uniquement ; dépôt Lampfall intouché.
+
+---
+Task ID: 23
+Agent: Z.ai Code (principal)
+Task: Synchroniser GitHub avec la version locale + 5 demandes : supprimer l'onglet « QR & Étiquettes » (Communication), réorganiser la sidebar, remplacer tout « Lamp/Lampe Fall » par « 2mails », ajouter les onglets Leads / Tâches / Projets.
+
+Work Log:
+- Recherche exhaustive des mentions lampfall (grep src prisma Dockerfile) puis remplacement global par 2mails : layout.tsx (titre onglet), health, mails, mail-settings, backup (nom de fichier sauvegarde-2mails), qr/qrtag User-Agent, settings (défauts), constants, auth.ts (secret de signature → 2mails-facturation-secret-2024), pdf.ts (en-têtes, « Livré par », « Édité le »), crm-automation (gabarits e-mail), login-view, app-shell, invoice-share-dialog, settings-view, mail-view, qr-view, dashboard-view, schema.prisma (défauts nomSociete/email/mailFromName), seeds v3/v4, Dockerfile (commentaire ligne 1 uniquement).
+- Nouveau logo 2mails généré par IA (carré vert, monogramme « 2m » doré, bordure or) → redimensionné 256px via sharp → public/logo-2mails.png + data-URL enregistrée dans Setting.logo ; fallback CompanyLogo, login-view, PDF, favicon et aperçu Paramètres pointent vers logo-2mails.png (logo-green.png conservé mais non référencé).
+- Base de données : découverte d'un reset des données (users/clients/invoices/crm vides, Setting seul survivant avec l'ancien nom) lors du db:push de la session → re-seed complet (seed-v3 admin/admin123, seed-v2 catégories, seed.ts démo facturation, seed-v4 mails/calendrier) + update Setting (nomSociete/mailFromName/email → 2MAILS/contact@2mails.sn) + re-config des plateformes CRM (secret webhook + prix packs) + recréation des items de démo via webhooks. Scripts utilitaires ajoutés : scripts/check-db.mjs, check-setting.mjs, update-brand.mjs.
+- Schéma : CrmLead (name, company, email, phone, source QRTAGS/QRBAGS/RECOMMANDATION/SITE_WEB/AUTRE, status NEW/CONTACTED/QUALIFIED/PROPOSAL/WON/LOST, value FCFA, notes) et CrmProject (name, description, clientId → CrmClient SetNull, status PLANNING/IN_PROGRESS/ON_HOLD/DONE/CANCELLED, budget, startDate, endDate, progress 0-100) → db push additif.
+- API : /api/crm/leads (GET filtres + counts + pipelineValue/wonValue, POST), /api/crm/leads/[id] (PUT, DELETE admin), /api/crm/projects (GET include client + counts, POST), /api/crm/projects/[id] (PUT, DELETE admin).
+- UI : crm-leads-view.tsx — kanban pipeline 6 colonnes (scroll horizontal mobile), cartes avec valeur/source/contact, Select changement de statut, recherche, 4 chiffres clés (pipeline FCFA, gagné cumul, nouveaux, devis) ; crm-projects-view.tsx — compteurs, tableau avec client lié, budget, barre d'avancement, statut inline, dialog création/édition (dates, budget, avancement, client CRM).
+- app-shell : onglet « QR & Étiquettes » (qrtags, section Communication) supprimé (entrée NAV + ViewId + rendu + import ; composant qr-view et API restants en réserve) ; sidebar réorganisée — Pilotage (Dashboard, Rapports, Calendrier) / CRM Unifié (CRM Unifié, Leads, Clients CRM, Tâches, Projets, QR Bags, QR Tags, Automatisations, Coach Virtuel) / Communication (Boîte mail) / Ventes / Achats & stock / Administration ; icônes UserPlus et FolderKanban ajoutées.
+- Vérifications : grep aucune référence orpheline à "qrtags" ; ScanLine/SettingsIcon ré-ajoutés aux imports après une suppression accidentelle ; lint 0 erreur.
+- Tests navigateur : titre onglet « 2MAILS — Système de Facturation », login avec logo 2m + heading 2MAILS, sidebar réorganisée complète (mobile sheet OK), Leads kanban rendu (3 démo : Awa Sow 300 000 F QRBags, Ibrahima Fall 750 000 F QRTags, Cheikh Diop 450 000 F Recommandation, pipeline 1 500 000 F), Projets (Pack 500 bracelets — Hôtel Terrou-Bi, client lié, 750 000 F, 40 %), Tâches avec nouvelle tâche démo, vue Factures existante intacte, 0 erreur console.
+
+Stage Summary:
+- La marque est partout « 2MAILS/2mails » (interface, e-mails, PDF, sauvegardes, seeds, métadonnées) avec un nouveau logo vert & or ; l'ancien identifiant Lamp Fall n'existe plus dans le code.
+- La sidebar propose maintenant le flux commercial complet : Leads → Clients → Tâches → Projets, plus les suivis QR et les automatisations ; l'onglet redondant « QR & Étiquettes » a disparu.
+- Données de démo locales re-créées après reset de la DB de dev ; en production Coolify les données réelles sont conservées (db push additif uniquement) et le seed-admin recrée l'admin si besoin.
+- Push 2mailsnew uniquement (synchronisation GitHub = locale).

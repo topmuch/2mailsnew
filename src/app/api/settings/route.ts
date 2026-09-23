@@ -4,11 +4,11 @@ import { getAuthUser } from "@/lib/auth";
 
 const DEFAULTS = {
   id: "main",
-  nomSociete: "ETS LAMP FALL",
+  nomSociete: "2MAILS",
   tagline: "Plomberie - Sanitaire - Luminaire",
   adresse: "Dakar, Sénégal",
   telephone: "+221 77 000 00 00",
-  email: "contact@etslampfall.sn",
+  email: "contact@2mails.sn",
   rc: "",
   ninea: "",
 };

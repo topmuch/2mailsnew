@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           auth: { user: setting.smtpUser, pass: setting.smtpPass },
         });
         const info = await transporter.sendMail({
-          from: `"${setting.mailFromName || "ETS LAMP FALL"}" <${setting.smtpUser}>`,
+          from: `"${setting.mailFromName || "2MAILS"}" <${setting.smtpUser}>`,
           to,
           subject,
           text,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       data: {
         direction: "OUT",
         folder: "SENT",
-        from: setting?.smtpUser || "local@lampfall",
+        from: setting?.smtpUser || "local@2mails",
         fromName: setting?.mailFromName || null,
         to,
         subject,

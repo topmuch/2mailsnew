@@ -9,7 +9,7 @@ type SettingRow = NonNullable<Awaited<ReturnType<typeof db.setting.findFirst>>>;
 
 /** Convertit la ligne Setting en MailConfig SANS mots de passe. */
 function toConfig(setting: SettingRow | null): MailConfig {
-  const mailFromName = setting?.mailFromName ?? "ETS LAMP FALL";
+  const mailFromName = setting?.mailFromName ?? "2MAILS";
   const smtpHost = setting?.smtpHost ?? "";
   const smtpUser = setting?.smtpUser ?? "";
   const smtpPass = setting?.smtpPass ?? "";
@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest) {
     const current = await db.setting.findFirst();
 
     const data = {
-      mailFromName: strField(body.mailFromName, current?.mailFromName ?? "ETS LAMP FALL"),
+      mailFromName: strField(body.mailFromName, current?.mailFromName ?? "2MAILS"),
       smtpHost: strField(body.smtpHost, current?.smtpHost ?? ""),
       smtpPort: numField(body.smtpPort, current?.smtpPort ?? 587),
       smtpUser: strField(body.smtpUser, current?.smtpUser ?? ""),

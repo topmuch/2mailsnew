@@ -11,13 +11,13 @@ export async function GET() {
     return NextResponse.json({
       status: "ok",
       db: true,
-      app: "ETS LAMP FALL",
+      app: "2MAILS",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("GET /api/health", error);
     return NextResponse.json(
-      { status: "error", db: false, app: "ETS LAMP FALL" },
+      { status: "error", db: false, app: "2MAILS" },
       { status: 503 }
     );
   }

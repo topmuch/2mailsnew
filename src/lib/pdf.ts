@@ -11,7 +11,7 @@ import {
   PAYMENT_METHOD_LABELS,
 } from "./constants";
 
-// ─── Couleurs (charte ETS LAMP FALL) ────────────────────────────────────────
+// ─── Couleurs (charte 2MAILS) ────────────────────────────────────────
 
 const GREEN = [30, 107, 58] as const;
 const GREEN_LIGHT = [113, 172, 131] as const;
@@ -110,11 +110,11 @@ interface CompanyInfo {
 }
 
 let companyInfo: CompanyInfo = {
-  name: "ETS LAMP FALL",
+  name: "2MAILS",
   tagline: "Plomberie - Sanitaire - Luminaire",
   address: "Dakar, Sénégal",
   phone: "+221 77 000 00 00",
-  email: "contact@etslampfall.sn",
+  email: "contact@2mails.sn",
   rc: "",
   ninea: "",
   logo: null,
@@ -163,7 +163,7 @@ export async function getLogoBase64(): Promise<string | null> {
   if (info.logo) return info.logo;
   if (logoCache !== undefined) return logoCache;
   try {
-    const res = await fetch("/logo-green.png");
+    const res = await fetch("/logo-2mails.png");
     const blob = await res.blob();
     logoCache = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -1081,7 +1081,7 @@ export async function buildDeliveryNotePDF(invoice: Invoice): Promise<jsPDF> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...DARK);
-  doc.text("Livré par (ETS LAMP FALL)", 32, ySig, { align: "center" });
+  doc.text("Livré par (2MAILS)", 32, ySig, { align: "center" });
   doc.text("Reçu par (le client)", 148, ySig, { align: "center" });
   doc.setDrawColor(...GRAY);
   doc.setLineWidth(0.25);
@@ -1569,7 +1569,7 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
   doc.setFontSize(7.5);
   doc.setTextColor(...GRAY);
   doc.text(
-    `Édité le ${new Date().toLocaleString("fr-FR")} — ETS LAMP FALL`,
+    `Édité le ${new Date().toLocaleString("fr-FR")} — 2MAILS`,
     105,
     290,
     { align: "center" }

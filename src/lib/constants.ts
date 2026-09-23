@@ -1,4 +1,4 @@
-// ─── Catégories de produits ETS LAMP FALL ───────────────────────────────────
+// ─── Catégories de produits 2MAILS ───────────────────────────────────
 
 export const PRODUCT_CATEGORIES = [
   "SANITAIRE",
@@ -127,11 +127,11 @@ export function currentMonth(): string {
 // ─── Infos société ──────────────────────────────────────────────────────────
 
 export const COMPANY = {
-  name: "ETS LAMP FALL",
+  name: "2MAILS",
   tagline: "Plomberie - Sanitaire - Luminaire",
   address: "Dakar, Sénégal",
   phone: "+221 77 000 00 00",
-  email: "contact@etslampfall.sn",
+  email: "contact@2mails.sn",
   ninea: "NINEA : 00000000 0000",
 };
 

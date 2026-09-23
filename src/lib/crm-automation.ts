@@ -63,7 +63,7 @@ export async function sendAutomationEmail(
       auth: { user: setting.smtpUser, pass: setting.smtpPass },
     });
     await transporter.sendMail({
-      from: `"${setting.mailFromName || setting.nomSociete || "ETS LAMP FALL"}" <${setting.smtpUser}>`,
+      from: `"${setting.mailFromName || setting.nomSociete || "2MAILS"}" <${setting.smtpUser}>`,
       to,
       subject,
       html,
@@ -106,9 +106,9 @@ async function logSent(data: {
   });
 }
 
-// Gabarit HTML commun (charte vert & or ETS LAMP FALL)
+// Gabarit HTML commun (charte vert & or 2MAILS)
 function wrapEmailHtml(title: string, bodyHtml: string): string {
-  const societe = "ETS LAMP FALL";
+  const societe = "2MAILS";
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f6f4;font-family:Segoe UI,Arial,sans-serif;">
   <div style="max-width:640px;margin:0 auto;padding:24px 16px;">
     <div style="background:linear-gradient(135deg,#14532d,#166534);border-radius:14px 14px 0 0;padding:20px 24px;">
@@ -276,7 +276,7 @@ export async function generateMorningReport(now = new Date()) {
     sectionHtml("🎯", "Objectif du jour", `<p style="margin:0;background:#fef9e7;border-left:4px solid #d4af37;padding:10px 14px;border-radius:6px;"><b>${esc(goal)}</b></p>`);
 
   return {
-    subject: `📅 Votre briefing du jour — ${setting?.nomSociete || "ETS LAMP FALL"}`,
+    subject: `📅 Votre briefing du jour — ${setting?.nomSociete || "2MAILS"}`,
     html: wrapEmailHtml("Briefing du jour", body),
   };
 }
@@ -357,7 +357,7 @@ export async function generateEveningReport(now = new Date()) {
     sectionHtml("💡", "Suggestion pour demain", `<p style="margin:0;background:#fef9e7;border-left:4px solid #d4af37;padding:10px 14px;border-radius:6px;"><b>${esc(suggestion)}</b></p>`);
 
   return {
-    subject: `📊 Votre bilan de la journée — ${setting?.nomSociete || "ETS LAMP FALL"}`,
+    subject: `📊 Votre bilan de la journée — ${setting?.nomSociete || "2MAILS"}`,
     html: wrapEmailHtml("Bilan de la journée", body),
   };
 }
@@ -385,7 +385,7 @@ export async function getRandomCoachMessage(timeSlot: "11h" | "14h" | "17h", now
     `<p style="margin:0 0 16px;">${now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} — ${fmtTimeFr(now)}</p>` +
     `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:5px solid #d4af37;border-radius:10px;padding:18px 20px;font-size:15px;line-height:1.7;">${esc(content)}</div>`;
   return {
-    subject: `${title} — ${setting?.nomSociete || "ETS LAMP FALL"}`,
+    subject: `${title} — ${setting?.nomSociete || "2MAILS"}`,
     html: wrapEmailHtml(title, body),
     content,
     messageId: picked.id,

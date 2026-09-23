@@ -55,7 +55,7 @@ import { buildDailyReportPDF, downloadPDF, printPDF, saveOrOpenInvoicePDF } from
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-// ─── Palette du design (vert & or ETS LAMP FALL) ────────────────────────────
+// ─── Palette du design (vert & or 2MAILS) ────────────────────────────
 
 const KPI_TONES = {
   green: "bg-gradient-to-br from-green-600 to-emerald-700 shadow-green-600/30",

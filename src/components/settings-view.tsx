@@ -135,7 +135,7 @@ export function SettingsView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sauvegarde-lampfall-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `sauvegarde-2mails-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -161,7 +161,7 @@ export function SettingsView() {
       const text = await file.text();
       const data: unknown = JSON.parse(text);
       if (!data || typeof data !== "object" || !("data" in (data as Record<string, unknown>))) {
-        throw new Error("Ce fichier ne ressemble pas à une sauvegarde ETS LAMP FALL.");
+        throw new Error("Ce fichier ne ressemble pas à une sauvegarde 2MAILS.");
       }
       setRestoreData(data);
       setRestoreFileName(file.name);
@@ -289,7 +289,7 @@ export function SettingsView() {
                  
                 <img src={settings.logo} alt="Logo de la société" className="h-full w-full object-contain p-2" />
               ) : (
-                <Image src="/logo-green.png" alt="Logo par défaut" width={120} height={120} className="h-full w-full object-contain p-3 opacity-80" />
+                <Image src="/logo-2mails.png" alt="Logo par défaut" width={120} height={120} className="h-full w-full object-contain p-3 opacity-80" />
               )}
             </div>
             <div className="flex gap-2">
@@ -332,11 +332,11 @@ export function SettingsView() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
-              {field("nomSociete", "Nom de la société", "ex : ETS LAMP FALL")}
+              {field("nomSociete", "Nom de la société", "ex : 2MAILS")}
               {field("tagline", "Slogan / activité", "ex : Plomberie - Sanitaire - Luminaire")}
               {field("adresse", "Adresse", "ex : Dakar, Sénégal")}
               {field("telephone", "Téléphone", "ex : +221 77 000 00 00", "tel")}
-              {field("email", "Email", "ex : contact@lampefall.sn", "email")}
+              {field("email", "Email", "ex : contact@2mails.sn", "email")}
               <div className="grid grid-cols-2 gap-4">
                 {field("rc", "RC", "N° RCCM")}
                 {field("ninea", "NINEA", "N° NINEA")}

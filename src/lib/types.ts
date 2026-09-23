@@ -561,3 +561,39 @@ export interface CrmAutomationStatus {
   lastSentAt: string | null;
   seededCoachMessages: number;
 }
+
+// ─── CRM Commercial : leads & projets ────────────────────────────────────────
+
+export interface CrmLead {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  source: "QRTAGS" | "QRBAGS" | "RECOMMANDATION" | "SITE_WEB" | "AUTRE";
+  status: "NEW" | "CONTACTED" | "QUALIFIED" | "PROPOSAL" | "WON" | "LOST";
+  value: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmProjectClient {
+  id: string;
+  name: string;
+}
+
+export interface CrmProject {
+  id: string;
+  name: string;
+  description: string | null;
+  clientId: string | null;
+  client: CrmProjectClient | null;
+  status: "PLANNING" | "IN_PROGRESS" | "ON_HOLD" | "DONE" | "CANCELLED";
+  budget: number;
+  startDate: string | null;
+  endDate: string | null;
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
+}

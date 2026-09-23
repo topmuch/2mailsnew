@@ -388,7 +388,7 @@ function MailConfigDialog({
               id="mailFromName"
               value={form.mailFromName}
               onChange={(e) => set("mailFromName", e.target.value)}
-              placeholder="ETS LAMP FALL"
+              placeholder="2MAILS"
             />
           </div>
 
@@ -437,7 +437,7 @@ function MailConfigDialog({
                 type="email"
                 value={form.smtpUser}
                 onChange={(e) => set("smtpUser", e.target.value)}
-                placeholder="contact@etslampfall.sn"
+                placeholder="contact@2mails.sn"
               />
             </div>
             <div className="space-y-1.5">
@@ -508,7 +508,7 @@ function MailConfigDialog({
                 type="email"
                 value={form.imapUser}
                 onChange={(e) => set("imapUser", e.target.value)}
-                placeholder="contact@etslampfall.sn"
+                placeholder="contact@2mails.sn"
               />
             </div>
             <div className="space-y-1.5">

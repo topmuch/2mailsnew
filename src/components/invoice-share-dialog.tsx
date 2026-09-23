@@ -56,7 +56,7 @@ interface InvoiceShareDialogProps {
  */
 export function InvoiceShareDialog({ invoice, mode, open, onOpenChange }: InvoiceShareDialogProps) {
   const { toast } = useToast();
-  const nomSociete = useSettingsStore((s) => s.settings)?.nomSociete ?? "ETS LAMP FALL";
+  const nomSociete = useSettingsStore((s) => s.settings)?.nomSociete ?? "2MAILS";
   const isRelance = mode === "relance";
 
   const [message, setMessage] = useState("");

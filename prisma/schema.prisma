@@ -213,16 +213,16 @@ model AuditLog {
 
 model Setting {
   id          String  @id @default("main")
-  nomSociete  String  @default("ETS LAMP FALL")
+  nomSociete  String  @default("2MAILS")
   tagline     String  @default("Plomberie - Sanitaire - Luminaire")
   adresse     String  @default("Dakar, Sénégal")
   telephone   String  @default("+221 77 000 00 00")
-  email       String  @default("contact@etslampfall.sn")
+  email       String  @default("contact@2mails.sn")
   rc          String  @default("")
   ninea       String  @default("")
   logo        String? // data-URL du logo personnalisé
   // Configuration boîte mail (SMTP envoi / IMAP réception)
-  mailFromName String  @default("ETS LAMP FALL")
+  mailFromName String  @default("2MAILS")
   smtpHost    String  @default("")
   smtpPort    Int     @default(587)
   smtpUser    String  @default("")
@@ -350,7 +350,43 @@ model CrmClient {
   notes      String?
   createdAt  DateTime  @default(now())
 
-  items CrmItem[]
+  items    CrmItem[]
+  projects CrmProject[]
+}
+
+// ─── CRM Commercial : leads (pipeline de prospection) et projets ────────────
+
+model CrmLead {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  source    String   @default("AUTRE") // QRTAGS | QRBAGS | RECOMMANDATION | SITE_WEB | AUTRE
+  status    String   @default("NEW") // NEW | CONTACTED | QUALIFIED | PROPOSAL | WON | LOST
+  value     Float    @default(0) // valeur estimée du deal (FCFA)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model CrmProject {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  clientId    String?
+  client      CrmClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  status      String     @default("PLANNING") // PLANNING | IN_PROGRESS | ON_HOLD | DONE | CANCELLED
+  budget      Float      @default(0) // budget (FCFA)
+  startDate   DateTime?
+  endDate     DateTime?
+  progress    Int        @default(0) // avancement 0-100
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([status])
 }
 
 // ─── CRM Automatisations (rapports quotidiens, coach virtuel, rappels RDV) ──

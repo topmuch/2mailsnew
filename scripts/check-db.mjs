@@ -1,0 +1,10 @@
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+console.log("users:", await prisma.user.count());
+console.log("settings:", await prisma.setting.count());
+console.log("clients (facturation):", await prisma.client.count());
+console.log("crmItems:", await prisma.crmItem.count());
+console.log("crmTasks:", await prisma.crmTask.count());
+console.log("crmLeads:", await prisma.crmLead.count());
+console.log("crmCoachMessages:", await prisma.crmCoachMessage.count());
+await prisma.$disconnect();

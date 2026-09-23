@@ -15,19 +15,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ETS LAMP FALL — Système de Facturation",
+  title: "2MAILS — Système de Facturation",
   description:
-    "Gestion de facturation, devis proforma, factures d'achat, commandes prévisionnelles, clients et stock pour ETS LAMP FALL (Plomberie - Sanitaire - Luminaire).",
+    "Gestion de facturation, devis proforma, factures d'achat, commandes prévisionnelles, clients et stock pour 2MAILS (Plomberie - Sanitaire - Luminaire).",
   keywords: [
     "facturation",
-    "ETS LAMP FALL",
+    "2MAILS",
     "plomberie",
     "sanitaire",
     "luminaire",
     "proforma",
   ],
   icons: {
-    icon: "/logo-green.png",
+    icon: "/logo-2mails.png",
   },
 };
 

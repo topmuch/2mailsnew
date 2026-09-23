@@ -22,7 +22,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ─── Jetons de session (HMAC-SHA256) ────────────────────────────────────────
 
-const SECRET = process.env.AUTH_SECRET || "lampfall-facturation-secret-2024";
+const SECRET = process.env.AUTH_SECRET || "2mails-facturation-secret-2024";
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 jours
 
 export interface SessionUser {

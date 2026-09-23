@@ -1,4 +1,4 @@
-# ETS LAMP FALL — Dockerfile pour Coolify (2mailsnew)
+# 2MAILS — Dockerfile pour Coolify (2mailsnew)
 
 FROM node:20-alpine
 RUN apk add --no-cache git libc6-compat sqlite
