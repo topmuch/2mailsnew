@@ -232,6 +232,7 @@ model Setting {
   imapPort    Int     @default(993)
   imapUser    String  @default("")
   imapPass    String  @default("")
+  mailDailyImportLimit Int @default(15) // nb max de mails importés du serveur IMAP par jour (anti-saturation)
   lastMailSync DateTime?
   updatedAt   DateTime @updatedAt
 }

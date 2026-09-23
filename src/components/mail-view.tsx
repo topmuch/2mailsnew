@@ -32,6 +32,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -143,11 +153,13 @@ function MailListItem({
   active,
   onSelect,
   onToggleStar,
+  onDelete,
 }: {
   mail: Mail;
   active: boolean;
   onSelect: (mail: Mail) => void;
   onToggleStar: (mail: Mail) => void;
+  onDelete: (mail: Mail) => void;
 }) {
   const isOut = mail.direction === "OUT";
   const party = isOut ? mail.to : mail.fromName || mail.from;
@@ -166,7 +178,7 @@ function MailListItem({
         }
       }}
       className={cn(
-        "relative flex w-full cursor-pointer items-start gap-3 border-b border-border/50 px-3 py-3 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/60 focus-visible:bg-muted/60 sm:px-4",
+        "group relative flex w-full cursor-pointer items-start gap-3 border-b border-border/50 px-3 py-3 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/60 focus-visible:bg-muted/60 sm:px-4",
         active && "bg-primary/[0.06] shadow-[inset_2px_0_0_0] shadow-primary",
         !mail.read && !active && "bg-sky-500/[0.04] hover:bg-sky-500/[0.07] dark:bg-sky-400/[0.05]"
       )}
@@ -198,6 +210,18 @@ function MailListItem({
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {excerpt(mail.body) || "—"}
           </p>
+          {/* Suppression rapide : toujours visible sur mobile, au survol sur desktop */}
+          <button
+            type="button"
+            aria-label={mail.folder === "TRASH" ? "Supprimer définitivement" : "Supprimer ce message"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(mail);
+            }}
+            className="shrink-0 rounded-full p-1 text-muted-foreground/40 opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
           <button
             type="button"
             aria-label={mail.starred ? "Retirer des favoris" : "Marquer comme favori"}
@@ -333,6 +357,7 @@ function TestRow({
 
 interface ConfigForm {
   mailFromName: string;
+  mailDailyImportLimit: string;
   smtpHost: string;
   smtpPort: string;
   smtpUser: string;
@@ -358,6 +383,7 @@ function MailConfigDialog({
   const { toast } = useToast();
   const [form, setForm] = useState<ConfigForm>({
     mailFromName: "",
+    mailDailyImportLimit: "15",
     smtpHost: "",
     smtpPort: "587",
     smtpUser: "",
@@ -377,6 +403,7 @@ function MailConfigDialog({
     if (open && config) {
       setForm({
         mailFromName: config.mailFromName ?? "",
+        mailDailyImportLimit: String(config.mailDailyImportLimit ?? 15),
         smtpHost: config.smtpHost ?? "",
         smtpPort: String(config.smtpPort ?? 587),
         smtpUser: config.smtpUser ?? "",
@@ -419,6 +446,7 @@ function MailConfigDialog({
     try {
       const payload: Record<string, unknown> = {
         mailFromName: form.mailFromName.trim(),
+        mailDailyImportLimit: Number(form.mailDailyImportLimit) || 15,
         smtpHost: form.smtpHost.trim(),
         smtpPort: Number(form.smtpPort) || 587,
         smtpUser: form.smtpUser.trim(),
@@ -534,6 +562,28 @@ function MailConfigDialog({
               onChange={(e) => set("mailFromName", e.target.value)}
               placeholder="2MAILS"
             />
+          </div>
+
+          {/* ─── Limite quotidienne d'importation (anti-saturation) ─── */}
+          <div className="space-y-1.5 rounded-xl border bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="mailDailyImportLimit" className="text-sm font-medium">
+                Mails reçus par jour (limite)
+              </Label>
+              <Input
+                id="mailDailyImportLimit"
+                type="number"
+                min={1}
+                max={500}
+                value={form.mailDailyImportLimit}
+                onChange={(e) => set("mailDailyImportLimit", e.target.value)}
+                className="w-24 text-center"
+              />
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Nombre maximal de messages importés du serveur chaque jour pour ne pas saturer la
+              boîte (15 par défaut). La limite se réinitialise chaque matin.
+            </p>
           </div>
 
           <Separator />
@@ -792,6 +842,10 @@ export default function MailView() {
   const [configOpen, setConfigOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  // Suppression en masse (confirmation puis exécution)
+  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const openCompose = (prefill?: { to?: string; subject?: string }) => {
     setComposeTo(prefill?.to ?? "");
     setComposeSubject(prefill?.subject ?? "");
@@ -847,11 +901,24 @@ export default function MailView() {
     try {
       const res = await authFetch("/api/mails/sync", { method: "POST" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Synchronisation impossible");
-      toast({
-        title: `${Number(json.imported ?? 0)} nouveau(x) mail(s)`,
-        description: "Boîte de réception synchronisée.",
-      });
+      if (!res.ok) throw new Error(json.error ?? json.message ?? "Synchronisation impossible");
+      const imported = Number(json.imported ?? 0);
+      if (json.limitReached && imported === 0) {
+        // Quota du jour déjà épuisé avant cette synchronisation
+        toast({
+          title: `Limite quotidienne atteinte (${json.limit ?? 15} mails/jour)`,
+          description:
+            json.message ??
+            "La synchronisation reprendra demain. Vous pouvez augmenter la limite dans la configuration.",
+        });
+      } else {
+        toast({
+          title: `${imported} nouveau(x) mail(s)`,
+          description: json.limitReached
+            ? `Limite quotidienne de ${json.limit ?? 15} mails atteinte — la suite arrivera demain.`
+            : "Boîte de réception synchronisée.",
+        });
+      }
       refetchConfig();
       await loadMails();
     } catch (e) {
@@ -862,6 +929,40 @@ export default function MailView() {
       });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  /** Suppression en masse : corbeille si dossier normal, vidage définitif si corbeille. */
+  const bulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const res = await authFetch("/api/mails/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Suppression impossible");
+      const n = Number(json.affected ?? 0);
+      toast({
+        title: json.permanent
+          ? `Corbeille vidée (${n} message${n > 1 ? "s" : ""})`
+          : `${n} message${n > 1 ? "s" : ""} déplacé${n > 1 ? "s" : ""} dans la corbeille`,
+        description: json.permanent
+          ? "Suppression définitive effectuée."
+          : "Vous pouvez les restaurer depuis la corbeille.",
+      });
+      setSelectedId(null);
+      await loadMails();
+    } catch (e) {
+      toast({
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Suppression en masse impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkOpen(false);
     }
   };
 
@@ -1090,8 +1191,41 @@ export default function MailView() {
                   </span>
                 )}
               </h2>
+              {/* Suppression en masse — desktop */}
+              {!loading && mails.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmBulkOpen(true)}
+                  disabled={bulkDeleting}
+                  className="ml-auto hidden h-8 gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive lg:flex"
+                >
+                  {bulkDeleting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  {folder === "TRASH" ? "Vider la corbeille" : "Tout supprimer"}
+                </Button>
+              )}
               {/* Actions mobiles (rail caché sur petit écran) */}
-              <div className="ml-auto flex items-center gap-1.5 lg:hidden">
+              <div className={cn("flex items-center gap-1.5 lg:hidden", !loading && mails.length > 0 && "ml-auto")}>
+                {!loading && mails.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmBulkOpen(true)}
+                    disabled={bulkDeleting}
+                    className="h-8 w-8 px-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={folder === "TRASH" ? "Vider la corbeille" : "Tout supprimer"}
+                  >
+                    {bulkDeleting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                )}
                 <Button size="sm" onClick={() => openCompose()} className="h-8 gap-1 px-2.5">
                   <Plus className="h-3.5 w-3.5" /> Écrire
                 </Button>
@@ -1200,6 +1334,7 @@ export default function MailView() {
                   active={mail.id === selectedId}
                   onSelect={openMail}
                   onToggleStar={toggleStar}
+                  onDelete={deleteMail}
                 />
               ))
             )}
@@ -1334,6 +1469,35 @@ export default function MailView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Confirmation de la suppression en masse ─── */}
+      <AlertDialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {folder === "TRASH" ? "Vider la corbeille ?" : "Tout supprimer ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {folder === "TRASH"
+                ? `Les ${mails.length} message${mails.length > 1 ? "s" : ""} de la corbeille seront supprimés définitivement. Cette action est irréversible.`
+                : `Tous les messages du dossier « ${folderTitle} » seront déplacés vers la corbeille. Vous pourrez les restaurer depuis celle-ci.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={bulkDelete}
+              disabled={bulkDeleting}
+              className={cn(
+                folder === "TRASH" && "bg-destructive text-white hover:bg-destructive/90"
+              )}
+            >
+              {bulkDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {folder === "TRASH" ? "Vider définitivement" : "Déplacer vers la corbeille"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ─── Dialog de configuration ─── */}
       <MailConfigDialog

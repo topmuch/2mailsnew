@@ -789,3 +789,21 @@ Stage Summary:
 - Boucle de correction raccourcie : remplir → Tester (sans sauvegarder) → corriger → vert → Enregistrer.
 - Le test SMTP auto-détecte le bon mode TLS et donne la consigne exacte.
 - Reste à l'utilisateur : générer un vrai mot de passe d'application Google et corriger le couple port/mode (465+TLS coché OU 587+TLS décoché).
+
+---
+Task ID: 27
+Agent: Z.ai Code (principal)
+Task: Suite retour utilisateur positif (Coach 11h reçu, IMAP fonctionnel) — 1) limite de 15 mails reçus par jour pour ne pas saturer la boîte ; 2) bouton supprimer un mail accessible ; 3) bouton tout supprimer en masse.
+
+Work Log:
+- Schema : nouveau champ Setting.mailDailyImportLimit Int @default(15) (anti-saturation) — db:push OK + redémarrage serveur.
+- POST /api/mails/sync : quota quotidien — importedTodayCount() (Mail direction IN créés depuis minuit), remaining = limite − déjà importés ; si 0 → réponse {limitReached:true, message clair} sans connexion IMAP ; sinon maxImport = min(remaining, 50) et break dans la boucle d'import ; réponse enrichie {imported, total, limit, importedToday, limitReached} ; limite bornée 1..500.
+- POST /api/mails/bulk-delete (nouveau, auth requise) : {folder} → INBOX/SENT = updateMany vers TRASH ; TRASH = deleteMany définitif ; renvoie {affected, permanent}.
+- /api/mail-settings GET/PUT : expose et accepte mailDailyImportLimit (borné 1..500, défaut 15) ; MailConfig typé.
+- mail-view.tsx : dialog config — carte « Mails reçus par jour (limite) » (input number, explication, réinitialisation matin) ; bouton « Tout supprimer » desktop + icône mobile dans l'en-tête de liste (visible si mails > 0) ; AlertDialog de confirmation (« Tout supprimer ? » → déplacer vers corbeille ; « Vider la corbeille ? » → définitif, bouton destructif) ; MailListItem — bouton corbeille par ligne (opacity-100 mobile, hover desktop, stopPropagation) ; toast de sync : quota atteint avant sync → titre « Limite quotidienne atteinte (15 mails/jour) », sinon « X nouveau(x) mail(s) — limite atteinte, suite demain ».
+- Tests : curl bulk-delete INBOX (4 déplacés) puis TRASH (4 supprimés définitivement) ; navigateur desktop — liste Envoyés avec « Tout supprimer », alertdialog, 2 messages déplacés → Corbeille 2, bouton « Vider la corbeille » présent, dialog config avec champ limite=15 ; iPhone 14 — bouton poubelle en-tête + suppression par ligne visible sur chaque mail ; 0 erreur console ; lint 0 erreur.
+
+Stage Summary:
+- Boîte anti-saturation : max 15 mails reçus importés/jour (réglable 1..500 dans Configuration), quota remis à zéro chaque matin, messages clairs à l'utilisateur.
+- Suppression : par ligne (poubelle au survol/toujours visible mobile), en masse par dossier avec confirmation, corbeille vidable définitivement — flux corbeille/restaurer inchangés.
+- Commit + push topmuch/2mailsnew uniquement.

@@ -342,6 +342,8 @@ export interface MailConfig {
   imapHost: string;
   imapPort: number;
   imapUser: string;
+  /** Nombre maximal de mails importés du serveur IMAP par jour (anti-saturation). */
+  mailDailyImportLimit: number;
   smtpConfigured: boolean;
   imapConfigured: boolean;
   lastMailSync: string | null;

@@ -11,6 +11,18 @@ const { ImapFlow } = imapflowModule;
 const MAX_MESSAGES = 50;
 const MAX_BODY_LENGTH = 100_000;
 
+/**
+ * Limite quotidienne d'importation (anti-saturation de la boîte) :
+ * on ne dépasse pas Setting.mailDailyImportLimit mails reçus importés par jour.
+ */
+async function importedTodayCount(): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  return db.mail.count({
+    where: { direction: "IN", createdAt: { gte: startOfDay } },
+  });
+}
+
 // ─── Extraction du texte d'un message brut (MIME) ───────────────────────────
 
 function decodeQuotedPrintable(input: string): string {
@@ -123,6 +135,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Quota du jour : mails déjà importés aujourd'hui / limite configurable (défaut 15)
+    const dailyLimit = Math.max(1, Math.min(500, setting.mailDailyImportLimit ?? 15));
+    const alreadyToday = await importedTodayCount();
+    const remaining = Math.max(0, dailyLimit - alreadyToday);
+
+    if (remaining === 0) {
+      return NextResponse.json({
+        imported: 0,
+        total: null,
+        limit: dailyLimit,
+        importedToday: alreadyToday,
+        limitReached: true,
+        message: `Limite quotidienne d'importation atteinte (${dailyLimit} mails/jour) — la synchronisation reprendra demain. Vous pouvez augmenter la limite dans la configuration de la boîte.`,
+      });
+    }
+
     const client = new ImapFlow({
       host: setting.imapHost,
       port: setting.imapPort,
@@ -141,6 +169,8 @@ export async function POST(request: NextRequest) {
       const total = mailbox.exists;
 
       let imported = 0;
+      // On s'arrête dès que le quota du jour est atteint (évite de télécharger inutilement)
+      const maxImport = Math.min(remaining, MAX_MESSAGES);
 
       if (total > 0) {
         // Les MAX_MESSAGES derniers messages de la boîte
@@ -189,6 +219,7 @@ export async function POST(request: NextRequest) {
         const seenInBatch = new Set<string>();
 
         for (const msg of messages) {
+          if (imported >= maxImport) break; // quota quotidien respecté
           if (!msg.uid) continue;
           if (!msg.messageId || existing.has(msg.messageId) || seenInBatch.has(msg.messageId)) {
             continue;
@@ -229,7 +260,14 @@ export async function POST(request: NextRequest) {
         data: { lastMailSync: new Date() },
       });
 
-      return NextResponse.json({ imported, total });
+      const importedToday = alreadyToday + imported;
+      return NextResponse.json({
+        imported,
+        total,
+        limit: dailyLimit,
+        importedToday,
+        limitReached: importedToday >= dailyLimit,
+      });
     } catch (error) {
       // Ferme proprement la connexion en cas d'échec IMAP
       try {

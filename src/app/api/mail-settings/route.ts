@@ -26,6 +26,7 @@ function toConfig(setting: SettingRow | null): MailConfig {
     imapHost,
     imapPort: setting?.imapPort ?? 993,
     imapUser,
+    mailDailyImportLimit: setting?.mailDailyImportLimit ?? 15,
     smtpConfigured: Boolean(smtpHost && smtpUser && smtpPass),
     imapConfigured: Boolean(imapHost && imapUser && imapPass),
     lastMailSync: setting?.lastMailSync ? setting.lastMailSync.toISOString() : null,
@@ -93,6 +94,11 @@ export async function PUT(request: NextRequest) {
       imapPort: numField(body.imapPort, current?.imapPort ?? 993),
       imapUser: strField(body.imapUser, current?.imapUser ?? ""),
       imapPass: passField(body.imapPass, current?.imapPass ?? ""),
+      // Limite quotidienne d'importation (anti-saturation) : bornée 1..500, défaut 15
+      mailDailyImportLimit: Math.max(
+        1,
+        Math.min(500, numField(body.mailDailyImportLimit, current?.mailDailyImportLimit ?? 15))
+      ),
     };
 
     const setting = await db.setting.upsert({
