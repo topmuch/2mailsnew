@@ -11,15 +11,15 @@ import {
   PAYMENT_METHOD_LABELS,
 } from "./constants";
 
-// ─── Couleurs (charte 2MAILS) ────────────────────────────────────────
+// ─── Couleurs (charte 2MAILS — bleu profond & ciel) ──────────────────────
 
-const GREEN = [30, 107, 58] as const;
-const GREEN_LIGHT = [113, 172, 131] as const;
-const GREEN_BG = [240, 248, 243] as const;
+const BLUE = [15, 76, 129] as const;        // #0F4C81 — bleu marine principal
+const BLUE_LIGHT = [125, 165, 205] as const; // #7DA5CD — bleu ciel secondaire
+const BLUE_BG = [238, 245, 251] as const;    // #EEF5FB — fond bleuté très clair
 const RED = [192, 43, 43] as const;
 const ORANGE = [202, 111, 9] as const;
-const GRAY = [105, 112, 108] as const;
-const DARK = [35, 45, 40] as const;
+const GRAY = [100, 112, 128] as const;
+const DARK = [30, 41, 59] as const;          // #1E293B — ardoise bleutée
 
 // ─── Formatage ──────────────────────────────────────────────────────────────
 
@@ -179,12 +179,12 @@ export async function getLogoBase64(): Promise<string | null> {
 
 // ─── Helpers de dessin ──────────────────────────────────────────────────────
 
-// Police des documents : les factures et proformas sont en Times (Times New Roman) italique,
-// les autres documents conservent Helvetica. Les titres « gras » restent italiques (gras italique).
+// Police des documents : les factures et proformas sont en serif droit (style MS Serif /
+// Times New Roman), les autres documents conservent Helvetica. Les titres passent en gras serif.
 type FontStyle = "normal" | "italic" | "bold" | "bolditalic";
 type PdfFont = { name: string; normal: FontStyle; bold: FontStyle };
 const DEFAULT_FONT: PdfFont = { name: "helvetica", normal: "normal", bold: "bold" };
-const INVOICE_FONT: PdfFont = { name: "times", normal: "italic", bold: "bolditalic" };
+const INVOICE_FONT: PdfFont = { name: "times", normal: "normal", bold: "bold" };
 
 function drawHeader(
   doc: jsPDF,
@@ -195,7 +195,7 @@ function drawHeader(
 ) {
   const company = companyInfo;
   // Bandeau vert fin en haut
-  doc.setFillColor(...GREEN);
+  doc.setFillColor(...BLUE);
   doc.rect(0, 0, 210, 3, "F");
 
   // Logo (format déduit de la data-URL : PNG ou JPEG)
@@ -216,7 +216,7 @@ function drawHeader(
   doc.text(company.name, xText, 15);
   doc.setFont(font.name, font.normal);
   doc.setFontSize(8.5);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   if (company.tagline) doc.text(company.tagline, xText, 20);
   doc.setTextColor(...GRAY);
   let hy = company.tagline ? 24.5 : 20.5;
@@ -241,7 +241,7 @@ function drawHeader(
   }
 
   // Titre à droite
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.setFont(font.name, font.bold);
   doc.setFontSize(20);
   doc.text(title, 196, 16, { align: "right" });
@@ -250,10 +250,10 @@ function drawHeader(
   doc.text(subtitle, 196, 22, { align: "right" });
 
   // Ligne de séparation
-  doc.setDrawColor(...GREEN);
+  doc.setDrawColor(...BLUE);
   doc.setLineWidth(0.6);
   doc.line(14, 40, 196, 40);
-  doc.setDrawColor(...GREEN_LIGHT);
+  doc.setDrawColor(...BLUE_LIGHT);
   doc.setLineWidth(0.25);
   doc.line(14, 41.2, 196, 41.2);
 }
@@ -267,7 +267,7 @@ function drawFooter(doc: jsPDF, font: PdfFont = DEFAULT_FONT) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const y = 288;
-    doc.setDrawColor(...GREEN);
+    doc.setDrawColor(...BLUE);
     doc.setLineWidth(0.4);
     doc.line(14, y - 4, 196, y - 4);
     doc.setFont(font.name, font.normal);
@@ -307,13 +307,13 @@ function statusBadge(
 }
 
 function paymentColor(status: string) {
-  if (status === "PAYE") return GREEN as unknown as number[];
+  if (status === "PAYE") return BLUE as unknown as number[];
   if (status === "PARTIEL") return ORANGE as unknown as number[];
   return RED as unknown as number[];
 }
 
 function deliveryColor(status: string) {
-  return status === "LIVRE" ? (GREEN as unknown as number[]) : GRAY as unknown as number[];
+  return status === "LIVRE" ? (BLUE as unknown as number[]) : GRAY as unknown as number[];
 }
 
 function watermark(doc: jsPDF, text: string, color: readonly number[], font: PdfFont = DEFAULT_FONT) {
@@ -360,18 +360,18 @@ function drawItemsTable(doc: jsPDF, items: TableItem[], startY: number, font: Pd
       fontStyle: font.normal,
       fontSize: 8.5,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 2, right: 2.5, bottom: 2, left: 2.5 },
     },
     headStyles: {
-      fillColor: GREEN as unknown as number[],
+      fillColor: BLUE as unknown as number[],
       textColor: [255, 255, 255],
       fontStyle: font.bold,
       fontSize: 8.5,
       halign: "left",
     },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 102, fontStyle: font.bold },
       1: { cellWidth: 26, halign: "center" },
@@ -400,8 +400,8 @@ export async function buildInvoicePDF(invoice: Invoice): Promise<jsPDF> {
   );
 
   // Watermark — uniquement les mentions positives (jamais « IMPAYÉ » sur la facture)
-  if (isProforma) watermark(doc, "PROFORMA", GREEN_LIGHT, INVOICE_FONT);
-  else if (invoice.paymentStatus === "PAYE") watermark(doc, "PAYÉ", GREEN_LIGHT, INVOICE_FONT);
+  if (isProforma) watermark(doc, "PROFORMA", BLUE_LIGHT, INVOICE_FONT);
+  else if (invoice.paymentStatus === "PAYE") watermark(doc, "PAYÉ", BLUE_LIGHT, INVOICE_FONT);
 
   // Bloc client
   const blockY = 48;
@@ -488,27 +488,27 @@ export async function buildInvoicePDF(invoice: Invoice): Promise<jsPDF> {
 
   totalRow("Total HT", fmtMoney(invoice.totalHT));
   totalRow(`TVA (${invoice.taxRate}%)`, fmtMoney(invoice.totalTTC - invoice.totalHT));
-  doc.setDrawColor(...GREEN);
+  doc.setDrawColor(...BLUE);
   doc.setLineWidth(0.4);
   doc.line(totalsX, ty - 4.6, 196, ty - 4.6);
   totalRow("TOTAL TTC", fmtMoney(invoice.totalTTC), {
     bold: true,
-    color: GREEN as unknown as number[],
-    fill: GREEN_BG as unknown as number[],
+    color: BLUE as unknown as number[],
+    fill: BLUE_BG as unknown as number[],
   });
   if (!isProforma) {
     totalRow("Montant payé", fmtMoney(invoice.amountPaid));
     const reste = invoice.totalTTC - invoice.amountPaid;
     totalRow("Reste à payer", fmtMoney(reste), {
       bold: true,
-      color: reste > 0 ? (RED as unknown as number[]) : (GREEN as unknown as number[]),
+      color: reste > 0 ? (RED as unknown as number[]) : (BLUE as unknown as number[]),
     });
   }
 
   // Bloc « arrêté à la somme de » / signature
   let by = tableEnd + 8;
   const words = amountInWordsFCFA(invoice.totalTTC);
-  doc.setFont(INVOICE_FONT.name, "italic");
+  doc.setFont(INVOICE_FONT.name, INVOICE_FONT.normal);
   doc.setFontSize(8.5);
   doc.setTextColor(...DARK);
   const sentence = isProforma
@@ -569,7 +569,7 @@ export async function buildOrderPDF(order: Order): Promise<jsPDF> {
     doc,
     ORDER_STATUS_LABELS[order.status] ?? order.status,
     order.status === "LIVREE"
-      ? (GREEN as unknown as number[])
+      ? (BLUE as unknown as number[])
       : order.status === "ANNULEE"
         ? (RED as unknown as number[])
         : order.status === "CONFIRMEE"
@@ -584,7 +584,7 @@ export async function buildOrderPDF(order: Order): Promise<jsPDF> {
   let ty = tableEnd + 7;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text("MONTANT ESTIMÉ :", 122, ty);
   doc.text(fmtMoney(order.items.reduce((s, i) => s + i.total, 0)), 194, ty, {
     align: "right",
@@ -641,13 +641,13 @@ export async function buildOrdersListPDF(orders: Order[]): Promise<jsPDF> {
       font: "helvetica",
       fontSize: 8,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 1.8, right: 2, bottom: 1.8, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 26, fontStyle: "bold" },
       1: { cellWidth: 44 },
@@ -689,7 +689,7 @@ export async function buildPurchasePDF(purchase: Purchase): Promise<jsPDF> {
   doc.text(fmtDate(purchase.date), 196, blockY, { align: "right" });
   if (purchase.fileName) {
     doc.text("Pièce jointe :", infoX, blockY + 5);
-    doc.setTextColor(...GREEN);
+    doc.setTextColor(...BLUE);
     doc.text(purchase.fileName.slice(0, 30), 196, blockY + 5, { align: "right" });
   }
 
@@ -698,7 +698,7 @@ export async function buildPurchasePDF(purchase: Purchase): Promise<jsPDF> {
   let ty = tableEnd + 7;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text("TOTAL ACHAT :", 122, ty);
   doc.text(fmtMoney(purchase.total), 194, ty, { align: "right" });
 
@@ -742,13 +742,13 @@ export async function buildInvoiceListPDF(
       font: "helvetica",
       fontSize: 8,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 1.8, right: 2, bottom: 1.8, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 30, fontStyle: "bold" },
       1: { cellWidth: 22, halign: "center" },
@@ -770,9 +770,9 @@ export async function buildInvoiceListPDF(
 function sectionTitle(doc: jsPDF, text: string, y: number): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text(text.toUpperCase(), 14, y);
-  doc.setDrawColor(...GREEN_LIGHT);
+  doc.setDrawColor(...BLUE_LIGHT);
   doc.setLineWidth(0.3);
   doc.line(14, y + 1.8, 196, y + 1.8);
   return y + 6;
@@ -789,12 +789,12 @@ const REPORT_TABLE_STYLES = {
     font: "helvetica",
     fontSize: 8,
     textColor: DARK as unknown as number[],
-    lineColor: [210, 218, 213],
+    lineColor: [206, 216, 228],
     lineWidth: 0.15,
     cellPadding: { top: 1.6, right: 2, bottom: 1.6, left: 2 },
   },
-  headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-  alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+  headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+  alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
   margin: { left: 14, right: 14 },
 };
 
@@ -818,8 +818,8 @@ export async function buildSalesReportPDF(report: SalesReport, periodLabel: stri
   const labelCell = (t: string) => ({
     content: t,
     styles: {
-      fillColor: GREEN_BG as unknown as number[],
-      textColor: GREEN as unknown as number[],
+      fillColor: BLUE_BG as unknown as number[],
+      textColor: BLUE as unknown as number[],
       fontStyle: "bold" as const,
       halign: "right" as const,
     },
@@ -854,7 +854,7 @@ export async function buildSalesReportPDF(report: SalesReport, periodLabel: stri
       font: "helvetica",
       fontSize: 8.5,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
     },
@@ -896,7 +896,7 @@ export async function buildSalesReportPDF(report: SalesReport, periodLabel: stri
         fmtNum(report.monthly.reduce((a, m) => a + (m.total - m.paid), 0)),
       ]],
       ...REPORT_TABLE_STYLES,
-      footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
+      footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
       columnStyles: {
         0: { cellWidth: 50 },
         1: { halign: "right" },
@@ -959,7 +959,7 @@ export async function buildSalesReportPDF(report: SalesReport, periodLabel: stri
         fmtNum(report.topProducts.reduce((a, p) => a + p.margin, 0)),
       ]],
       ...REPORT_TABLE_STYLES,
-      footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
+      footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
       columnStyles: {
         0: { cellWidth: 92 },
         1: { cellWidth: 24, halign: "center" },
@@ -987,7 +987,7 @@ export async function buildSalesReportPDF(report: SalesReport, periodLabel: stri
       ]),
       foot: [["TOTAL", "", "", "", "", fmtNum(s.totalTTC)]],
       ...REPORT_TABLE_STYLES,
-      footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
+      footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
       columnStyles: {
         0: { cellWidth: 30, fontStyle: "bold" },
         1: { cellWidth: 22, halign: "center" },
@@ -1034,12 +1034,12 @@ export async function buildDeliveryNotePDF(invoice: Invoice): Promise<jsPDF> {
   }
 
   // Encadré livraison
-  doc.setDrawColor(...GREEN);
-  doc.setFillColor(...GREEN_BG);
+  doc.setDrawColor(...BLUE);
+  doc.setFillColor(...BLUE_BG);
   doc.roundedRect(140, blockY - 4, 56, 20, 2, 2, "FD");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text("LIVRAISON", 168, blockY + 2, { align: "center" });
   doc.setFontSize(8);
   doc.setTextColor(...DARK);
@@ -1061,13 +1061,13 @@ export async function buildDeliveryNotePDF(invoice: Invoice): Promise<jsPDF> {
       font: "helvetica",
       fontSize: 9,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 110 },
       1: { cellWidth: 30, halign: "center", fontStyle: "bold" },
@@ -1124,13 +1124,13 @@ export async function buildVatReportPDF(report: SalesReport, periodLabel: string
       font: "helvetica",
       fontSize: 8.5,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 50 },
       1: { halign: "right" },
@@ -1209,13 +1209,13 @@ export async function buildRestockOrderPDF(products: Product[]): Promise<jsPDF> 
       font: "helvetica",
       fontSize: 8.5,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 62 },
       1: { cellWidth: 28 },
@@ -1451,9 +1451,9 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
 
   // ─── Bloc de synthèse (4 cases) ───────────────────────────────────────────
   const kpis: { label: string; value: string; color: readonly (number | number[])[] }[] = [
-    { label: "Factures du jour", value: String(report.summary.invoiceCount), color: GREEN },
+    { label: "Factures du jour", value: String(report.summary.invoiceCount), color: BLUE },
     { label: "Total facturé", value: fmtMoney(report.summary.totalTTC), color: DARK },
-    { label: "Encaissé (versements)", value: fmtMoney(report.summary.receivedTotal), color: GREEN },
+    { label: "Encaissé (versements)", value: fmtMoney(report.summary.receivedTotal), color: BLUE },
     { label: "Règlements crédit", value: fmtMoney(report.summary.creditPaidTotal), color: ORANGE },
   ];
   const boxW = 44;
@@ -1462,7 +1462,7 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
   let kx = 14;
   const ky = 50;
   for (const k of kpis) {
-    doc.setFillColor(...GREEN_BG);
+    doc.setFillColor(...BLUE_BG);
     doc.roundedRect(kx, ky, boxW, boxH, 2, 2, "F");
     doc.setTextColor(...GRAY);
     doc.setFontSize(7);
@@ -1502,8 +1502,8 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
         : [["—", "Aucune facture ce jour", "", "", "", ""]],
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 2, textColor: DARK },
-    headStyles: { fillColor: [...GREEN], textColor: 255, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [...GREEN_BG] },
+    headStyles: { fillColor: [...BLUE], textColor: 255, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [...BLUE_BG] },
     columnStyles: {
       3: { halign: "right" },
       4: { halign: "right" },
@@ -1516,7 +1516,7 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
   let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text("Versements encaissés", 14, y);
   autoTable(doc, {
     startY: y + 2,
@@ -1533,8 +1533,8 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
         : [["—", "Aucun versement ce jour", "", "", ""]],
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 2, textColor: DARK },
-    headStyles: { fillColor: [...GREEN], textColor: 255, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [...GREEN_BG] },
+    headStyles: { fillColor: [...BLUE], textColor: 255, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [...BLUE_BG] },
     columnStyles: { 4: { halign: "right" } },
     margin: { left: 14, right: 14 },
   });
@@ -1542,7 +1542,7 @@ export async function buildDailyReportPDF(report: DailyReport): Promise<jsPDF> {
   // ─── Total encaissé du jour ───────────────────────────────────────────────
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const grandTotal = report.summary.receivedTotal;
-  doc.setFillColor(...GREEN);
+  doc.setFillColor(...BLUE);
   doc.roundedRect(120, y - 5, 76, 12, 2, 2, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(9);
@@ -1626,7 +1626,7 @@ export async function buildClientHistoryPDF(
   doc.setTextColor(...GRAY);
   doc.text("Total facturé :", 196, blockY + 6, { align: "right" });
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...GREEN);
+  doc.setTextColor(...BLUE);
   doc.text(fmtMoney(totalVentes), 196, blockY + 12, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
@@ -1635,7 +1635,7 @@ export async function buildClientHistoryPDF(
   doc.text(fmtMoney(totalPaye), 196, blockY + 22, { align: "right" });
   const reste = totalVentes - totalPaye;
   doc.text("Reste à payer :", 196, blockY + 27, { align: "right" });
-  doc.setTextColor(...(reste > 0 ? RED : GREEN));
+  doc.setTextColor(...(reste > 0 ? RED : BLUE));
   doc.text(fmtMoney(reste), 196, blockY + 31, { align: "right" });
   doc.setTextColor(...GRAY);
 
@@ -1667,13 +1667,13 @@ export async function buildClientHistoryPDF(
       font: "helvetica",
       fontSize: 8,
       textColor: DARK as unknown as number[],
-      lineColor: [210, 218, 213],
+      lineColor: [206, 216, 228],
       lineWidth: 0.15,
       cellPadding: { top: 1.8, right: 2, bottom: 1.8, left: 2 },
     },
-    headStyles: { fillColor: GREEN as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: GREEN_BG as unknown as number[], textColor: GREEN as unknown as number[], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: GREEN_BG as unknown as number[] },
+    headStyles: { fillColor: BLUE as unknown as number[], textColor: [255, 255, 255], fontStyle: "bold" },
+    footStyles: { fillColor: BLUE_BG as unknown as number[], textColor: BLUE as unknown as number[], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: BLUE_BG as unknown as number[] },
     columnStyles: {
       0: { cellWidth: 32, fontStyle: "bold" },
       1: { cellWidth: 22, halign: "center" },

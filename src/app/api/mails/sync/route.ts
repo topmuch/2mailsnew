@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import imapflowModule from "imapflow";
 import { db } from "@/lib/db";
+import { getAuthUser } from "@/lib/auth";
+import { describeMailError } from "@/lib/mail-diagnostics";
 
 // imapflow v2 expose la classe via l'export par défaut :
 // `import imapflowModule from "imapflow"` → { ImapFlow, AuthenticationFailure }
@@ -103,8 +105,13 @@ function extractTextFromSource(source: Buffer | undefined): string {
 
 // ─── POST : synchronisation IMAP de la boîte de réception ───────────────────
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
     const setting = await db.setting.findFirst();
     if (!setting || !setting.imapHost || !setting.imapUser || !setting.imapPass) {
       return NextResponse.json(
@@ -121,6 +128,11 @@ export async function POST() {
       port: setting.imapPort,
       secure: setting.imapPort === 993,
       auth: { user: setting.imapUser, pass: setting.imapPass },
+      logger: false,
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 20_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 40_000,
     });
 
     try {
@@ -229,7 +241,10 @@ export async function POST() {
     }
   } catch (error) {
     console.error("POST /api/mails/sync", error);
-    const message = error instanceof Error ? error.message : "erreur inconnue";
-    return NextResponse.json({ error: `Échec IMAP : ${message}` }, { status: 502 });
+    // Message clair en français : cause exacte (identifiants, hôte, port bloqué…)
+    return NextResponse.json(
+      { error: describeMailError("IMAP", error) },
+      { status: 502 }
+    );
   }
 }

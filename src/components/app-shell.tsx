@@ -414,7 +414,12 @@ export function AppShell() {
 
   return (
     <CategoriesProvider>
-      <div className="min-h-screen flex flex-col">
+      <div
+        className={cn(
+          "min-h-screen flex flex-col",
+          view === "mails" && "lg:h-dvh lg:overflow-hidden"
+        )}
+      >
       {/* Header mobile */}
       <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -454,7 +459,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className={cn("flex flex-1", view === "mails" && "lg:min-h-0 lg:overflow-hidden")}>
         {/* Sidebar desktop */}
         <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
           <div className="flex items-center gap-3 px-4 py-5">
@@ -487,7 +492,11 @@ export function AppShell() {
             <UserMenu user={user} onLogout={handleLogout} />
           </div>
 
-          <main className="flex-1 min-w-0 bg-background">
+          <main className="flex flex-1 min-w-0 flex-col bg-background">
+            {view === "mails" ? (
+              /* Boîte mail : occupe toute la page (design premium 3 volets) */
+              <MailView />
+            ) : (
             <div className="mx-auto max-w-6xl px-3 sm:px-6 py-5 sm:py-7 pb-10">
               {view === "dashboard" && (
                 <DashboardView onNavigate={(v) => select(v as ViewId)} onNewInvoice={newInvoice} />
@@ -515,13 +524,13 @@ export function AppShell() {
               {view === "crm-coach" && <CrmCoachView isAdmin={isAdmin} />}
               {view === "crm-leads" && <CrmLeadsView isAdmin={isAdmin} />}
               {view === "crm-projects" && <CrmProjectsView isAdmin={isAdmin} />}
-              {view === "mails" && <MailView />}
               {view === "produits" && <ProductsView />}
               {view === "mouvements" && <StockMovementsView />}
               {view === "utilisateurs" && (isAdmin ? <UsersView currentUser={user} /> : <RestrictedCard />)}
               {view === "audit" && (isAdmin ? <AuditView /> : <RestrictedCard />)}
               {view === "parametres" && (isAdmin ? <SettingsView /> : <RestrictedCard />)}
             </div>
+            )}
           </main>
         </div>
       </div>

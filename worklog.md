@@ -730,3 +730,27 @@ Stage Summary:
 - Aucune fonctionnalité retirée : rapport du jour, navigation, KPI, PDF, toutes les vues CRM/facturation intactes ; badges sémantiques (payé/impayé) conservés.
 - Nouveau logo bleu cohérent déployé partout (interface, data-URL DB, favicon).
 - Push 2mailsnew uniquement ; Coolify prendra la version automatiquement.
+
+---
+Task ID: 24
+Agent: Z.ai Code (principal)
+Task: 1) Facture & proforma en bleu avec police serif droite (style MS Serif) ; 2) boîte mail refondue en design premium pleine page ; 3) débogage IMAP (email configuré mais réception impossible) avec diagnostic intégré.
+
+Work Log:
+- PDF (src/lib/pdf.ts) : constantes GREEN/GREEN_LIGHT/GREEN_BG → BLUE/BLUE_LIGHT/BLUE_BG — BLUE #0F4C81 (15,76,129), BLUE_LIGHT #7DA5CD, BLUE_BG #EEF5FB ; DARK → ardoise bleutée (30,41,59), GRAY (100,112,128), lignes de grille (206,216,228). Tous les documents (facture, proforma, commande, achat, rapports, bons) passent au bleu — badges sémantiques inchangés (Payé/Reste en vert/rouge, Partiel ambre).
+- Police facture/proforma : INVOICE_FONT passe de Times ITALIQUE à Times DROIT (normal/bold) — rendu style « MS Serif » demandé ; la phrase « Arrêtée la présente facture à la somme de… » passe aussi en droit. Autres documents inchangés (Helvetica).
+- Diagnostic mail : nouveau src/lib/mail-diagnostics.ts — testImapConnection (ImapFlow : logger:false, tls rejectUnauthorized:false, timeouts 15-40s) + testSmtpConnection (nodemailer verify) + describeMailError traduisant chaque code (AUTHENTICATIONFAILED → mot de passe d'application Gmail, ENOTFOUND/ECONNREFUSED/CONNECT_TIMEOUT/ESOCKET → hôte/port/TLS) en messages FR actionnables.
+- Nouvelle API POST /api/mail-settings/test (admin) : teste IMAP et SMTP en direct, renvoie {configured, ok, details, raw} par protocole.
+- POST /api/mails/sync sécurisé (getAuthUser) + client ImapFlow durci (logger off, TLS tolérant, timeouts) + erreurs renvoyées en français clair via describeMailError (au lieu du message brut « Échec IMAP : … »).
+- Dialog configuration (mail-view.tsx) : bouton « Tester la connexion » (PlugZap) + affichage TestRow IMAP/SMTP (vert/rouge avec détail), conseils Gmail intégrés sous chaque section (smtp.gmail.com 587/465, imap.gmail.com 993, mot de passe d'application 16 caractères).
+- Boîte mail premium pleine page : mail-view.tsx réécrit — racine h-[calc(100dvh-8.75rem)] mobile / lg:flex-1 desktop ; rail gauche (Nouveau message, Synchroniser, dossiers à badges dégradé primary→sky-600, Configuration, carte « Statut de la boîte » SMTP/IMAP actif + compte + dernière sync) ; liste centrée (en-tête dossier + compte, puces de dossiers mobiles, recherche) ; volet lecture droit (avatar dégradé, Répondre/Supprimer/Restaurer) ; overlays et dialogs conservés ; empty states premium ; suppressions/étoiles/lu non-lu/recherche debounce intacts.
+- app-shell.tsx : MailView rendu hors du conteneur max-w-6xl (full-bleed) ; conteneur racine conditionnel lg:h-dvh lg:overflow-hidden + row lg:min-h-0 quand view=mails (la sidebar défile en interne, le footer reste collé en bas) — autres vues strictement inchangées (min-h-screen auto conservé).
+- Piège résolu : flex-1 (basis 0%) contre conteneur à hauteur indéfinie retombe sur « content » → hauteur définie lg:h-dvh sur la racine, sinon la page dépassait le viewport (1450px).
+- Config de test (fake Gmail) créée puis réinitialisée en base dev ; connectivity sandbox 993/587 vérifiée OUVERTE ; test réel validé : connexion imap.gmail.com:993 OK, erreur d'auth explicite affichée.
+- Tests navigateur : desktop 1440×900 (page=900=vh, footerBottom=900, mailBottom=839, sidebar scrollable), mode sombre bleuté impeccable, iPhone 14 (banner, puces dossiers, Écrire/Sync/Config, overlay lecture plein écran), PDF facture ouvert en blob : bleu + serif confirmés, Dashboard/Factures non affectés (scroll naturel), 0 erreur console (warning Radix préexistant seul), lint 0 erreur.
+
+Stage Summary:
+- Facture & proforma (et tous les PDF) en bleu #0F4C81 avec écritures serif droites façon MS Serif — plus aucun vert dans les documents.
+- Boîte mail = client mail premium pleine page 3 volets (rail/liste/lecture) clair & sombre, footer toujours visible, sidebar à défilement interne uniquement sur cette vue.
+- Problème IMAP outillé : bouton « Tester la connexion » montrant la cause exacte (identifiants, mot de passe d'application Gmail, hôte, port bloqué, TLS), messages d'erreur de sync en français clair, connexion IMAP durcie (TLS tolérant + timeouts) — la config locale étant vide, l'utilisateur doit relancer le test sur son instance : si Gmail, utiliser un mot de passe d'application (pas le mot de passe du compte).
+- Aucune fonctionnalité retirée ; push sur topmuch/2mailsnew uniquement (Coolify prendra la version automatiquement).
