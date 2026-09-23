@@ -54,7 +54,7 @@ export function ThemeToggle() {
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
             key={isDark ? "moon" : "sun"}
-            className="absolute inset-0 flex items-center justify-center text-[oklch(0.35_0.1_153)]"
+            className="absolute inset-0 flex items-center justify-center text-[oklch(0.32_0.06_258)]"
             initial={{ rotate: -90, opacity: 0, scale: 0.6 }}
             animate={{ rotate: 0, opacity: 1, scale: 1 }}
             exit={{ rotate: 90, opacity: 0, scale: 0.6 }}

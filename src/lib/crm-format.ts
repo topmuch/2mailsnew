@@ -56,14 +56,14 @@ export function sumPlatforms(platformStats: CrmPlatformStat[] | undefined, pick:
   return (platformStats ?? []).reduce((acc, s) => acc + (pick(s) || 0), 0);
 }
 
-/** Transforme les données camembert en couleurs cohérentes (or = QRTAGS, bleu = QRBAGS). */
+/** Transforme les données camembert en couleurs cohérentes (ambre = QRTAGS, bleu = QRBAGS). */
 export const PIE_COLORS: Record<string, string> = {
-  QRTAGS: "var(--color-gold, #d4a017)",
+  QRTAGS: "var(--color-gold, #f59e0b)",
   QRBAGS: "#3b82f6", // bleu — distinctif QRBags (demandé par l'utilisateur)
 };
 
 export function pieColor(name: string): string {
-  return PIE_COLORS[name] ?? "#22c55e";
+  return PIE_COLORS[name] ?? "#0aa2c4";
 }
 
 /** Total du camembert (0 si vide). */

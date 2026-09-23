@@ -269,13 +269,13 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
             <Card key={p.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-500 text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-sky-700 text-white">
                     {p.name === "QRBAGS" ? <QrCode className="h-5 w-5" aria-hidden /> : <ScanLine className="h-5 w-5" aria-hidden />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm flex items-center gap-2">
                       {p.label || p.name}
-                      <Badge variant={p.isActive ? "outline" : "secondary"} className={p.isActive ? "border-emerald-300 text-emerald-700 dark:text-emerald-400" : ""}>
+                      <Badge variant={p.isActive ? "outline" : "secondary"} className={p.isActive ? "border-cyan-300 text-cyan-700 dark:text-cyan-400" : ""}>
                         {p.isActive ? "Connectée" : "Inactive"}
                       </Badge>
                     </p>

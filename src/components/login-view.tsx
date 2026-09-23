@@ -92,9 +92,9 @@ export function LoginView({
       <aside className="luxe-banner relative hidden w-[58%] shrink-0 flex-col justify-between overflow-hidden lg:flex xl:w-[60%]">
         {/* Aurores décoratives + grille */}
         <div aria-hidden className="absolute inset-0">
-          <div className="luxe-float-a absolute -left-40 -top-40 h-[30rem] w-[30rem] rounded-full bg-gold/25 blur-3xl" />
+          <div className="luxe-float-a absolute -left-40 -top-40 h-[30rem] w-[30rem] rounded-full bg-cyan-400/25 blur-3xl" />
           <div className="luxe-float-b absolute -right-40 bottom-1/4 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl" />
-          <div className="luxe-float-c absolute bottom-40 left-1/3 h-[24rem] w-[24rem] rounded-full bg-gold/15 blur-3xl" />
+          <div className="luxe-float-c absolute bottom-40 left-1/3 h-[24rem] w-[24rem] rounded-full bg-sky-300/15 blur-3xl" />
           <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black_25%,transparent_78%)]" />
         </div>
 
@@ -106,10 +106,10 @@ export function LoginView({
           className="relative z-10 flex items-center justify-between px-10 pt-7 text-white/85 xl:px-14"
         >
           <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5 text-gold" aria-hidden /> Espace sécurisé
+            <Sparkles className="h-3.5 w-3.5 text-cyan-300" aria-hidden /> Espace sécurisé
           </span>
           <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/70">
-            <MapPin className="h-3.5 w-3.5 text-gold" aria-hidden /> Dakar, Sénégal
+            <MapPin className="h-3.5 w-3.5 text-cyan-300" aria-hidden /> Dakar, Sénégal
           </span>
         </motion.div>
 
@@ -121,7 +121,7 @@ export function LoginView({
           className="relative z-10 flex flex-1 flex-col items-start justify-center gap-7 px-10 text-white xl:px-14"
         >
           <motion.div variants={itemV} className="relative">
-            <span aria-hidden className="luxe-glow absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold/25 blur-3xl" />
+            <span aria-hidden className="luxe-glow absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/25 blur-3xl" />
             <div className="relative rounded-3xl border border-white/25 bg-white/95 p-4 shadow-2xl">
               {settings?.logo ? (
                 <img
@@ -146,7 +146,7 @@ export function LoginView({
               {defaultName}
             </h1>
             <p className="mt-4 flex items-center gap-2 text-base text-white/85 xl:text-lg">
-              <Sparkles className="h-4 w-4 shrink-0 text-gold" aria-hidden />
+              <Sparkles className="h-4 w-4 shrink-0 text-cyan-300" aria-hidden />
               {settings?.tagline ?? "Facturation • Stock • Gestion"}
             </p>
           </motion.div>
@@ -158,7 +158,7 @@ export function LoginView({
                 variants={itemV}
                 className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-white/90 backdrop-blur transition-colors hover:bg-white/10 xl:text-[15px]"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/20 text-gold ring-1 ring-gold/30">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-400/30">
                   <f.icon className="h-5 w-5" aria-hidden />
                 </span>
                 {f.label}
@@ -175,9 +175,9 @@ export function LoginView({
           className="relative z-10 flex items-center justify-between gap-4 px-10 pb-7 text-[10px] font-medium uppercase tracking-[0.3em] text-white/60 xl:px-14"
         >
           <span>Facturation</span>
-          <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
+          <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
           <span>Gestion</span>
-          <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
+          <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
         </motion.div>
       </aside>
 
@@ -191,7 +191,7 @@ export function LoginView({
         {/* Fond décoratif discret (visible surtout en mobile) */}
         <div aria-hidden className="pointer-events-none absolute inset-0 lg:hidden">
           <div className="luxe-float-a absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
-          <div className="luxe-float-b absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-gold/15 blur-3xl" />
+          <div className="luxe-float-b absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
         </div>
 
         {/* En-tête compact (mobile uniquement) */}

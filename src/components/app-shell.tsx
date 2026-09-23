@@ -311,14 +311,14 @@ function UserMenu({ user, onLogout }: { user: AuthUser; onLogout: () => void }) 
             aria-label="Menu du compte"
           >
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-green-600 to-emerald-500 text-xs font-bold text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-600 to-slate-700 text-xs font-bold text-white"
               aria-hidden
             >
               {initials}
             </span>
             <span className="hidden sm:block text-left leading-tight">
               <span className="block max-w-32 truncate text-xs font-semibold">{user.name}</span>
-              <span className="block text-[10px] text-gold">
+              <span className="block text-[10px] text-cyan-300">
                 {user.role === "ADMIN" ? "Administrateur" : "Employé"}
               </span>
             </span>
@@ -479,7 +479,7 @@ export function AppShell() {
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Barre supérieure desktop : toggle thème + compte */}
           <div className="hidden lg:flex items-center justify-end gap-3 border-b border-border/70 bg-background/80 backdrop-blur px-6 py-2.5">
-            <Badge variant="outline" className="border-gold/50 text-gold font-medium">
+            <Badge variant="outline" className="border-primary/40 text-primary font-medium">
               {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}
             </Badge>
             <div className="flex-1" />

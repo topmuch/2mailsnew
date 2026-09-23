@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import {
-  Area,
-  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -20,6 +21,7 @@ import {
   CreditCard,
   Download,
   FileText,
+  Gauge,
   Loader2,
   Package,
   Plus,
@@ -55,13 +57,13 @@ import { buildDailyReportPDF, downloadPDF, printPDF, saveOrOpenInvoicePDF } from
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-// ─── Palette du design (vert & or 2MAILS) ────────────────────────────
+// ─── Palette bleutée (navy & cyan, inspirée du panneau dashboard) ─────
 
 const KPI_TONES = {
-  green: "bg-gradient-to-br from-green-600 to-emerald-700 shadow-green-600/30",
-  gold: "bg-gradient-to-br from-amber-500 to-yellow-600 shadow-amber-500/30",
-  rose: "bg-gradient-to-br from-rose-500 to-red-600 shadow-rose-500/30",
-  teal: "bg-gradient-to-br from-teal-500 to-emerald-600 shadow-teal-500/30",
+  cyan: "bg-gradient-to-br from-cyan-500 to-sky-700 shadow-cyan-600/30",
+  amber: "bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30",
+  red: "bg-gradient-to-br from-rose-500 to-red-600 shadow-rose-500/30",
+  navy: "bg-gradient-to-br from-slate-600 to-slate-800 shadow-slate-700/30",
 } as const;
 
 type Tone = keyof typeof KPI_TONES;
@@ -141,7 +143,7 @@ function BigStat({
   );
 }
 
-/** Barre de progression horizontale (top clients / catégories). */
+/** Barre de progression avec pastille de valeur (façon « Completed Tasks »). */
 function HBar({
   label,
   value,
@@ -159,13 +161,17 @@ function HBar({
     <div title={`${label} : ${display}`}>
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="truncate font-medium">{label}</span>
-        <span className="shrink-0 tabular-nums text-muted-foreground">{display}</span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-muted/70">
-        <div
-          className={cn("h-full rounded-full transition-all", colorClass)}
-          style={{ width: `${Math.max(2, (value / max) * 100)}%` }}
-        />
+      <div className="flex items-center gap-2">
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted/70">
+          <div
+            className={cn("h-full rounded-full transition-all", colorClass)}
+            style={{ width: `${Math.max(3, (value / max) * 100)}%` }}
+          />
+        </div>
+        <span className="min-w-16 shrink-0 rounded-md border bg-muted/40 px-1.5 py-0.5 text-center text-[11px] font-bold tabular-nums">
+          {display}
+        </span>
       </div>
     </div>
   );
@@ -230,9 +236,9 @@ export function DashboardView({
     const sc = stats?.statusCounts;
     if (!sc) return [];
     return [
-      { name: "Payées", value: sc.PAYE, color: "#2e7d32" },
-      { name: "Partielles", value: sc.PARTIEL, color: "#c9a227" },
-      { name: "Impayées", value: sc.NON_PAYE, color: "#c02b2b" },
+      { name: "Payées", value: sc.PAYE, color: "var(--chart-1)" },
+      { name: "Partielles", value: sc.PARTIEL, color: "var(--chart-2)" },
+      { name: "Impayées", value: sc.NON_PAYE, color: "var(--chart-3)" },
     ].filter((d) => d.value > 0);
   }, [stats]);
 
@@ -249,13 +255,14 @@ export function DashboardView({
     return (
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <Skeleton className="h-80 w-full lg:col-span-2" />
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 w-full" />
-            ))}
-          </div>
+          <Skeleton className="h-80 w-full" />
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <Skeleton className="h-72 w-full lg:col-span-2" />
@@ -316,29 +323,51 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* ─── Rangée 1 : graphique + 4 KPI colorées ─── */}
+      {/* ─── Rangée 1 : 4 KPI colorées (façon panneau de référence) ─── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ColoredKpi
+          title="Ventes du jour"
+          value={formatMoneyCompact(stats.today.sales)}
+          icon={FileText}
+          tone="cyan"
+          hint={`${stats.today.invoiceCount} facture(s)`}
+        />
+        <ColoredKpi
+          title="Encaissé du jour"
+          value={formatMoneyCompact(stats.today.received)}
+          icon={Wallet}
+          tone="amber"
+          hint={`${stats.today.paymentCount} versement(s)`}
+        />
+        <ColoredKpi
+          title="Créances clients"
+          value={formatMoneyCompact(stats.unpaidTotal)}
+          icon={CreditCard}
+          tone="red"
+          hint="Reste à encaisser"
+        />
+        <ColoredKpi
+          title="Taux de paiement"
+          value={`${paidPct}%`}
+          icon={Gauge}
+          tone="navy"
+          hint={`${stats.statusCounts.PAYE} payée(s) sur ${stats.statusCounts.PAYE + stats.statusCounts.PARTIEL + stats.statusCounts.NON_PAYE}`}
+        />
+      </div>
+
+      {/* ─── Rangée 2 : bar chart ventes + donut statuts ─── */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="card-luxe shadow-luxe lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="h-4 w-4 text-primary" aria-hidden />
-              Évolution des ventes — {stats.year}
+              Ventes mensuelles — {stats.year}
             </CardTitle>
           </CardHeader>
           <CardContent className="h-72 sm:h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2e7d32" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="#2e7d32" stopOpacity={0.02} />
-                  </linearGradient>
-                  <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#c9a227" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#c9a227" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.2)" vertical={false} />
+              <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                 <YAxis
                   tick={{ fontSize: 11 }}
@@ -349,119 +378,30 @@ export function DashboardView({
                 />
                 <Tooltip
                   formatter={ChartTooltipMoney}
-                  contentStyle={{ borderRadius: 10, borderColor: "rgba(0,0,0,0.1)", fontSize: 12 }}
+                  cursor={{ fill: "rgba(100,116,139,0.12)" }}
+                  contentStyle={{ borderRadius: 10, borderColor: "rgba(100,116,139,0.25)", fontSize: 12 }}
                 />
-                <Area
-                  type="monotone"
+                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
+                <Bar
                   dataKey="total"
                   name="Facturé"
-                  stroke="#2e7d32"
-                  strokeWidth={2.5}
-                  fill="url(#gradGreen)"
+                  fill="var(--chart-4)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={26}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="paid"
                   name="Encaissé"
-                  stroke="#c9a227"
-                  strokeWidth={2}
-                  fill="url(#gradGold)"
+                  fill="var(--chart-1)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={26}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* 4 cartes colorées (2×2) */}
-        <div className="grid grid-cols-2 gap-3">
-          <ColoredKpi
-            title="Ventes du jour"
-            value={formatMoneyCompact(stats.today.sales)}
-            icon={FileText}
-            tone="green"
-            hint={`${stats.today.invoiceCount} facture(s)`}
-          />
-          <ColoredKpi
-            title="Encaissé du jour"
-            value={formatMoneyCompact(stats.today.received)}
-            icon={Wallet}
-            tone="gold"
-            hint={`${stats.today.paymentCount} versement(s)`}
-          />
-          <ColoredKpi
-            title="Créances clients"
-            value={formatMoneyCompact(stats.unpaidTotal)}
-            icon={CreditCard}
-            tone="rose"
-            hint="Reste à encaisser"
-          />
-        </div>
-      </div>
-
-      {/* ─── Rangée 2 : table dernières factures + donut statuts ─── */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="min-w-0 overflow-hidden shadow-luxe lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between gap-2 text-base">
-              Dernières factures
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onNavigate("factures")}>
-                Voir tout
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-0 pb-0">
-            {stats.recentInvoices.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">Aucune facture.</p>
-            ) : (
-              <Table>
-                {/* En-tête coloré façon tableau du modèle */}
-                <TableHeader>
-                  <TableRow className="bg-primary hover:bg-primary">
-                    <TableHead className="h-10 rounded-tl-lg text-primary-foreground">N°</TableHead>
-                    <TableHead className="h-10 text-primary-foreground">Client</TableHead>
-                    <TableHead className="h-10 text-primary-foreground">Paiement</TableHead>
-                    <TableHead className="h-10 text-right text-primary-foreground">Montant</TableHead>
-                    <TableHead className="h-10 rounded-tr-lg text-right text-primary-foreground">PDF</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.recentInvoices.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="whitespace-nowrap text-xs font-semibold">{f.number}</TableCell>
-                      <TableCell className="max-w-28 truncate text-xs" title={f.clientName}>
-                        {f.clientName || "Comptoir"}
-                      </TableCell>
-                      <TableCell>
-                        <PaymentBadge status={f.paymentStatus} />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">
-                        {formatMoney(f.totalTTC)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await saveOrOpenInvoicePDF(f, "download");
-                            } catch {
-                              toast({ title: "Erreur PDF", variant: "destructive" });
-                            }
-                          }}
-                          className="inline-flex text-muted-foreground hover:text-primary"
-                          aria-label={`Télécharger ${f.number}`}
-                        >
-                          <Download className="h-4 w-4" aria-hidden />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Donut : répartition des statuts */}
+        {/* Donut : répartition des statuts (pastille % au centre) */}
         <Card className="card-luxe shadow-luxe">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Statut des factures</CardTitle>
@@ -515,7 +455,96 @@ export function DashboardView({
         </Card>
       </div>
 
-      {/* ─── Rangée 3 : Top clients + Top catégories ─── */}
+      {/* ─── Rangée 3 : table dernières factures + grande carte revenu ─── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="min-w-0 overflow-hidden shadow-luxe lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
+              Dernières factures
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onNavigate("factures")}>
+                Voir tout
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            {stats.recentInvoices.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Aucune facture.</p>
+            ) : (
+              <Table>
+                {/* En-tête cyan façon tableau du modèle */}
+                <TableHeader>
+                  <TableRow className="bg-primary hover:bg-primary">
+                    <TableHead className="h-10 rounded-tl-lg text-primary-foreground">N°</TableHead>
+                    <TableHead className="h-10 text-primary-foreground">Client</TableHead>
+                    <TableHead className="h-10 text-primary-foreground">Paiement</TableHead>
+                    <TableHead className="h-10 text-right text-primary-foreground">Montant</TableHead>
+                    <TableHead className="h-10 rounded-tr-lg text-right text-primary-foreground">PDF</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.recentInvoices.map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell className="whitespace-nowrap text-xs font-semibold">{f.number}</TableCell>
+                      <TableCell className="max-w-28 truncate text-xs" title={f.clientName}>
+                        {f.clientName || "Comptoir"}
+                      </TableCell>
+                      <TableCell>
+                        <PaymentBadge status={f.paymentStatus} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">
+                        {formatMoney(f.totalTTC)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await saveOrOpenInvoicePDF(f, "download");
+                            } catch {
+                              toast({ title: "Erreur PDF", variant: "destructive" });
+                            }
+                          }}
+                          className="inline-flex text-muted-foreground hover:text-primary"
+                          aria-label={`Télécharger ${f.number}`}
+                        >
+                          <Download className="h-4 w-4" aria-hidden />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Grande carte revenu (façon « Revenue » du modèle) */}
+        <Card className="card-luxe shadow-luxe">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Revenue — {stats.year}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex h-[calc(100%-4.2rem)] flex-col justify-center">
+            <div className="rounded-xl bg-gradient-to-br from-cyan-500 to-sky-700 p-5 text-white shadow-lg shadow-cyan-600/25">
+              <p className="text-xs font-semibold uppercase tracking-widest opacity-90">Encaissé {stats.year}</p>
+              <p className="mt-1.5 truncate text-3xl font-black tabular-nums" title={formatMoney(stats.paidTotal)}>
+                {formatMoneyCompact(stats.paidTotal)}
+              </p>
+              <p className="mt-1 text-xs opacity-90">
+                Facturé : {formatMoneyCompact(stats.revenueTotal)} · Créances : {formatMoneyCompact(stats.unpaidTotal)}
+              </p>
+              <Button
+                size="sm"
+                onClick={() => onNavigate("factures")}
+                className="mt-4 border-0 bg-white/20 text-white hover:bg-white/30"
+              >
+                Voir les factures →
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Rangée 4 : Top clients + Top catégories ─── */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="card-luxe shadow-luxe">
           <CardHeader className="pb-3">
@@ -539,10 +568,10 @@ export function DashboardView({
                   display={formatMoneyCompact(c.total)}
                   colorClass={
                     i === 0
-                      ? "bg-gradient-to-r from-green-700 to-emerald-500"
+                      ? "bg-gradient-to-r from-sky-700 to-cyan-500"
                       : i === 1
-                        ? "bg-gradient-to-r from-green-600 to-emerald-400"
-                        : "bg-gradient-to-r from-green-500/90 to-emerald-300/80"
+                        ? "bg-gradient-to-r from-sky-600 to-cyan-400"
+                        : "bg-gradient-to-r from-sky-500/90 to-cyan-300/80"
                   }
                 />
               ))
@@ -572,10 +601,10 @@ export function DashboardView({
                   display={formatMoneyCompact(c.total)}
                   colorClass={
                     i === 0
-                      ? "bg-gradient-to-r from-amber-600 to-yellow-400"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-400"
                       : i === 1
-                        ? "bg-gradient-to-r from-amber-500 to-yellow-300"
-                        : "bg-gradient-to-r from-amber-400/90 to-yellow-200/80"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-300"
+                        : "bg-gradient-to-r from-amber-400/90 to-orange-200/80"
                   }
                 />
               ))
@@ -584,7 +613,7 @@ export function DashboardView({
         </Card>
       </div>
 
-      {/* ─── Rangée 4 : grandes stats + alertes stock ─── */}
+      {/* ─── Rangée 5 : grandes stats + alertes stock ─── */}
       <div className="grid gap-4 lg:grid-cols-3">
         <BigStat
           title="Total clients"
@@ -600,46 +629,53 @@ export function DashboardView({
           onClick={() => onNavigate("produits")}
           actionLabel="Voir les produits"
         />
-
-        <Card className="card-luxe shadow-luxe lg:col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
-              Alertes de stock
-              <span className="ml-auto">
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onNavigate("produits")}>
-                  Produits
-                </Button>
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats.lowStock.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                Tous les stocks sont au niveau. 👍
-              </p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {stats.lowStock.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium" title={p.name}>
-                        {p.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Seuil : {p.minStock} {p.unit}
-                      </p>
-                    </div>
-                    <span className="whitespace-nowrap rounded-md bg-red-100 px-2 py-1 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
-                      {p.stock} {p.unit}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <BigStat
+          title="Commandes en attente"
+          value={String(stats.pendingOrders)}
+          icon={AlertTriangle}
+          onClick={() => onNavigate("commandes")}
+          actionLabel="Voir les commandes"
+        />
       </div>
+
+      <Card className="card-luxe shadow-luxe">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+            Alertes de stock
+            <span className="ml-auto">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onNavigate("produits")}>
+                Produits
+              </Button>
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats.lowStock.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Tous les stocks sont au niveau. 👍
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {stats.lowStock.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium" title={p.name}>
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Seuil : {p.minStock} {p.unit}
+                    </p>
+                  </div>
+                  <span className="whitespace-nowrap rounded-md bg-red-100 px-2 py-1 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+                    {p.stock} {p.unit}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

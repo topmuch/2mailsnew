@@ -708,3 +708,25 @@ Stage Summary:
 - La sidebar propose maintenant le flux commercial complet : Leads → Clients → Tâches → Projets, plus les suivis QR et les automatisations ; l'onglet redondant « QR & Étiquettes » a disparu.
 - Données de démo locales re-créées après reset de la DB de dev ; en production Coolify les données réelles sont conservées (db push additif uniquement) et le seed-admin recrée l'admin si besoin.
 - Push 2mailsnew uniquement (synchronisation GitHub = locale).
+
+---
+Task ID: 24
+Agent: Z.ai Code (principal)
+Task: Refonte du design du dashboard en couleur bleutée (inspiration panneau admin navy/cyan fourni en image) + mode sombre/clair bleuté sur toute l'application.
+
+Work Log:
+- Analyse de l'image de référence (AVIF converti en PNG via ffmpeg) : sidebar navy foncé avec item actif cyan vif, cartes blanches sur fond gris clair, donut avec % au centre, barres de progression colorées avec pastille de valeur, bar chart multi-couleurs, grand bloc revenu cyan.
+- src/app/globals.css réécrit : palette navy & cyan en clair ET en sombre — --primary cyan (oklch 0.6 0.1 216 clair / 0.72 en sombre), --sidebar navy bleuté (oklch 0.32 0.035 258 clair / 0.185 en sombre), --sidebar-primary cyan vif pour l'onglet actif, fonds bleutés (0.968 clair / 0.155 navy sombre), charts 1-5 recolorés (cyan, ambre, rouge, navy, violet), scrollbars bleutées ; classes custom recolorées (text-luxe-gradient navy→cyan, luxe-banner navy, card-luxe liseré cyan, theme-toggle-luxe navy/cyan, theme-toggle-knob cyan clair, nav-luxe-active liseré cyan, shadow-luxe bleutée) — noms de classes conservés pour ne toucher aucun composant.
+- --gold redéfini en ambre chaud (variable conservée pour compatibilité) : les accents « or » deviennent ambre, ce qui préserve le codage CRM QRTags=ambre / QRBags=bleu et s'harmonise avec la palette de l'image (cyan/rouge/ambre/navy).
+- Dashboard principal (dashboard-view.tsx) refondu : 4 cartes KPI colorées en lg:grid-cols-4 (Ventes du jour cyan, Encaissé du jour ambre, Créances rouge, nouveau « Taux de paiement » navy avec paidPct) ; AreaChart remplacé par BarChart groupé « Facturé » navy / « Encaissé » cyan avec barres arrondies et légende (couleurs via var(--chart-N), lisibles en clair et sombre) ; donut statuts recoloré cyan/ambre/rouge avec % payées au centre ; grande carte « Revenue — {année} » façon bloc cyan dégradé (encaissé total via stats.paidTotal, facturé, créances, bouton « Voir les factures → ») ; HBar redessinée avec pastille de valeur encadrée à droite (façon « 75/50/35 » du modèle) ; Top clients en dégradés cyan, catégories en ambre ; 3 BigStats (ajout « Commandes en attente » = pendingOrders) ; alertes stock conservées ; skeletons mis à jour.
+- Accents de marque passés en bleu : app-shell (avatar initials cyan/slate, badge date en primary, rôle en cyan-300), login-view (aurores bg-gold → cyan-400/sky-300, icônes features et filets en cyan), theme-toggle (poignée icône navy), crm-format (fallback camembert cyan, QRTags = var gold/ambre), stats-card (tonalité « global » emerald → cyan), crm-dashboard-view (icônes plateformes dégradé cyan/sky, badge « Connectée » cyan).
+- Nouveau logo 2mails bleu généré par IA (carré navy, monogramme « 2m » cyan, liseré cyan) via CLI z-ai → redimensionné 256px (sharp, scripts/update-logo.mjs) → public/logo-2mails.png + data-URL écrite dans Setting.logo (login, sidebar, PDF, favicon).
+- Badges sémantiques conservés volontairement (Payé=vert, Non payé=rouge, Partiel=ambre, succès/erreur) — seule la marque passe en bleu.
+- Cache .next purgeé (le serveur servait l'ancien CSS compilé) + redémarrage dev (setsid nohup) → nouveau thème servi ; lint 0 erreur.
+- Tests navigateur (agent-browser) : login bleuté complet (bandeau navy, aurores cyan, bouton navy/cyan, nouveau logo) ; dashboard clair : sidebar navy + item actif cyan, 4 KPI (0 FCFA / 0 FCFA / 965 k FCFA / 43 %), bar chart navy/cyan, donut 43 %, table factures en-tête cyan, carte Revenue « 1,52 M FCFA » avec bouton, HBar avec pastilles (829 k FCFA…), BigStats, alertes stock, footer navy collé ; mode sombre : nuit navy profonde, cyan lumineux, tous les graphiques lisibles ; CRM unifié en sombre (bordures ambre/cyan, cartes plateformes « Connectée » cyan, 8 500 FCFA revenu estimé) ; iPhone 14 : header navy, menu burger, dashboard 2×2, camemberts ; vues Factures et Leads cohérentes ; 0 erreur console/page (seul warning Radix DialogContent préexistant).
+
+Stage Summary:
+- Toute l'application 2MAILS est passée en thème bleuté navy & cyan avec mode clair/sombre commutable (bouton pilule existant, poignée cyan) — l'image de référence est reprise : sidebar navy à item actif cyan, donut % central, barres à pastilles, bar chart bi-couleurs, gros bloc revenu cyan.
+- Aucune fonctionnalité retirée : rapport du jour, navigation, KPI, PDF, toutes les vues CRM/facturation intactes ; badges sémantiques (payé/impayé) conservés.
+- Nouveau logo bleu cohérent déployé partout (interface, data-URL DB, favicon).
+- Push 2mailsnew uniquement ; Coolify prendra la version automatiquement.

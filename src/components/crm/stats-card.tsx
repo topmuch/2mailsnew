@@ -8,21 +8,21 @@ import type { StatTone } from "@/lib/crm-format";
 
 // ─── StatsCard du dashboard CRM unifié ──────────────────────────────────────
 // Carte blanche, ombre légère, bordure gauche colorée :
-// - Or/jaune  → QRTags dominant
-// - Bleu      → QRBags dominant
-// - Vert      → global / équilibre
+// - Ambre  → QRTags dominant
+// - Bleu   → QRBags dominant
+// - Cyan   → global / équilibre (thème bleuté 2MAILS)
 // (codage demandé dans le prompt 2, adapté au thème vert & or de 2mails)
 
 const TONE_BORDER: Record<StatTone, string> = {
   qrts: "border-l-4 border-l-gold",
   qrbg: "border-l-4 border-l-blue-500",
-  global: "border-l-4 border-l-emerald-500",
+  global: "border-l-4 border-l-cyan-500",
 };
 
 const TONE_DOT: Record<StatTone, string> = {
   qrts: "bg-gold",
   qrbg: "bg-blue-500",
-  global: "bg-emerald-500",
+  global: "bg-cyan-500",
 };
 
 export default function StatsCard({
