@@ -59,6 +59,12 @@ export async function PUT(request: NextRequest) {
     };
     if (logo !== undefined) data.logo = logo;
 
+    // Objectif de CA mensuel (widget de progression du dashboard) — optionnel
+    if (body.monthlyGoal !== undefined) {
+      const goal = Number(body.monthlyGoal);
+      data.monthlyGoal = Number.isFinite(goal) && goal >= 0 ? goal : 0;
+    }
+
     const settings = await db.setting.update({ where: { id: "main" }, data });
     return NextResponse.json(settings);
   } catch (error) {

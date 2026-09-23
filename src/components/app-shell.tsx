@@ -74,6 +74,8 @@ import CrmCoachView from "@/components/crm/crm-coach-view";
 import CrmLeadsView from "@/components/crm/crm-leads-view";
 import CrmProjectsView from "@/components/crm/crm-projects-view";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { GlobalSearch, GlobalSearchTrigger } from "@/components/global-search";
+import { NotificationBell } from "@/components/notification-bell";
 import { useSettingsStore } from "@/lib/settings-store";
 import { authFetch, clearSession, getCachedUser, verifySession } from "@/lib/auth-client";
 import type { AuthUser } from "@/lib/types";
@@ -431,6 +433,8 @@ export function AppShell() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <GlobalSearchTrigger className="h-9 w-9 justify-center px-0 md:h-9 md:w-auto md:justify-start md:px-3" />
+          <NotificationBell onNavigate={select} />
           <ThemeToggle />
           {mounted && (
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -489,6 +493,8 @@ export function AppShell() {
               {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}
             </Badge>
             <div className="flex-1" />
+            <GlobalSearchTrigger />
+            <NotificationBell onNavigate={select} />
             <ThemeToggle />
             <UserMenu user={user} onLogout={handleLogout} />
           </div>
@@ -498,9 +504,9 @@ export function AppShell() {
               /* Boîte mail : occupe toute la page (design premium 3 volets) */
               <MailView />
             ) : (
-            <div className="mx-auto max-w-6xl px-3 sm:px-6 py-5 sm:py-7 pb-10">
+            <div className="w-full min-w-0 mx-auto max-w-6xl px-3 sm:px-6 py-5 sm:py-7 pb-10">
               {view === "dashboard" && (
-                <DashboardView onNavigate={(v) => select(v as ViewId)} onNewInvoice={newInvoice} />
+                <DashboardView onNavigate={(v) => select(v as ViewId)} onNewInvoice={newInvoice} isAdmin={isAdmin} />
               )}
               {view === "factures" && (
                 <InvoicesView
@@ -538,6 +544,9 @@ export function AppShell() {
 
       {/* Bouton flottant « Ajout rapide » (client / tâche / RDV / note) */}
       <QuickAddButton />
+
+      {/* Recherche globale (palette Ctrl+K) */}
+      <GlobalSearch onNavigate={select} />
 
       {/* Footer collant */}
       <footer className="mt-auto border-t border-sidebar-border bg-sidebar text-sidebar-foreground/75">

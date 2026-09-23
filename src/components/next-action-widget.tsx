@@ -66,7 +66,7 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
   return (
     <section
       aria-label="Priorités du moment"
-      className="rounded-2xl bg-gradient-to-r from-[#1f3fbf] to-[#3a5ce8] p-4 shadow-lg sm:p-6"
+      className="min-w-0 overflow-hidden rounded-2xl bg-gradient-to-r from-[#1f3fbf] to-[#3a5ce8] p-4 shadow-lg sm:p-6"
     >
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-bold text-white sm:text-xl">
@@ -103,7 +103,7 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
           {actions.slice(0, 3).map((action, index) => (
             <div
               key={action.id}
-              className="flex items-start gap-3 rounded-xl bg-white/90 p-3.5 sm:p-4"
+              className="flex min-w-0 items-start gap-3 overflow-hidden rounded-xl bg-white/90 p-3.5 sm:p-4"
             >
               <div className="w-7 shrink-0 text-center text-2xl font-black text-[#1f3fbf]" aria-hidden>
                 {index + 1}

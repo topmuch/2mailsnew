@@ -253,7 +253,36 @@ export interface Settings {
   rc: string;
   ninea: string;
   logo?: string | null;
+  /** Objectif de CA mensuel (FCFA) — widget progression du dashboard */
+  monthlyGoal?: number;
   updatedAt?: string;
+}
+
+// ─── Productivité : notifications & recherche globale ───────────────────────
+
+export interface AppNotification {
+  id: string;
+  type: "INVOICE_OVERDUE" | "RDV_TODAY" | "TASK_OVERDUE" | "STOCK_LOW" | "FOLLOWUP_CREATED";
+  title: string;
+  description?: string;
+  severity: "high" | "medium" | "low";
+  /** Vue à ouvrir au clic (identifiant de navigation du shell) */
+  view: string;
+  date?: string;
+}
+
+export interface GlobalSearchItem {
+  id: string;
+  type: "CLIENT" | "INVOICE" | "PRODUCT" | "TASK" | "EVENT" | "LEAD" | "MAIL";
+  title: string;
+  sub?: string;
+  view: string;
+}
+
+export interface GlobalSearchGroup {
+  type: GlobalSearchItem["type"];
+  label: string;
+  items: GlobalSearchItem[];
 }
 
 // ─── Utilisateurs ───────────────────────────────────────────────────────────

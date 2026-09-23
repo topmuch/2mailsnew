@@ -233,6 +233,7 @@ model Setting {
   imapUser    String  @default("")
   imapPass    String  @default("")
   mailDailyImportLimit Int @default(15) // nb max de mails importés du serveur IMAP par jour (anti-saturation)
+  monthlyGoal  Float     @default(0) // objectif de chiffre d'affaires mensuel (FCFA) — widget progression du dashboard
   lastMailSync DateTime?
   updatedAt   DateTime @updatedAt
 }

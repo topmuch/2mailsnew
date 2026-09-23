@@ -57,6 +57,7 @@ import { buildDailyReportPDF, downloadPDF, printPDF, saveOrOpenInvoicePDF } from
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { NextActionWidget } from "@/components/next-action-widget";
+import { MonthlyGoalCard } from "@/components/monthly-goal-card";
 
 // ─── Palette bleutée (navy & cyan, inspirée du panneau dashboard) ─────
 
@@ -188,9 +189,11 @@ function ChartTooltipMoney(value: number | string): string {
 export function DashboardView({
   onNavigate,
   onNewInvoice,
+  isAdmin,
 }: {
   onNavigate: (view: string) => void;
   onNewInvoice: () => void;
+  isAdmin?: boolean;
 }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const { data: stats, loading } = useFetch<DashboardStats>(
@@ -329,6 +332,9 @@ export function DashboardView({
 
       {/* ─── Widget « Prochaine action » : 3 priorités automatiques ─── */}
       <NextActionWidget onNavigate={onNavigate} />
+
+      {/* ─── Objectif du mois : progression CA vs objectif ─── */}
+      <MonthlyGoalCard isAdmin={isAdmin} />
 
       {/* ─── Bandeau KPI : 4 grandes cartes pleine largeur (version large) ─── */}
       <div className="grid gap-3 sm:gap-4">
