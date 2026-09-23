@@ -1,5 +1,6 @@
 import { schedule } from "node-cron";
 import { runDueJobs, isBusinessHours } from "@/lib/crm-automation";
+import { runAutomaticFollowups } from "@/lib/crm-followups";
 
 // ─── Scheduler des automatisations CRM (node-cron) ───────────────────────────
 // Un seul tick par minute : à chaque minute, runDueJobs compare l'heure locale
@@ -26,6 +27,11 @@ export function startCrmScheduler() {
           `[crm-scheduler] ${now.toISOString()} — exécuté : ${result.ran.join(", ") || "rien"}` +
             (result.errors.length ? ` | erreurs : ${result.errors.join(" | ")}` : ""),
         );
+      }
+      // Relances automatiques : une fois par jour à partir de 09h00
+      const followups = await runAutomaticFollowups(now);
+      if (followups.created.length) {
+        console.log(`[crm-scheduler] relances automatiques : ${followups.created.length} tâche(s) créée(s) — ${followups.created.join(", ")}`);
       }
     } catch (error) {
       console.error("[crm-scheduler] erreur du tick :", error);

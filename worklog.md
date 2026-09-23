@@ -859,3 +859,28 @@ Work Log:
 Stage Summary:
 - Les 4 KPI (Ventes du jour, Encaissé du jour, Créances clients, Taux de paiement) occupent chacune une pleine largeur en grande carte colorée avec valeur XXL — bien plus visibles qu'avant.
 - Aucun changement de données ni d'API, purement présentationnel ; commit + push topmuch/2mailsnew uniquement.
+
+---
+Task ID: 31
+Agent: Z.ai Code (principal)
+Task: 1) Synchroniser GitHub ↔ local ; 2) augmenter la police des onglets du sidebar ; 3) intégrer 5 fonctionnalités de productivité dans le CRM (mission complète) — le tout ADAPTÉ à l'existant (SQLite, thème bleu, CRM intégré), sans rien supprimer.
+
+Work Log:
+- Sync git : fetch 2mailsnew → local = GitHub = 9a0b13e (identiques, rien à tirer) ; rappel : remote origin pointe vers Lampfall (interdit), pushes uniquement vers 2mailsnew.
+- Sidebar : onglets text-sm → text-base (16px), titres de section 10px → 11px.
+- Schéma (+ db:push) : WhatsAppTemplate {name, content, category RELANCE|PROPOSITION|SUPPORT|AUTRE, isActive}, ProductPack {name, price, quantity, type QRTAGS|QRBAGS|SUBSCRIPTION|AUTRE, isActive}, Note {content, author}. Seed AUTOMATIQUE au premier appel API (src/lib/productivity-defaults.ts : ensureWhatsAppTemplates 3 modèles, ensureProductPacks 6 packs, renderTemplate {{vars}}) → rien à faire manuellement en prod Coolify.
+- F1 /api/next-actions : score = facture VENTE NON_PAYE/PARTIEL en retard 100+10/j ; RDV < 2 h 80 ; tâche CRM en retard 70+5/j ; client sans facture > 30 j (ou jamais facturé + créé > 30 j) 50 ; top 3 trié + total. Composant next-action-widget : bannière dégradé bleu marque, badges URGENT/IMPORTANT/À FAIRE, numéros #1-#3, bouton → qui navigue vers la vue concernée (factures/calendrier/crm-tasks/clients), état vide « Tout est à jour », bouton recalcul.
+- F2 /api/whatsapp-templates GET/POST + [id] PUT/DELETE (DELETE admin). whatsapp-quick-send : liste modèles + badges catégorie, textarea libre, aperçu live avec variables remplies, normalisation téléphone Sénégal (771234567 → 221771234567) puis wa.me nouvel onglet ; PRÉ-REMPLISSAGE AUTO de la relance : la facture impayée la plus ancienne du client est récupérée (numéro/montant restant/échéance).
+- F3 /api/quick-add POST (CLIENT→client, TASK→crmTask, EVENT→calendarEvent RDV gold, NOTE→note) + GET notes récentes + DELETE note. quick-add-button : bouton flottant fixe bottom-right (bleu marque, devient ✕), dialog 4 tuiles → formulaire dynamique par type, notes récentes listées avec suppression, toasts.
+- F4 /api/product-packs GET/POST (seed 6 packs) + /api/quick-invoice POST {clientId, packId} : facture VENTE numérotée FV-YYYY-XXXX, 1 article pack, TVA 18 %, audit log ; quick-invoice : sélection pack → Générer → saveOrOpenInvoicePDF « open » → PDF s'ouvre automatiquement (vérifié : FV-2026-0003, 40 000 HT → 47 200 TTC).
+- F5 src/lib/crm-followups.ts runAutomaticFollowups(now, force) : factures VENTE NON_PAYE/PARTIEL avec dueDate > 10 j de retard → tâche CrmTask HIGH « Relance facture N » (idempotent par titre ouvert, garde 1×/jour après 09 h, force pour test admin) ; branché dans le tick node-cron existant (crm-scheduler.ts) ; route manuelle POST /api/follow-ups/run (admin).
+- Intégrations : NextActionWidget en haut du dashboard (avant les KPI larges), QuickAddButton dans app-shell (global, visible hors mails), menus « WhatsApp rapide » + « Facture rapide (packs) » dans le dropdown de chaque client (clients-view).
+- Incident traité : la base SQLite sandbox a été retrouvée VIDE en cours de route (toutes tables à 0, y compris users — cause externe : recyclage du volume sandbox ; code intact, prod Coolify non affectée) → re-seed v3 (admin/admin123 + settings) puis données de test recréées VIA LES NOUVELLES API (double usage : jeu de test + validation bout en bout).
+- Fix UI : ScrollArea max-h ne clippe pas → remplacée par div max-h-64 overflow-y-auto dans whatsapp-quick-send et quick-invoice (la liste déborde sous le bouton).
+- Vérifications : curl login/next-actions/templates/packs/quick-add/quick-invoice/follow-ups (créé 1 tâche, re-run = 0 dupliqué) tous 200 ; navigateur desktop — widget priorités affiche facture impayée (score 300) + tâche de relance auto, Quick Add note créée + listée, WhatsApp : 3 modèles + aperçu FV-2026-0002/59 000 FCFA/03-09-2026, Facture rapide : PDF FV-2026-0003 ouvert ; mobile 390 px — widget + KPI larges + bouton flottant OK ; lint 0 erreur ; logs 200.
+
+Stage Summary:
+- Les 5 fonctionnalités de productivité sont en place et adaptées au thème bleu + CRM intégré : widget 3 priorités auto, WhatsApp 1 clic avec modèles + relance pré-remplie, Quick Add flottant (client/tâche/RDV/note), facture en 2 clics (pack → PDF), relances automatiques quotidiennes > 10 jours de retard.
+- Seeds automatiques (templates + packs) : aucun pas manuel en production.
+- Sidebar : police des onglets augmentée à 16 px ; GitHub = local (9a0b13e puis nouveau commit).
+- Données démo sandbox perdues (recyclage volume, non lié au code) : admin recréé, jeu de test minimal reconstruit via les API — production Coolify inchangée.

@@ -464,3 +464,33 @@ model QrLookup {
   status    String   @default("OK") // OK | ERREUR
   createdAt DateTime @default(now())
 }
+
+// ─── Productivité : WhatsApp, packs facturation rapide, notes ───────────────
+
+model WhatsAppTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  content   String // texte avec variables {{clientName}}, {{invoiceNumber}}…
+  category  String   @default("AUTRE") // RELANCE | PROPOSITION | SUPPORT | AUTRE
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductPack {
+  id          String   @id @default(cuid())
+  name        String // ex. « Pack 50 QRTags Standard »
+  description String?
+  price       Float // FCFA (HT)
+  quantity    Int      @default(1) // 50, 100, 500…
+  type        String   @default("AUTRE") // QRTAGS | QRBAGS | SUBSCRIPTION | AUTRE
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  content   String
+  author    String? // nom de l'utilisateur créateur
+  createdAt DateTime @default(now())
+}

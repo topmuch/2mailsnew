@@ -32,17 +32,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   History,
+  MessageCircle,
   MoreHorizontal,
   Pencil,
   Plus,
   Search,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDebouncedValue, useFetch } from "@/hooks/use-fetch";
 import { formatMoney } from "@/lib/constants";
 import type { Client } from "@/lib/types";
 import { ClientDetailView } from "@/components/client-detail-view";
+import { WhatsAppQuickSend } from "@/components/whatsapp-quick-send";
+import { QuickInvoice } from "@/components/quick-invoice";
 
 interface ClientRow extends Client {
   _count?: { invoices: number; orders: number };
@@ -84,6 +88,9 @@ export function ClientsView() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<Client | null>(null);
+  // Productivité : WhatsApp rapide + facture rapide (dialogs par client)
+  const [waClient, setWaClient] = useState<ClientRow | null>(null);
+  const [qiClient, setQiClient] = useState<ClientRow | null>(null);
 
   useEffect(() => {
     if (dialogOpen) {
@@ -295,6 +302,12 @@ export function ClientsView() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setWaClient(c)}>
+                            <MessageCircle className="h-4 w-4 text-emerald-600" /> WhatsApp rapide
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setQiClient(c)}>
+                            <Zap className="h-4 w-4" /> Facture rapide (packs)
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setSelectedClientId(c.id)}>
                             <History className="h-4 w-4" /> Historique des achats
                           </DropdownMenuItem>
@@ -352,6 +365,38 @@ export function ClientsView() {
               Supprimer
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp rapide (modèles pré-écrits + message libre) */}
+      <Dialog open={waClient !== null} onOpenChange={(v) => !v && setWaClient(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="sr-only">WhatsApp rapide</DialogTitle>
+            <DialogDescription className="sr-only">
+              Envoyer un message WhatsApp pré-écrit ou personnalisé à ce client.
+            </DialogDescription>
+          </DialogHeader>
+          {waClient && (
+            <WhatsAppQuickSend
+              clientName={waClient.name}
+              clientPhone={waClient.phone ?? ""}
+              clientContextId={waClient.id}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Facture rapide en 2 clics (packs prédéfinis) */}
+      <Dialog open={qiClient !== null} onOpenChange={(v) => !v && setQiClient(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Facture rapide</DialogTitle>
+            <DialogDescription className="sr-only">
+              Créer une facture à partir d'un pack prédéfini, PDF ouvert automatiquement.
+            </DialogDescription>
+          </DialogHeader>
+          {qiClient && <QuickInvoice clientId={qiClient.id} clientName={qiClient.name} />}
         </DialogContent>
       </Dialog>
     </div>

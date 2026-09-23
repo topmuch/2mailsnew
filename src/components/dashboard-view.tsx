@@ -56,6 +56,7 @@ import { PaymentBadge } from "@/components/status-badges";
 import { buildDailyReportPDF, downloadPDF, printPDF, saveOrOpenInvoicePDF } from "@/lib/pdf";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { NextActionWidget } from "@/components/next-action-widget";
 
 // ─── Palette bleutée (navy & cyan, inspirée du panneau dashboard) ─────
 
@@ -325,6 +326,9 @@ export function DashboardView({
           </div>
         </div>
       </div>
+
+      {/* ─── Widget « Prochaine action » : 3 priorités automatiques ─── */}
+      <NextActionWidget onNavigate={onNavigate} />
 
       {/* ─── Bandeau KPI : 4 grandes cartes pleine largeur (version large) ─── */}
       <div className="grid gap-3 sm:gap-4">

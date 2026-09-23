@@ -64,6 +64,7 @@ import { SettingsView } from "@/components/settings-view";
 import { LoginView } from "@/components/login-view";
 import MailView from "@/components/mail-view";
 import CalendarView from "@/components/calendar-view";
+import { QuickAddButton } from "@/components/quick-add-button";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
@@ -169,7 +170,7 @@ function NavItems({
     <nav className={cn("space-y-4", className)} aria-label="Navigation principale">
       {sections.map((section) => (
         <div key={section.title}>
-          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/60">
+          <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-widest text-sidebar-foreground/60">
             {section.title}
           </p>
           <div className="space-y-1">
@@ -183,7 +184,7 @@ function NavItems({
                   onClick={() => onSelect(item.id)}
                   title={item.label}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all text-left",
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-all text-left",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-bold nav-luxe-active"
                       : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -534,6 +535,9 @@ export function AppShell() {
           </main>
         </div>
       </div>
+
+      {/* Bouton flottant « Ajout rapide » (client / tâche / RDV / note) */}
+      <QuickAddButton />
 
       {/* Footer collant */}
       <footer className="mt-auto border-t border-sidebar-border bg-sidebar text-sidebar-foreground/75">
