@@ -461,7 +461,26 @@ function MailConfigDialog({
     setTesting(true);
     setTestResults(null);
     try {
-      const res = await authFetch("/api/mail-settings/test", { method: "POST" });
+      // Teste les valeurs saisies dans le formulaire SANS les enregistrer :
+      // pratique pour corriger host/port/mot de passe jusqu'au vert, puis enregistrer.
+      // Les mots de passe laissés vides utilisent ceux déjà enregistrés côté serveur.
+      const payload: Record<string, unknown> = {
+        smtpHost: form.smtpHost.trim(),
+        smtpPort: Number(form.smtpPort) || 587,
+        smtpUser: form.smtpUser.trim(),
+        smtpSecure: form.smtpSecure,
+        imapHost: form.imapHost.trim(),
+        imapPort: Number(form.imapPort) || 993,
+        imapUser: form.imapUser.trim(),
+      };
+      if (form.smtpPass.trim()) payload.smtpPass = form.smtpPass;
+      if (form.imapPass.trim()) payload.imapPass = form.imapPass;
+
+      const res = await authFetch("/api/mail-settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Test impossible");
       setTestResults({ imap: json.imap, smtp: json.smtp });

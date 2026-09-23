@@ -771,3 +771,21 @@ Work Log:
 Stage Summary:
 - La config mail étant vide en local, l'utilisateur doit (1) créer un mot de passe d'application Google (2FA obligatoire), (2) cliquer « Gmail automatique », (3) saisir son adresse Gmail + le mot de passe d'application dans les champs SMTP et IMAP, (4) Enregistrer puis Tester la connexion — le bouton montre maintenant la cause exacte en cas d'échec.
 - Correctifs durables : route de test restaurée, préréglage Gmail en 1 clic, mots de passe d'application tolérants aux espaces, guides intégrés dans le dialog.
+
+---
+Task ID: 26
+Agent: Z.ai Code (principal)
+Task: Analyse des erreurs réelles retournées par le test de connexion sur l'instance de production (IMAP auth refusée + SMTP erreur SSL/TLS) et amélioration du flux de correction.
+
+Work Log:
+- Diagnostic : les erreurs utilisateur proviennent de la PRODUCTION (base locale vide, mais erreurs Gmail réelles = réseau OK) ; IMAP atteint imap.gmail.com:993 (TLS OK) mais identifiants refusés ; SMTP en erreur SSL/TLS = mauvais couple port/« TLS direct ».
+- POST /api/mail-settings/test enrichi : accepte un corps JSON optionnel avec les valeurs du formulaire (smtp*/imap*) → teste SANS enregistrer ; mots de passe vides = retombée sur ceux enregistrés en base ; passField identique à la sauvegarde (16 alnum → espaces retirés).
+- Réessai SMTP automatique : si échec SSL/TLS, retest avec le mode opposé (secure inversé, même port) ; si le mode alternatif VERIFIE, le message indique exactement « COCHEZ/DÉCOCHEZ TLS direct avec le port X » — sinon l'erreur d'origine reste (creds fausses ≠ mauvais mode).
+- mail-diagnostics.ts : GmailHint pointe vers myaccount.google.com/apppasswords ; messages authFailed IMAP/SMTP précisent « adresse email COMPLÈTE » + « mot de passe d'application de 16 caractères récemment généré et collé sans erreur ».
+- mail-view.tsx runTest : envoie le payload du formulaire (mêmes règles que la sauvegarde) — l'utilisateur peut itérer host/port/pass jusqu'au vert PUIS enregistrer.
+- Tests réels sandbox : IMAP fake app password → « Authentification refusée… » (connexion TLS OK), SMTP 587+TLS direct → erreur SSL/TLS attendue ; lint 0 erreur.
+
+Stage Summary:
+- Boucle de correction raccourcie : remplir → Tester (sans sauvegarder) → corriger → vert → Enregistrer.
+- Le test SMTP auto-détecte le bon mode TLS et donne la consigne exacte.
+- Reste à l'utilisateur : générer un vrai mot de passe d'application Google et corriger le couple port/mode (465+TLS coché OU 587+TLS décoché).

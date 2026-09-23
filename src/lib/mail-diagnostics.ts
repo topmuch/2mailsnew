@@ -34,7 +34,7 @@ interface ErrLike {
 }
 
 const GmailHint =
-  "Pour Gmail ou Google Workspace : activez la validation en deux étapes puis générez un « Mot de passe d'application » (16 caractères) sur myaccount.google.com → Sécurité — votre mot de passe habituel ne fonctionne pas.";
+  "Pour Gmail ou Google Workspace : le mot de passe à utiliser est un « Mot de passe d'application » de 16 caractères, à générer sur myaccount.google.com/apppasswords après avoir activé la validation en deux étapes — votre mot de passe habituel ne fonctionne jamais.";
 
 // ─── Traduction des erreurs en langage clair ────────────────────────────────
 
@@ -52,7 +52,7 @@ export function describeMailError(protocol: "IMAP" | "SMTP", error: unknown): st
 
   if (protocol === "IMAP") {
     if (authFailed)
-      return `Authentification refusée par le serveur : l'utilisateur ou le mot de passe est incorrect. ${GmailHint}`;
+      return `Authentification refusée par le serveur : vérifiez que l'utilisateur est votre adresse email COMPLÈTE (ex. nom@gmail.com) et que le mot de passe est bien un mot de passe d'application de 16 caractères, récemment généré et collé sans erreur. ${GmailHint}`;
     if (code === "CONNECT_TIMEOUT" || code === "ETIMEDOUT" || /timeout|timed out/.test(msg))
       return "Délai dépassé : le serveur IMAP ne répond pas. Vérifiez l'hôte et le port — le port 993 peut être bloqué par un pare-feu ou par l'hébergeur.";
     if (code === "ENOTFOUND" || code === "EAI_AGAIN")
@@ -68,7 +68,7 @@ export function describeMailError(protocol: "IMAP" | "SMTP", error: unknown): st
 
   // SMTP
   if (authFailed)
-    return `Authentification SMTP refusée : utilisateur ou mot de passe incorrect. ${GmailHint}`;
+    return `Authentification SMTP refusée : vérifiez l'adresse email complète et utilisez un mot de passe d'application de 16 caractères. ${GmailHint}`;
   if (err.responseCode === 534 || /5\.7\.14|5\.7\.9/.test(raw))
     return `Connexion refusée par le fournisseur (protection Google). ${GmailHint}`;
   if (code === "ESOCKET" || /ssl|tls|wrong version number/i.test(raw))
