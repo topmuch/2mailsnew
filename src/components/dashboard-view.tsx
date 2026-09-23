@@ -68,7 +68,7 @@ const KPI_TONES = {
 
 type Tone = keyof typeof KPI_TONES;
 
-/** Carte KPI colorée façon « Weekly Sales » du modèle. */
+/** Grande carte KPI colorée pleine largeur (bannière horizontale, valeur XXL). */
 function ColoredKpi({
   title,
   value,
@@ -85,22 +85,25 @@ function ColoredKpi({
   return (
     <div
       className={cn(
-        "flex min-h-24 flex-col justify-between gap-2 rounded-xl p-4 text-white shadow-lg transition-transform hover:scale-[1.02]",
+        "flex flex-col gap-3 rounded-2xl p-4 text-white shadow-lg transition-shadow hover:shadow-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5",
         KPI_TONES[tone]
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-90">{title}</p>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
-          <Icon className="h-4 w-4" aria-hidden />
+      <div className="flex min-w-0 items-center gap-3.5 sm:gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 sm:h-14 sm:w-14">
+          <Icon className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold uppercase tracking-wider opacity-95 sm:text-base">{title}</p>
+          {hint && <p className="mt-0.5 truncate text-[11px] opacity-85 sm:text-xs">{hint}</p>}
         </div>
       </div>
-      <div>
-        <p className="truncate text-lg font-extrabold tabular-nums sm:text-xl" title={value}>
-          {value}
-        </p>
-        {hint && <p className="text-[11px] opacity-85">{hint}</p>}
-      </div>
+      <p
+        className="truncate text-3xl font-extrabold tabular-nums sm:shrink-0 sm:text-4xl"
+        title={value}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -255,9 +258,9 @@ export function DashboardView({
     return (
       <div className="space-y-4">
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full" />
+            <Skeleton key={i} className="h-28 w-full sm:h-24" />
           ))}
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -323,8 +326,8 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* ─── Rangée 1 : 4 KPI colorées (façon panneau de référence) ─── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* ─── Bandeau KPI : 4 grandes cartes pleine largeur (version large) ─── */}
+      <div className="grid gap-3 sm:gap-4">
         <ColoredKpi
           title="Ventes du jour"
           value={formatMoneyCompact(stats.today.sales)}

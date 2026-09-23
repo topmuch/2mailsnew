@@ -845,3 +845,17 @@ Work Log:
 Stage Summary:
 - Sidebar (desktop, sheet mobile, header mobile, footer, menu compte) unifiée sur le bleu #1F3FBF avec écriture blanche, mode sombre en #1B36AC — fidèle à la pièce jointe.
 - Aucune régression fonctionnelle ; commit + push topmuch/2mailsnew uniquement (jamais Lamp Fall).
+
+---
+Task ID: 30
+Agent: Z.ai Code (principal)
+Task: Augmenter la taille des KPI du tableau de bord et les passer en version large (demande « 1/ » de l'utilisateur).
+
+Work Log:
+- dashboard-view.tsx — ColoredKpi refondu en bannière horizontale pleine largeur : icône agrandie (h-12→h-14 sm), titre text-sm/base, valeur en text-3xl mobile → text-4xl desktop (au lieu de lg/xl), padding p-4→p-5, coins rounded-2xl, hover shadow-xl (scale retiré sur pleine largeur) ; mobile = empilé (icône+titre puis valeur géante dessous), sm+ = titre à gauche / valeur à droite.
+- Grille KPI : grid-cols-2/lg:grid-cols-4 → colonne unique gap-3/4 (une grande carte par ligne, 4 lignes) ; skeleton de chargement aligné (h-28 sm:h-24).
+- Vérifié navigateur : desktop 1440px — 4 bannières pleine largeur, valeurs XXL (« 965 k FCFA », « 43% ») ; mobile 390px — cartes empilées lisibles, aucune troncature gênante ; 0 erreur console ; lint 0 erreur.
+
+Stage Summary:
+- Les 4 KPI (Ventes du jour, Encaissé du jour, Créances clients, Taux de paiement) occupent chacune une pleine largeur en grande carte colorée avec valeur XXL — bien plus visibles qu'avant.
+- Aucun changement de données ni d'API, purement présentationnel ; commit + push topmuch/2mailsnew uniquement.
