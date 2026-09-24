@@ -968,3 +968,21 @@ Stage Summary:
 - Le Coach Virtuel devient un vrai coach conversationnel : chat en direct (IA z-ai-web-dev-sdk côté serveur) qui connaît l'état réel du business du jour et se souvient de la conversation (modèle CrmCoachChat), avec salutation chiffrée, 4 raccourcis d'action, indicateurs de frappe et reset.
 - Nouveaux artefacts : prisma CrmCoachChat, src/lib/coach-context.ts, src/app/api/crm/coach/chat/route.ts, src/components/crm/crm-coach-chat.tsx ; modifiés : crm-coach-view.tsx (import + rendu + sous-titre).
 - La fonctionnalité existante (messages planifiés 11h/14h/17h, « Envoyer un… », bibliothèque admin, historique) est inchangée.
+
+---
+Task ID: 36
+Agent: Z.ai Code (principal)
+Task: « Notifications reçues mais pas de changement » → diagnostic : sandbox réinitialisé, base vidée ; restauration complète + protection
+
+Work Log:
+- Diagnostic : login admin refusé (« Identifiant ou mot de passe incorrect ») → inspection SQLite : table User VIDE, toutes les tables vides (0 User/Client/Invoice/Product/CrmTask…, 1 Setting recréé par l'app). Fichier db/custom.db recréé à 10:20 lors d'un redémarrage du sandbox (schema complet régénéré par db:push au boot) — les données créées depuis le 20/09 étaient sur le disque sandbox uniquement.
+- Sauvegardes : git contenait uniquement une db du 20/09 (commit auto 926fef4, ancien schéma 11 tables, supprimée du suivi ensuite car /db/ est gitignoré) → données récentes non récupérables depuis git ; reconstruction à partir du jeu de démonstration documenté (captures + worklog Tasks 30-35).
+- scripts/restore-demo.ts (nouveau, idempotent) : recrée admin/admin123 (scrypt identique à src/lib/auth.ts), client Hôtel Terrou-Bi, factures FV-2026-0001 (53 100)/0002 (59 000, échue J-21)/0003 (47 200) avec articles (HT×1,18=TTC), tâche « Relance facture FV-2026-0002 » (HIGH, J-1), plateformes QRTAGS (15 000 FCFA/pack)/QRBAGS (25 000), blog note « Astuce WhatsApp relance » (ambre, épinglée), favori wa.me/221771234567 (FOURNISSEUR), 30 messages Coach. Dates normalisées à MINUIT (corrigeait « retard de 0 j / 20 j » au lieu de 1 j / 21 j) — correction appliquée aussi aux lignes existantes via SQLite + au script.
+- Setting.tagline remise à « QR Tags & QR Bags — Dakar » (les autres champs société : adresse/téléphone/RC/NINEA à ressaisir dans Paramètres — perdus avec la base).
+- PROTECTION : db/custom.db re-suivi dans git (git add -f malgré /db/ gitignore) + scripts/restore-demo.ts versionnés → toute future réinitialisation sera récupérable depuis GitHub (2mailsnew) et restaurable en 1 commande.
+- Vérifié au navigateur : login admin OK ; dashboard identique (priorités « Facture FV-2026-0002 impayée — 59 000 FCFA en retard de 21 j » + tâche « retard de 1 j ») ; badge notifications 3 (tâche, facture échue, relance auto) ; sidebar compacte ; coach greeting avec les vrais chiffres. Lint 0/0.
+
+Stage Summary:
+- Cause comprise : reset du sandbox (pas une régression de l'app) → base SQLite recréée vide, d'où « notifications reçues mais aucun changement » (session invalide + données disparues).
+- App entièrement restaurée et vérifiée ; script scripts/restore-demo.ts réutilisable (bun run scripts/restore-demo.ts) ; base versionnée dans git pour la résilience.
+- À communiquer : ressaisir adresse/téléphone/RC/NINEA/logo dans Paramètres si souhaité ; les notifications sont des alertes calculées en direct qui disparaissent d'elles-mêmes quand le problème est réglé (facture payée, tâche terminée).
