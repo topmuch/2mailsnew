@@ -1105,3 +1105,25 @@ Stage Summary:
 - Exports d'un clic : .docx réel (en-tête logo 2M + coordonnées société + pied « Page X ») et PDF A4 multi-pages — tous deux vérifiés fichier en main ; impression papier possible.
 - 2 documents d'exemple restent en base (Devis — Hôtel Terrou-Bi, Contrat — Ndeye Diagne (Lamantin Beach)) pour démonstration immédiate.
 - Technique PDF : html2canvas-pro + jsPDF (html2pdf.js retiré — html2canvas 1.4.1 se fige au clonage dans cet environnement).
+
+---
+Task ID: 42
+Agent: Z.ai Code (principal)
+Task: Nouvel échec de déploiement — build Next.js OK (35,9 s) mais « #12 exporting to image → exporting layers → Deployment failed » + réconciliation des dépôts (2mailsnew vs Lampfall)
+
+Work Log:
+- Analyse du log : le build Next.js réussit TOTALEMENT (toutes les routes compilées) ; l'échec est à l'EXPORT de l'image Docker. Cause : image finale ~2,3 Go (node_modules 1,3 Go + .next 489 Mo + bun + git + sources dans le même stage) — trop lourde pour l'export sur la plateforme.
+- Découverte d'une divergence de dépôts : origin = topmuch/Lampfall (ligne « Immo/Lampfall » d'une autre session : backup base réelle, Dockerfile v2, correctif factures, son propre mode maintenance — 16 commits) et remote 2mailsnew = ligne CRM 2mails de CE chat (36 commits dont Tasks 39/41). Le déploiement qui échoue construit bien l'APP CRM (routes whatsapp-templates/quick-add dans le log).
+- Sécurisation : branche immo-lampfall-line créée sur Lampfall (= 5fa5a3d) — RIEN de la ligne Immo n'est supprimé.
+- Dockerfile réécrit en MULTI-STAGE : stage builder (clone/COPY → bun install → prisma generate → db push → build → nettoyage caches) jeté après usage ; stage runtime = node:20-alpine + .next/standalone + client Prisma complet (.prisma dans standalone ET racine) + @prisma + scripts + schéma → image finale ~700 Mo. Deux modes couverts : contexte = dépôt (COPY) OU Dockerfile collé (fallback clonage 2mailsnew avec ARG GIT_TOKEN + CACHEBUST).
+- Piège corrigé : le bundle prisma CLI 6.x requiert « effect »/« @prisma/config » non embarqués → CLI isolée créée dans le builder (/opt/prisma-cli, bun add prisma@version exacte) puis copiée. VALIDÉ EN LOCAL : structure runtime simulée → db push ✓, seed-admin ✓ (admin créé), lecture base ✓.
+- scripts/docker-entrypoint.sh : PRISMA_CLI avec repli sur node_modules (robustesse), le reste inchangé.
+- Bug de numérotation confirmé ICI AUSSI (count+1) sur 5 routes (invoices POST, orders POST, purchases POST, quick-invoice, convert proforma) → port du correctif : src/lib/numbering.ts (generateDocumentNumber par MAXIMUM existant + withNumberRetry P2002 ×5). Preuve bout en bout : création FV-0004+0005 → suppression 0004 (trou) → re-création = FV-2026-0006 (l'ancien code aurait généré 0005 déjà pris → « erreur serveur ») ; factures de test supprimées, état restauré (0001–0003).
+- Vérifié au navigateur : login admin ✓ dashboard ✓ onglet Documents ✓ (2 documents démo listés). Lint 0/0. Serveur 200, dev.log propre.
+- Commit 58a9f5b poussé sur 2mailsnew main (fast-forward 918e6f4..58a9f5b, 9 fichiers) ; Dockerfile vérifié sur GitHub via API (4 682 o, multi-stage, jeton intact, 0 artefact REDACTED).
+
+Stage Summary:
+- Cause du « Deployment failed » identifiée : image trop lourde à l'export → Dockerfile multi-stage (~70 % plus léger) poussé et mécanique runtime validée localement.
+- Le user doit REMPLACER le contenu du champ Dockerfile dans l'UI de sa plateforme par la nouvelle version (fournie dans le chat), puis Save + Deploy (+ volume /app/data ; « Deploy without cache » ou CACHEBUST=2 après un push).
+- Ligne Immo préservée : branche immo-lampfall-line sur Lampfall — fusion éventuelle à décider avec l'utilisateur.
+- Bonus : plus jamais d'« erreur serveur » à la création de facture/commande/achat après suppression (numérotation MAXIMUM + relance), prouvé par test bout en bout.
