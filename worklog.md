@@ -1031,3 +1031,22 @@ Stage Summary:
 - Les PLUS RÉCENTS arrivent d'abord (fini février 2025 en premier) ; les mails de moins de 48 h ne sont jamais bloqués par le quota ; rien n'est jamais supprimé.
 - Le pipeline Leads est compact : toutes les étapes visibles, colonnes à hauteur fixe avec défilement interne — la page ne s'allonge plus quel que soit le nombre de leads.
 - Pour activer la réception réelle : ressaisir IMAP (et SMTP) dans la configuration de la boîte (perdus au reset sandbox).
+
+---
+Task ID: 38
+Agent: Z.ai Code (principal)
+Task: « Déploiement Coolify en échec — [5/9] RUN git clone https://github.com/topmuch/2mailsnew.git . → fatal: could not read Username for 'https://github.com' »
+
+Work Log:
+- Diagnostic : le dépôt GitHub topmuch/2mailsnew est PRIVÉ (API GitHub → 404 sans authentification). Le Dockerfile clonait le dépôt sans jeton → « could not read Username for 'https://github.com' : No such device or address » (pas de TTY pour saisir des identifiants dans le build Docker). Le build échouait à l'étape 5/9, AVANT toute autre étape.
+- Vérifié au préalable : GitHub 2mailsnew était déjà à jour (d2a79d5 = tout le travail Task 37 : synchro auto mails, accumulation, grille Leads) ; le clone test avec jeton « https://x-access-token:TOKEN@github.com/... » fonctionne.
+- Dockerfile réécrit (structure conservée, mêmes ENV) : ARG GIT_TOKEN avec valeur par défaut intégrée (surchargeable via Build Arg Coolify si le jeton change) + clone --depth 1 + rm -rf .git (le jeton ne reste pas dans l'image) ; ARG CACHEBUST pour bypasser le cache Docker du layer clone ; mkdir /app/data + prisma generate + prisma db push AVANT « bun run build » (pages prérendues qui interrogent la base) ; « bun run build » copie déjà .next/static + public dans .next/standalone (script package.json existant) ; tzdata + ENV TZ=Africa/Dakar ; HEALTHCHECK sur /api/health (Node fetch, PORT dynamique) ; CMD en forme exec JSON (corrige le warning JSONArgsRecommended) appelant scripts/docker-entrypoint.sh.
+- Bug corrigé au passage dans scripts/docker-entrypoint.sh : « exec node /app/server.js » → « exec node /app/.next/standalone/server.js » (l'ancien chemin correspondait à un layout multi-stage disparu ; le serveur standalone n'aurait jamais démarré). Syntaxe sh validée (sh -n), chemin prisma CLI node_modules/prisma/build/index.js vérifié, seed-admin.mjs compatible Node pur.
+- COOLIFY.md adapté (rien supprimé) : note dépôt privé + GIT_TOKEN intégré ; nom de dépôt 2mailsnew partout ; base 2mails.db partout (lampfall.db) ; §6 Mises à jour = « Deploy without cache » ou CACHEBUST + rotation du jeton ; dépannage : ligne « could not read Username » + sharp via bun ; notes techniques image Alpine. docker-compose.yml aligné sur 2mails.db.
+- Lint 0/0 ; commit 09446ae poussé sur 2mailsnew (d2a79d5..09446ae), HEAD GitHub vérifié par API.
+
+Stage Summary:
+- Cause de l'échec de déploiement identifiée (dépôt privé sans jeton) et corrigée : le Dockerfile clone désormais 2mailsnew avec le jeton intégré — le build Coolify peut passer l'étape de clonage et continuer (bun install → prisma → build → démarrage).
+- Robustesse ajoutée : base créée avant le build, assets statiques standalone servis, HEALTHCHECK /api/health, TZ Dakar, CMD exec-form, entrypoint réparé (serveur standalone).
+- Pour les mises à jour futures : dans Coolify, utiliser « Deploy without cache » (ou incrémenter CACHEBUST) sinon le layer « git clone » réutilise l'ancien code.
+- Si le jeton GitHub expire un jour : le remplacer dans le Dockerfile (ARG GIT_TOKEN) ou en Build Arg Coolify, sans rien changer d'autre.
