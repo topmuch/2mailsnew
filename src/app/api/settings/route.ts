@@ -65,6 +65,11 @@ export async function PUT(request: NextRequest) {
       data.monthlyGoal = Number.isFinite(goal) && goal >= 0 ? goal : 0;
     }
 
+    // Mode maintenance (écran de blocage pour les non-admins) — optionnel
+    if (body.maintenanceMode !== undefined) {
+      data.maintenanceMode = Boolean(body.maintenanceMode);
+    }
+
     const settings = await db.setting.update({ where: { id: "main" }, data });
     return NextResponse.json(settings);
   } catch (error) {

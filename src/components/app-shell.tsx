@@ -50,6 +50,7 @@ import {
   Truck,
   UserPlus,
   Users2,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CategoriesProvider } from "@/components/categories-provider";
@@ -510,6 +511,18 @@ export function AppShell() {
   const companyName = settings?.nomSociete ?? "2MAILS";
   const companyTagline = settings?.tagline ?? "";
 
+  // ─── Mode maintenance : les non-admins voient un écran de blocage ──────────
+  if (settings?.maintenanceMode && !isAdmin) {
+    return (
+      <MaintenanceScreen
+        onLogout={handleLogout}
+        companyName={companyName}
+        telephone={settings.telephone}
+        email={settings.email}
+      />
+    );
+  }
+
   // Ouvre / referme une section de la sidebar (accordéon persistant)
   const toggleNavSection = (title: string) => {
     setOpenSections((prev) => {
@@ -641,7 +654,7 @@ export function AppShell() {
             <UserMenu user={user} onLogout={handleLogout} />
           </div>
 
-          <main className="flex flex-1 min-w-0 flex-col bg-background">
+          <main className="flex min-h-0 flex-1 min-w-0 flex-col bg-background">
             {view === "mails" ? (
               /* Boîte mail : occupe toute la page (design premium 3 volets) */
               <MailView />
@@ -734,6 +747,64 @@ function RestrictedCard() {
       <p className="font-semibold">Accès réservé à l&apos;administrateur</p>
       <p className="text-sm text-muted-foreground max-w-sm">
         Votre rôle d&apos;employé ne permet pas d&apos;accéder à cette section. Contactez l&apos;administrateur de la société.
+      </p>
+    </div>
+  );
+}
+
+// ─── Écran de mode maintenance (non-admins) ──────────────────────────────────
+
+function MaintenanceScreen({
+  onLogout,
+  companyName,
+  telephone,
+  email,
+}: {
+  onLogout: () => void;
+  companyName: string;
+  telephone?: string;
+  email?: string;
+}) {
+  // Re-vérifie automatiquement toutes les 30 s — l'accès revient dès que
+  // l'administrateur désactive le mode maintenance (bouton « Réessayer » = immédiat).
+  const load = useSettingsStore((s) => s.load);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      load();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-950/60">
+          <Wrench className="h-8 w-8 animate-pulse text-amber-600 dark:text-amber-400" aria-hidden />
+        </div>
+        <h1 className="mt-5 text-xl font-bold">Application en maintenance</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          {companyName} effectue une mise à jour. L&apos;application sera de nouveau
+          disponible dans quelques instants — merci de votre patience.
+        </p>
+        {(telephone || email) && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Besoin urgent de nous joindre ?{" "}
+            {telephone && <span className="font-medium text-foreground">{telephone}</span>}
+            {telephone && email ? " · " : ""}
+            {email && <span className="font-medium text-foreground">{email}</span>}
+          </p>
+        )}
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Button variant="outline" onClick={() => load()} className="min-h-11 gap-2">
+            <Loader2 className="h-4 w-4" aria-hidden /> Réessayer
+          </Button>
+          <Button variant="ghost" onClick={onLogout} className="min-h-11 gap-2 text-muted-foreground">
+            <LogOut className="h-4 w-4" aria-hidden /> Se déconnecter
+          </Button>
+        </div>
+      </div>
+      <p className="mt-6 text-xs text-muted-foreground/70">
+        Cette page se met à jour automatiquement toutes les 30 secondes.
       </p>
     </div>
   );

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -25,11 +26,13 @@ import {
   Loader2,
   Save,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/auth-client";
 import { invalidateCompanyCache } from "@/lib/pdf";
 import { useSettingsStore } from "@/lib/settings-store";
+import { cn } from "@/lib/utils";
 import type { Settings } from "@/lib/types";
 
 /** Redimensionne une image en data-URL JPEG (max 512px) pour le logo. */
@@ -61,6 +64,39 @@ export function SettingsView() {
   const [restoreData, setRestoreData] = useState<unknown>(null);
   const [restoreFileName, setRestoreFileName] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Mode maintenance (appliqué immédiatement, sans passer par « Enregistrer »)
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+
+  const toggleMaintenance = async (checked: boolean) => {
+    if (!settings) return;
+    setMaintenanceBusy(true);
+    const previous = settings.maintenanceMode ?? false;
+    setSettings({ ...settings, maintenanceMode: checked });
+    try {
+      const res = await authFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...settings, maintenanceMode: checked }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur d'enregistrement");
+      setSettings(json);
+      useSettingsStore.getState().setSettings(json);
+      invalidateCompanyCache();
+      toast({
+        title: checked ? "Mode maintenance activé" : "Mode maintenance désactivé",
+        description: checked
+          ? "Les employés verront un écran de maintenance à leur prochain chargement. Vous gardez l'accès complet."
+          : "L'application est de nouveau accessible à tous.",
+      });
+    } catch (err) {
+      setSettings({ ...settings, maintenanceMode: previous });
+      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Erreur inconnue", variant: "destructive" });
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -399,6 +435,43 @@ export function SettingsView() {
           />
           <p className="text-xs text-muted-foreground sm:ml-auto sm:text-right">
             La restauration remplace toutes les données actuelles.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Mode maintenance */}
+      <Card className={cn("card-luxe transition-colors", settings.maintenanceMode && "border-amber-400/60 bg-amber-50/40 dark:border-amber-500/40 dark:bg-amber-950/20")}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wrench className={cn("h-4 w-4", settings.maintenanceMode ? "text-amber-600 dark:text-amber-400" : "text-primary")} aria-hidden />
+            Mode maintenance
+            {settings.maintenanceMode && (
+              <Badge className="bg-amber-500 text-white hover:bg-amber-500">Actif</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Bloque l&apos;accès de l&apos;application aux employés (écran de maintenance) pendant vos
+            opérations — mise à jour, inventaire, configuration… Vous, en tant qu&apos;administrateur,
+            gardez un accès complet à toutes les sections.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={settings.maintenanceMode ?? false}
+              onCheckedChange={(v) => toggleMaintenance(v)}
+              disabled={maintenanceBusy}
+              aria-label="Activer le mode maintenance"
+            />
+            <span className="text-sm font-semibold">
+              {settings.maintenanceMode ? "Application fermée aux employés" : "Application ouverte à tous"}
+            </span>
+            {maintenanceBusy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />}
+          </div>
+          <p className="text-xs text-muted-foreground sm:ml-auto sm:text-right">
+            {settings.maintenanceMode
+              ? "Désactivez l'interrupteur pour rouvrir l'accès."
+              : "Le changement est appliqué immédiatement — pas besoin d'enregistrer."}
           </p>
         </CardContent>
       </Card>

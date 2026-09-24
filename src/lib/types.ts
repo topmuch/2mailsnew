@@ -255,6 +255,8 @@ export interface Settings {
   logo?: string | null;
   /** Objectif de CA mensuel (FCFA) — widget progression du dashboard */
   monthlyGoal?: number;
+  /** Mode maintenance : bloque l'accès de l'application aux non-admins */
+  maintenanceMode?: boolean;
   updatedAt?: string;
 }
 

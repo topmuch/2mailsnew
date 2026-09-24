@@ -1171,7 +1171,7 @@ export default function MailView() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[248px_minmax(0,1fr)_minmax(0,1.35fr)] lg:gap-4 lg:p-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[248px_minmax(0,1fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:p-4">
         {/* ─── Rail gauche : actions + dossiers + statut ─── */}
         <aside className="hidden min-h-0 flex-col gap-4 lg:flex">
           <div className="rounded-2xl border bg-card shadow-sm">
