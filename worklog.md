@@ -1127,3 +1127,21 @@ Stage Summary:
 - Le user doit REMPLACER le contenu du champ Dockerfile dans l'UI de sa plateforme par la nouvelle version (fournie dans le chat), puis Save + Deploy (+ volume /app/data ; « Deploy without cache » ou CACHEBUST=2 après un push).
 - Ligne Immo préservée : branche immo-lampfall-line sur Lampfall — fusion éventuelle à décider avec l'utilisateur.
 - Bonus : plus jamais d'« erreur serveur » à la création de facture/commande/achat après suppression (numérotation MAXIMUM + relance), prouvé par test bout en bout.
+
+---
+Task ID: 43
+Agent: Z.ai Code (principal)
+Task: 4e échec de déploiement — build tué pendant « Generating static pages using 7 workers (24/49) », mort silencieuse sans message d'erreur
+
+Work Log:
+- Analyse du nouveau log : le Dockerfile MULTI-STAGE est bien utilisé (« [builder 9/10] RUN bun run build && rm -rf /app/.next/cache » = étape 9 du Dockerfile poussé en Task 42) et la compilation Turbopack réussit (« ✓ Compiled successfully in 24.4s », « Skipping validation of types ») → le correctif d'image est actif. La mort survient juste après « Generating static pages using 7 workers (24/49) », sans AUCUN message d'erreur ni trace → signature d'un OOM kill (SIGKILL noyau faute de RAM), pas d'un bug applicatif.
+- Mécanisme vérifié dans le code Next.js 16.1.3 (node_modules/next/dist/build/index.js, fonction getNumberOfWorkers) : par défaut `next build` lance (os.cpus().length − 1) = 7 workers sur le serveur 8 cœurs (le log dit « using 7 workers »), chacun un PROCESSUS Node séparé, pour « Collecting page data » ET « Generating static pages ». 7 workers × ~0,5-1 Go en pic → dépasse la RAM disponible du serveur (partagée avec l'app en production + la plateforme). La phase compile Turbopack (mono-processus) tenait, les 7 workers ont fait déborder. L'essai #3 avait pu finir son build par chance (charge hôte variable) — le serveur est à la limite.
+- Correctif : next.config.ts → experimental.cpus: 1. Option officielle vérifiée dans node_modules (config-shared.d.ts cpus?: number + getNumberOfWorkers : la valeur explicite prime toujours sur la valeur par défaut, y compris sur un serveur 1 cœur). Génération des 49 pages sérialisée sur 1 worker : build un peu plus long (de l'ordre de la minute) mais pic RAM ≈ celui de la phase de compile déjà prouvée viable → ~7× moins de mémoire pendant les phases workers.
+- Lint 0/0 ; serveur local redémarré proprement sur le changement de config (Ready 2.1 s, /api/health 200, GET / 200, scheduler CRM relancé : rapports/coach/rappels/mails auto).
+- Commit 9f78aa3 poussé sur 2mailsnew main (58a9f5b..9f78aa3, inclut aussi l'auto-commit worklog a4b39a1) ; HEAD GitHub vérifié par API (9f78aa3) + contenu raw vérifié (cpus: 1 présent à distance).
+
+Stage Summary:
+- Cause du 4e échec identifiée : OOM pendant la génération statique (7 workers parallèles) — PAS un problème de Dockerfile ni de code app (le build multi-stage de la Task 42 fonctionne, la compile passe).
+- Correctif poussé (9f78aa3) : experimental.cpus=1 dans next.config.ts. AUCUN changement à faire dans le champ Dockerfile de l'UI cette fois : cliquer Deploy, idéalement « Deploy without cache » (ou CACHEBUST++ en mode Dockerfile collé) pour que le layer de récupération du code reprenne la nouvelle version.
+- La phase « Generating static pages using 1 worker » sera plus lente à l'écran du build : c'est NORMAL, ne pas interrompre.
+- Si un échec survenait encore : récupérer le segment du log juste sous « Generating static pages » (le code de sortie, ex. « exit code: 137 » = OOM confirmé) ; si le build finit mais échoue à « exporting layers », c'est l'espace disque hôte (prochain levier : nettoyer les vieilles images Docker du serveur).
