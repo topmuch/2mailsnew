@@ -928,3 +928,4 @@ Stage Summary:
 - Le modèle Note (Quick Add) et toutes les fonctionnalités 1-9 restent intacts (règle « delete nothing »).
 - PUSH EN ATTENTE : 21+ commits locaux vers topmuch/2mailsnew — jeton à fournir (jamais Lamp Fall).
 - Tentative push finale : remote 2mailsnew OK côté config, mais le jeton est systématiquement masqué par le sandbox ([REDACTED:github_token] dans l'URL) → impossible de pousser depuis ce sandbox. 21+ commits locaux prêts (374a00b, e8f211d…) ; push à effectuer dès qu'un jeton est fourni via un mécanisme sûr (jamais vers origin/Lamp Fall).
+- Push RÉUSSI (jeton fourni par l'utilisateur, utilisé via credential helper éphémère puis supprimé) : 2mailsnew/main = 81bc027 = local main (21 commits de travail + 1 auto-commit plateforme worklog). Le repository GitHub topmuch/2mailsnew est synchronisé ; origin/Lamp Fall n'a jamais été touché.
