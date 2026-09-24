@@ -630,3 +630,29 @@ export interface CrmProject {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Blog note (notes riches) & Favoris (liens internet) ────────────────────
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  content: string;
+  tags: string; // tags séparés par des virgules
+  color: "blue" | "green" | "amber" | "red" | "purple";
+  pinned: boolean;
+  author: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Favorite {
+  id: string;
+  title: string;
+  url: string;
+  description: string | null;
+  category: "GENERAL" | "FOURNISSEUR" | "CLIENT" | "OUTIL" | "CONCURRENT" | "ADMINISTRATION" | "AUTRE";
+  pinned: boolean;
+  author: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

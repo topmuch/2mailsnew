@@ -495,3 +495,37 @@ model Note {
   author    String? // nom de l'utilisateur créateur
   createdAt DateTime @default(now())
 }
+
+// ─── Blog note (notes riches : titre, contenu long, tags, épinglage) ────────
+
+model BlogPost {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("")
+  tags      String   @default("") // tags séparés par des virgules (SQLite : pas de liste)
+  color     String   @default("blue") // blue | green | amber | red | purple
+  pinned    Boolean  @default(false) // note épinglée en haut
+  author    String? // nom de l'utilisateur créateur
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pinned])
+  @@index([updatedAt])
+}
+
+// ─── Favoris (sauvegarde de liens internet) ──────────────────────────────────
+
+model Favorite {
+  id          String   @id @default(cuid())
+  title       String
+  url         String // lien complet (https://…)
+  description String? // note/personnalisation du lien
+  category    String   @default("GENERAL") // GENERAL | FOURNISSEUR | CLIENT | OUTIL | CONCURRENT | ADMINISTRATION | AUTRE
+  pinned      Boolean  @default(false) // favori épinglé en haut
+  author      String? // nom de l'utilisateur créateur
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([pinned])
+}

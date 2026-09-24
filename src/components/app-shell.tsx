@@ -38,11 +38,13 @@ import {
   Luggage,
   Mail,
   Menu,
+  NotebookPen,
   Package,
   ScanLine,
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
+  Star,
   Truck,
   UserPlus,
   Users2,
@@ -65,6 +67,8 @@ import { LoginView } from "@/components/login-view";
 import MailView from "@/components/mail-view";
 import CalendarView from "@/components/calendar-view";
 import { QuickAddButton } from "@/components/quick-add-button";
+import BlogNotesView from "@/components/blog-notes-view";
+import FavoritesView from "@/components/favorites-view";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
@@ -90,6 +94,8 @@ type ViewId =
   | "rapports"
   | "calendrier"
   | "mails"
+  | "blog-notes"
+  | "favoris"
   | "crm"
   | "crm-qrbags"
   | "crm-qrtags"
@@ -130,6 +136,9 @@ const NAV: {
   { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
   { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
+  // ─── Notes & Favoris ───
+  { id: "blog-notes", label: "Blog note (notes partagées)", short: "Blog note", icon: NotebookPen, section: "Notes & Favoris" },
+  { id: "favoris", label: "Favoris (liens internet)", short: "Favoris", icon: Star, section: "Notes & Favoris" },
   // ─── Ventes ───
   { id: "factures", label: "Factures", short: "Factures", icon: FileText, section: "Ventes" },
   { id: "proforma", label: "Factures proforma", short: "Proforma", icon: FileSignature, section: "Ventes" },
@@ -520,6 +529,8 @@ export function AppShell() {
               {view === "achats" && <PurchasesView />}
               {view === "fournisseurs" && <SuppliersView />}
               {view === "clients" && <ClientsView />}
+              {view === "blog-notes" && <BlogNotesView />}
+              {view === "favoris" && <FavoritesView />}
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
