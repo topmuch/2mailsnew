@@ -23,6 +23,8 @@ import {
   CalendarClock,
   CalendarDays,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ClipboardList,
   Contact,
   FileSignature,
@@ -155,15 +157,26 @@ const NAV: {
   { id: "parametres", label: "Paramètres société", short: "Paramètres", icon: SettingsIcon, section: "Administration", adminOnly: true },
 ];
 
+const NAV_SECTIONS_KEY = "2mails-nav-sections";
+
+/** Titre de la section correspondant à une vue (fallback « Pilotage »). */
+const sectionOf = (id: ViewId) => NAV.find((i) => i.id === id)?.section ?? "Pilotage";
+
 function NavItems({
   active,
   onSelect,
   isAdmin,
+  openSections,
+  onToggleSection,
+  onToggleAll,
   className,
 }: {
   active: ViewId;
   onSelect: (id: ViewId) => void;
   isAdmin: boolean;
+  openSections: Record<string, boolean>;
+  onToggleSection: (title: string) => void;
+  onToggleAll: () => void;
   className?: string;
 }) {
   const items = NAV.filter((item) => !item.adminOnly || isAdmin);
@@ -177,39 +190,83 @@ function NavItems({
       sections.push({ title: item.section, items: [item] });
     }
   }
+  const allOpen = sections.length > 0 && sections.every((s) => openSections[s.title]);
   return (
-    <nav className={cn("space-y-4", className)} aria-label="Navigation principale">
-      {sections.map((section) => (
-        <div key={section.title}>
-          <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-widest text-sidebar-foreground/60">
-            {section.title}
-          </p>
-          <div className="space-y-1">
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = active === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onSelect(item.id)}
-                  title={item.label}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-all text-left",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-bold nav-luxe-active"
-                      : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.short}</span>
-                </button>
-              );
-            })}
+    <nav className={cn("space-y-3", className)} aria-label="Navigation principale">
+      <div className="flex items-center justify-end px-3">
+        <button
+          type="button"
+          onClick={onToggleAll}
+          className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground"
+          aria-label={allOpen ? "Replier toutes les sections" : "Déplier toutes les sections"}
+        >
+          {allOpen ? <ChevronsDownUp className="h-3 w-3" aria-hidden /> : <ChevronsUpDown className="h-3 w-3" aria-hidden />}
+          {allOpen ? "Replier" : "Tout déplier"}
+        </button>
+      </div>
+      {sections.map((section) => {
+        const isOpen = !!openSections[section.title];
+        const hasActive = section.items.some((item) => item.id === active);
+        return (
+          <div key={section.title}>
+            <button
+              type="button"
+              onClick={() => onToggleSection(section.title)}
+              aria-expanded={isOpen}
+              title={isOpen ? `Replier « ${section.title} »` : `Déplier « ${section.title} »`}
+              className="mb-1.5 flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            >
+              <ChevronDown
+                className={cn("h-3 w-3 shrink-0 transition-transform duration-200", !isOpen && "-rotate-90")}
+                aria-hidden
+              />
+              <span className="truncate">{section.title}</span>
+              <span className="ml-auto flex items-center gap-1.5">
+                {!isOpen && hasActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-sidebar-primary shadow-sm" aria-label="Section en cours" />
+                )}
+                <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-[9px] font-bold text-sidebar-foreground/70">
+                  {section.items.length}
+                </span>
+              </span>
+            </button>
+            {/* Contenu repliable (animation via grid-rows, retiré du focus quand fermé) */}
+            <div
+              className={cn(
+                "grid transition-all duration-200 ease-out",
+                isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              )}
+            >
+              <div className="overflow-hidden" inert={!isOpen}>
+                <div className="space-y-1 pb-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = active === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onSelect(item.id)}
+                        title={item.label}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-all text-left",
+                          isActive
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-bold nav-luxe-active"
+                            : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.short}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -370,6 +427,22 @@ export function AppShell() {
     () => true,
     () => false
   );
+  // Sections de navigation ouvertes (accordéons, persistées en localStorage).
+  // La section de la vue active est toujours visible pour ne jamais perdre sa position.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const stored: Record<string, boolean> = {};
+    try {
+      const raw = localStorage.getItem(NAV_SECTIONS_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) Object.assign(stored, parsed);
+      }
+    } catch {
+      /* stockage indisponible (SSR / navigation privée) : état par défaut */
+    }
+    stored[sectionOf("dashboard")] = true;
+    return stored;
+  });
 
   useEffect(() => {
     loadSettings();
@@ -391,6 +464,19 @@ export function AppShell() {
 
   const select = (id: ViewId) => {
     setView(id);
+    // Ouvre automatiquement la section de la vue atteinte (recherche globale,
+    // notifications, tableau de bord…) pour que sa position reste visible
+    setOpenSections((prev) => {
+      const section = sectionOf(id);
+      if (prev[section]) return prev;
+      const next = { ...prev, [section]: true };
+      try {
+        localStorage.setItem(NAV_SECTIONS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
     setMobileOpen(false);
     window.scrollTo({ top: 0 });
   };
@@ -423,6 +509,39 @@ export function AppShell() {
   const isAdmin = user.role === "ADMIN";
   const companyName = settings?.nomSociete ?? "2MAILS";
   const companyTagline = settings?.tagline ?? "";
+
+  // Ouvre / referme une section de la sidebar (accordéon persistant)
+  const toggleNavSection = (title: string) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      try {
+        localStorage.setItem(NAV_SECTIONS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  // Tout déplier / replier (en gardant la section active visible)
+  const toggleAllNavSections = () => {
+    setOpenSections((prev) => {
+      const titles: string[] = [];
+      for (const item of NAV) {
+        if (item.adminOnly && !isAdmin) continue;
+        if (!titles.includes(item.section)) titles.push(item.section);
+      }
+      const allOpen = titles.every((t) => prev[t]);
+      const next: Record<string, boolean> = {};
+      for (const t of titles) next[t] = allOpen ? t === sectionOf(view) : true;
+      try {
+        localStorage.setItem(NAV_SECTIONS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   return (
     <CategoriesProvider>
@@ -466,7 +585,14 @@ export function AppShell() {
                     <p className="text-[10px] opacity-70 truncate">{companyTagline}</p>
                   </div>
                 </div>
-                <NavItems active={view} onSelect={select} isAdmin={isAdmin} />
+                <NavItems
+                  active={view}
+                  onSelect={select}
+                  isAdmin={isAdmin}
+                  openSections={openSections}
+                  onToggleSection={toggleNavSection}
+                  onToggleAll={toggleAllNavSections}
+                />
               </SheetContent>
             </Sheet>
           )}
@@ -486,7 +612,14 @@ export function AppShell() {
             </div>
           </div>
           <div className="px-3 pb-4 flex-1 overflow-y-auto">
-            <NavItems active={view} onSelect={select} isAdmin={isAdmin} />
+            <NavItems
+              active={view}
+              onSelect={select}
+              isAdmin={isAdmin}
+              openSections={openSections}
+              onToggleSection={toggleNavSection}
+              onToggleAll={toggleAllNavSections}
+            />
           </div>
           <div className="px-4 py-4 border-t border-sidebar-border text-[11px] text-sidebar-foreground/60">
             {settings?.telephone && <p>{settings.telephone}</p>}

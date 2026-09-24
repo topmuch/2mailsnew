@@ -929,3 +929,23 @@ Stage Summary:
 - PUSH EN ATTENTE : 21+ commits locaux vers topmuch/2mailsnew — jeton à fournir (jamais Lamp Fall).
 - Tentative push finale : remote 2mailsnew OK côté config, mais le jeton est systématiquement masqué par le sandbox ([REDACTED:github_token] dans l'URL) → impossible de pousser depuis ce sandbox. 21+ commits locaux prêts (374a00b, e8f211d…) ; push à effectuer dès qu'un jeton est fourni via un mécanisme sûr (jamais vers origin/Lamp Fall).
 - Push RÉUSSI (jeton fourni par l'utilisateur, utilisé via credential helper éphémère puis supprimé) : 2mailsnew/main = 81bc027 = local main (21 commits de travail + 1 auto-commit plateforme worklog). Le repository GitHub topmuch/2mailsnew est synchronisé ; origin/Lamp Fall n'a jamais été touché.
+
+---
+Task ID: 34
+Agent: Z.ai Code (principal)
+Task: Sidebar trop longue → transformer les sections de navigation en accordéons repliables (sans rien supprimer)
+
+Work Log:
+- Constat : 26 onglets en 7 sections rendaient la sidebar ~1400 px de haut (scrollbar systématique desktop).
+- app-shell.tsx — NavItems refactorisé en accordéons : chaque titre de section devient un bouton (chevron rotatif animé, compteur d'onglets en badge, aria-expanded) ; contenu repliable via animation grid-rows-[0fr/1fr] + inert={!isOpen} pour retirer les onglets cachés du focus clavier ; point indicateur discret sur une section repliée contenant la vue active ; bouton global « Tout déplier / Replier » en haut de la nav.
+- État lifté dans AppShell : openSections (Record<section, boolean>) initialisé depuis localStorage « 2mails-nav-sections » (la section de la vue active toujours forcée ouverte) ; persisté à chaque bascule ; partagé par la sidebar desktop ET le drawer mobile (même source) ; auto-ouverture de la section atteinte intégrée dans select() (recherche globale, notifications, dashboard) — pas d'effet, conforme react-hooks/set-state-in-effect.
+-「Tout déplier」ouvre les 7 sections ;「Replier」ferme tout sauf la section de la vue active.
+- Lint : correction d'une erreur react-hooks/set-state-in-effect (setState déplacé de useEffect vers select()), 0 erreur 0 warning.
+- Vérifié au navigateur (1440 px) : état par défaut compact — seule PILOTAGE ouverte, nav mesurée à 500 px (vs ~1400 px) ; ouverture/fermeture CRM Unifié OK (aria-expanded true/false) ; Tout déplier → 7/7 ouvertes + label « Replier » ; Replier → seule la section active reste ouverte ; navigation Ctrl+K vers « Tâches » → section CRM UNIFIÉ ouverte automatiquement ; reload → état exact restauré depuis localStorage (Ventes:true après navigation drawer).
+- Mobile 390 px : aucun débordement (scrollWidth 390), drawer hamburger avec les mêmes accordéons et le même état (Pilotage + CRM ouverts), navigation vers Factures depuis le drawer → drawer fermé + vue affichée + localStorage « Ventes »:true.
+- Mode sombre : sidebar desktop et drawer lisibles (chevrons, compteurs, badges) ; tableau de bord et liste Factures non régressés ; footer présent. Aucune erreur dev.log / console / page.
+
+Stage Summary:
+- La sidebar passe d'une liste fixe de 26 onglets (~1400 px) à des accordéons persistés : ~500 px par défaut (seule la section active ouverte), navigation conservée à 100 % (règle « delete nothing »).
+- UX : chevron rotatif + compteur par section, point indicateur de la section active repliée, bouton global Tout déplier/Replier, auto-ouverture de la section de la vue atteinte, état partagé desktop/mobile et persisté entre les rechargements.
+- Aucun modèle/API/vue métier modifié : seul src/components/app-shell.tsx (NavItems + AppShell) a changé.
