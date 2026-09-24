@@ -949,3 +949,22 @@ Stage Summary:
 - La sidebar passe d'une liste fixe de 26 onglets (~1400 px) à des accordéons persistés : ~500 px par défaut (seule la section active ouverte), navigation conservée à 100 % (règle « delete nothing »).
 - UX : chevron rotatif + compteur par section, point indicateur de la section active repliée, bouton global Tout déplier/Replier, auto-ouverture de la section de la vue atteinte, état partagé desktop/mobile et persisté entre les rechargements.
 - Aucun modèle/API/vue métier modifié : seul src/components/app-shell.tsx (NavItems + AppShell) a changé.
+
+---
+Task ID: 35
+Agent: Z.ai Code (principal)
+Task: Rendre le Coach Virtuel plus engageant et plus réel → chat IA en direct nourri des données CRM réelles
+
+Work Log:
+- Constat : le Coach Virtuel était purement statique (pool de messages pré-écrits envoyés à 11h/14h/17h) — aucune interaction possible.
+- prisma/schema.prisma : nouveau modèle CrmCoachChat (id, role « user »|« coach », content, createdAt, index createdAt) = conversation IA persistée ; db:push OK + redémarrage du dev server (le premier restart incomplet donnait db.crmCoachChat undefined → pkill + double-fork, résolu).
+- src/lib/coach-context.ts (nouveau) : buildCoachGreeting() — salutation serveur avec les chiffres réels (activations, packs, CA estimé, tâches en retard, factures impayées, nom du propriétaire, salutation selon l'heure) ; buildCoachSystemPrompt() — prompt système français injectant les DONNÉES RÉELLES du jour : objectif, KPIs (getDailyKpis), 6 tâches en retard, tâches du jour, 6 factures impayées (numéro, client, reste FCFA, échéance dépassée), RDV, e-mails reçus/envoyés. Style imposé : vouvoiement chaleureux, réponses courtes actionnables, texte simple sans markdown, chiffres uniquement du contexte, question de relance finale.
+- src/app/api/crm/coach/chat/route.ts (nouveau) : GET (60 derniers messages + salutation), POST (persiste le message user → historique 20 derniers → LLM z-ai-web-dev-sdk (backend, import dynamique, thinking disabled) → persiste la réponse ; erreur LLM → 502 propre), DELETE (réinitialise la conversation). Auth obligatoire, runtime nodejs.
+- src/components/crm/crm-coach-chat.tsx (nouveau) : panneau « Coach Virtuel — en direct » — avatar gradient + pastille verte pulsante + badge En ligne ; bulles coach (or) / utilisateur (primary, alignées droite) avec heures ; message optimiste + indicateur « Le coach réfléchit… » (3 points animés) ; auto-scroll bas ; 4 suggestions rapides (priorités, plan d'action, rédiger une relance, analyse des résultats) ; textarea Entrée=envoyer / Maj+Entrée=nouvelle ligne ; bouton reset avec confirm ; correction post-test : le champ se vide désormais dans tous les cas après envoi.
+- crm-coach-view.tsx : CrmCoachChat intégré sous l'en-tête (ajout pur), sous-titre mis à jour — les 3 créneaux, la bibliothèque de messages, l'historique d'envois et le dialog admin restent INTACTS (règle « delete nothing »).
+- Vérifié au navigateur (1440 px) : salutation avec vrais chiffres (« 1 tâche en retard, 3 factures impayées ») ; question « priorités » → réponse en 2,6 s citant FV-2026-0002 (59 000 FCFA échue) + les 2 factures Terrou-Bi (53 100 / 47 200 FCFA) ; demande de relance → email complet rédigé (Cordialement, 2MAILS Sénégal) ; suggestions fonctionnelles ; reset → conversation vidée + salutation régénérée ; persistance prouvée (les messages curl réapparurent au premier chargement navigateur, et inversement) ; mode sombre lisible ; mobile 390 px sans débordement ; lint 0/0 ; dev.log sans erreur.
+
+Stage Summary:
+- Le Coach Virtuel devient un vrai coach conversationnel : chat en direct (IA z-ai-web-dev-sdk côté serveur) qui connaît l'état réel du business du jour et se souvient de la conversation (modèle CrmCoachChat), avec salutation chiffrée, 4 raccourcis d'action, indicateurs de frappe et reset.
+- Nouveaux artefacts : prisma CrmCoachChat, src/lib/coach-context.ts, src/app/api/crm/coach/chat/route.ts, src/components/crm/crm-coach-chat.tsx ; modifiés : crm-coach-view.tsx (import + rendu + sous-titre).
+- La fonctionnalité existante (messages planifiés 11h/14h/17h, « Envoyer un… », bibliothèque admin, historique) est inchangée.

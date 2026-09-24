@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/auth-client";
 import { formatRelativeFr } from "@/components/crm/crm-shared";
+import CrmCoachChat from "@/components/crm/crm-coach-chat";
 import type { CrmCoachMessage, CrmSentMessage } from "@/lib/types";
 
 // ─── Coach Virtuel : 3 messages/jour (11h Business, 14h Mindset, 17h Closing) ─
@@ -155,9 +156,13 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
           <Bot className="h-6 w-6 text-gold" /> Coach Virtuel
         </h1>
         <p className="text-sm text-muted-foreground">
-          3 messages motivants par jour (11h, 14h, 17h) — du lundi au samedi, arrêt le samedi à 13h, repos le dimanche.
+          Discutez en direct avec votre coach IA (il connaît vos données du jour) et recevez 3 messages motivants par jour
+          (11h, 14h, 17h) — du lundi au samedi, arrêt le samedi à 13h, repos le dimanche.
         </p>
       </div>
+
+      {/* Chat en direct avec le coach IA */}
+      <CrmCoachChat />
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-3">

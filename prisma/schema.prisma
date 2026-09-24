@@ -454,6 +454,17 @@ model CrmAutomationConfig {
   updatedAt            DateTime @updatedAt
 }
 
+// ─── Coach Virtuel : conversation IA persistée ──────────────────────────────
+
+model CrmCoachChat {
+  id        String   @id @default(cuid())
+  role      String // "user" (propriétaire) | "coach" (IA)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // ─── QR Tags (historique QRtag.net + QRBags) ────────────────────────────────
 
 model QrLookup {
