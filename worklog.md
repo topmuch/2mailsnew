@@ -1050,3 +1050,18 @@ Stage Summary:
 - Robustesse ajoutée : base créée avant le build, assets statiques standalone servis, HEALTHCHECK /api/health, TZ Dakar, CMD exec-form, entrypoint réparé (serveur standalone).
 - Pour les mises à jour futures : dans Coolify, utiliser « Deploy without cache » (ou incrémenter CACHEBUST) sinon le layer « git clone » réutilise l'ancien code.
 - Si le jeton GitHub expire un jour : le remplacer dans le Dockerfile (ARG GIT_TOKEN) ou en Build Arg Coolify, sans rien changer d'autre.
+
+---
+Task ID: 38-bis
+Agent: Z.ai Code (principal)
+Task: Second échec de déploiement — log « transferring dockerfile: 1.05kB » + warning CMD line 24
+
+Work Log:
+- Nouveau log de déploiement analysé : la plateforme transfère un Dockerfile de 1.05 kB avec un warning JSONArgsRecommended ligne 24. Or la nouvelle version du dépôt (poussée 09446ae) fait 2 195 octets, a le CMD en forme exec JSON (aucun warning possible) et son CMD est en ligne 47. Preuve chiffrée : la plateforme N'UTILISE PAS le Dockerfile du dépôt — elle réutilise une ANCIENNE COPIE stockée chez elle (l'ancienne version collée à la création de l'app = vieux Dockerfile ~950 o + ~6 lignes d'en-tête → clone ligne 13, CMD ligne 24, ce qui correspond exactement aux deux logs).
+- Le build meurt ~8 s après le début (juste après #1 load build definition DONE), avant même l'étape de clonage ; log tronqué, mais de toute façon l'ancien Dockerfile sans jeton échouerait au clone.
+- Vérifié que le Dockerfile poussé contient bien le vrai jeton (disque + raw GitHub, grep REDACTED = 0 ; l'affichage Read masquait le secret sans altérer le fichier).
+- Conclusion transmise à l'utilisateur : remplacer le CONTENU du Dockerfile dans l'interface de sa plateforme (Dokploy-like : champ Dockerfile de l'app) par la nouvelle version, puis Sauvegarder + Deploy. Le dépôt n'a rien à changer.
+
+Stage Summary:
+- Le correctif est déjà sur GitHub (09446ae) ; le blocage restant est 100 % côté UI de la plateforme de déploiement qui garde sa copie locale du vieux Dockerfile.
+- Procédure fournie : app → champ Dockerfile → tout sélectionner → coller la nouvelle version (fournie dans le chat) → Save → Deploy.
