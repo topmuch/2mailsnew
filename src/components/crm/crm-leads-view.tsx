@@ -211,23 +211,24 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
         <Input placeholder="Rechercher un lead…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
       </div>
 
-      {/* Kanban pipeline */}
+      {/* Kanban pipeline — grille responsive : toutes les étapes visibles,
+          hauteur plafonnée avec défilement interne (la page ne s'allonge plus) */}
       {loading ? (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {STAGES.map((s) => (
-            <div key={s.value} className="min-w-56 flex-1 space-y-2 rounded-lg border bg-muted/30 p-3">
+            <div key={s.value} className="space-y-2 rounded-lg border bg-muted/30 p-3">
               <div className="h-4 w-24 animate-pulse rounded bg-muted" />
               <div className="h-16 animate-pulse rounded bg-muted" />
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {STAGES.map((stage) => {
             const stageLeads = filtered.filter((l) => l.status === stage.value);
             const stageValue = stageLeads.reduce((s, l) => s + (l.value ?? 0), 0);
             return (
-              <div key={stage.value} className="flex min-w-60 max-w-72 flex-1 flex-col rounded-lg border bg-muted/30">
+              <div key={stage.value} className="flex min-w-0 flex-col rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between border-b px-3 py-2.5">
                   <p className="flex items-center gap-2 text-sm font-semibold">
                     <span className={`h-2 w-2 rounded-full ${stage.dot}`} aria-hidden />
@@ -236,7 +237,7 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
                   <Badge variant="outline" className="text-[10px]">{stageLeads.length}</Badge>
                 </div>
                 <p className="px-3 pt-1.5 text-[11px] text-muted-foreground">{fmtFcfa(stageValue)}</p>
-                <div className="flex-1 space-y-2 p-2">
+                <div className="max-h-[380px] min-h-0 flex-1 space-y-2 overflow-y-auto p-2 pr-1">
                   {stageLeads.length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">Vide</p>
                   ) : (

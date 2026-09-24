@@ -192,6 +192,24 @@ async function main() {
   }
   console.log("✓ Messages du Coach Virtuel en place");
 
+  // ── 8. Leads de démonstration (pipeline commercial) ───────────────────────
+  for (const l of [
+    { name: "Ibrahima Fall", company: "Hôtel Terrou-Bi", status: "NEW", value: 150000 },
+    { name: "Awa Ndiaye", company: "Radisson Blu", status: "NEW", value: 250000 },
+    { name: "Omar Sy", company: "Palais Dakar", status: "CONTACTED", value: 180000 },
+    { name: "Fatou Ba", company: "King Fahd Palace", status: "CONTACTED", value: 90000 },
+    { name: "Moussa Diop", company: "AGV Voyages", status: "QUALIFIED", value: 320000 },
+    { name: "Aminata Sow", company: "Sénégal Airlines", status: "PROPOSAL", value: 500000 },
+    { name: "Cheikh Mbaye", company: "Coralie Chaussures", status: "WON", value: 75000 },
+    { name: "Ndeye Diagne", company: "Lamantin Beach", status: "LOST", value: 210000 },
+  ]) {
+    const existing = await db.crmLead.findFirst({ where: { name: l.name, company: l.company } });
+    if (!existing) {
+      await db.crmLead.create({ data: { ...l, source: "QRTAGS" } });
+    }
+  }
+  console.log("✓ Leads de démonstration (8 prospects répartis dans le pipeline) prêts");
+
   console.log("\n🎉 Restauration terminée — connectez-vous avec admin / admin123");
 }
 

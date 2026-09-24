@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -868,6 +868,42 @@ export default function MailView() {
   );
   const config = configData?.config ?? null;
 
+  // Temps réel : référence toujours fraîche vers loadMails (pour les effets à montage unique)
+  const loadMailsRef = useRef(loadMails);
+  useEffect(() => {
+    loadMailsRef.current = loadMails;
+  }, [loadMails]);
+
+  // Synchronisation IMAP automatique à l'ouverture de la boîte : les nouveaux
+  // mails arrivent immédiatement, sans cliquer sur « Synchroniser ».
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch("/api/mails/sync", { method: "POST" });
+        if (res.ok && !cancelled) {
+          await loadMailsRef.current();
+          refetchConfig();
+        }
+      } catch {
+        // silencieux : le bandeau « IMAP non configuré » informe déjà l'utilisateur
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refetchConfig]);
+
+  // Rafraîchissement de la liste chaque minute : le serveur re-synchronise la
+  // boîte toutes les 2 minutes de son côté — les nouveaux mails apparaissent
+  // ici en ~2 minutes max, sans aucune action (et tout de suite à l'ouverture).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadMailsRef.current();
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Sélection
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = useMemo(() => mails.find((m) => m.id === selectedId) ?? null, [mails, selectedId]);
@@ -1217,6 +1253,14 @@ export default function MailView() {
                     Dernière sync : {lastSyncLabel}
                   </>
                 )}
+                <br />
+                <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
+                  <span className="relative flex h-1.5 w-1.5" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                  </span>
+                  Auto : vérification toutes les 2 minutes
+                </span>
               </p>
             </div>
           </div>
@@ -1368,7 +1412,7 @@ export default function MailView() {
                 <p className="font-semibold">Aucun message</p>
                 <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
                   {folder === "INBOX"
-                    ? "Cliquez sur « Synchroniser » pour importer les messages de votre serveur IMAP."
+                    ? "Les nouveaux messages arrivent automatiquement (vérification toutes les 2 minutes). Le bouton « Synchroniser » force une vérification immédiate."
                     : "Les messages de ce dossier apparaîtront ici."}
                 </p>
               </div>

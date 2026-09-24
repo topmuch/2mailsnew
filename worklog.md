@@ -1009,3 +1009,25 @@ Stage Summary:
 - Par défaut, un RDV génère désormais UN SEUL rappel (H-1) ; J-1 18h et H-15min réactivables dans CRM Unifié → Automatisations → Rappels de RDV.
 - Les boutons « Tests manuels » de l'admin fonctionnent à nouveau (route créée) et n'interfèrent pas avec les envois automatiques.
 - Rappel contexte : SMTP vide depuis le reset sandbox (Paramètres → Boîte mail à ressaisir) — tant que SMTP n'est pas reconfiguré, les envois automatiques échouent proprement et sont journalisés une seule fois (statut Échec dans l'historique).
+
+---
+Task ID: 37
+Agent: Z.ai Code (principal)
+Task: « Emails datant de février 2025 + synchro non automatique + temps réel + emails qui disparaissent » et « page Leads en colonne, liste qui s'allonge »
+
+Work Log:
+- Diagnostic mails : la synchronisation IMAP (POST /api/mails/sync) était 100 % manuelle et parcourait les 50 derniers messages en ORDRE CROISSANT (ordre de séquence IMAP) en s'arrêtant au quota du jour (15/j) → elle importait toujours les PLUS ANCIENS en premier (février 2025), les mails récents n'arrivaient jamais. Aucune suppression n'existe dans le code (les mails « s'autodétruisant » venaient du reset sandbox + quota bloquant la réception de nouveaux mails).
+- Nouveau src/lib/mail-sync.ts : logique de synchronisation extraite de la route pour être partagée. Améliorations : tri par date DÉCROISSANTE (les plus récents d'abord) ; fenêtre temps réel 48 h — un mail reçu depuis moins de 48 h contourne le quota quotidien (le quota ne ralentit que le rattrapage d'historique) ; verrou global __mailSyncRunning (un seul processus IMAP à la fois) ; accumulation garantie (dédoublonnage par messageId, zéro suppression) ; backfill des corps vides conservé.
+- Route /api/mails/sync réécrite en wrapper mince (auth + mapping 400 « IMAP non configuré » + 502 describeMailError) — contrat de réponse inchangé pour l'UI.
+- Temps réel serveur : le scheduler (crm-scheduler.ts) lance runMailSync toutes les 2 minutes (minutes paires), silencieux sauf import effectif/échec, actif y compris le week-end (la réception est passive).
+- Temps réel client (mail-view.tsx) : synchronisation IMAP automatique à l'ouverture de la Boîte mail (sans toast, chargement silencieux) ; rafraîchissement de la liste chaque minute ; indicateur vert pulsant « Auto : vérification toutes les 2 minutes » dans le statut de la boîte ; texte d'état vide mis à jour (n'invite plus à cliquer sur Synchroniser).
+- Fausse alerte écartée : une séquence « [m » imprimée dans le terminal était avalée par le filtre de sortie (interprétée comme séquence ANSI) — la route mails n'a jamais été corrompue (vérifié au niveau des octets : const [mails, présent dans HEAD comme dans le working tree).
+- Leads (crm-leads-view.tsx) : le kanban était un flex horizontal avec débordement (6 colonnes × 240px = 1520px > contenu ~1104px → colonnes coupées + scroll horizontal) et hauteurs illimitées (la page s'allongeait à chaque lead). Remplacé par une grille responsive 1/2/3/6 colonnes (sm/lg/2xl) + hauteur plafonnée par colonne (max-h-[380px], défilement interne pr-1, pattern maison) — toutes les étapes visibles, longueur de page constante.
+- 8 leads de démonstration créés (Terrou-Bi, Radisson, Palais Dakar, King Fahd, AGV, Sénégal Airlines, Coralie, Lamantin Beach) répartis sur les 6 étapes ; ajoutés en section 8 idempotente de scripts/restore-demo.ts (résilience aux resets).
+- Vérifié : lint 0/0 ; sync POST → 400 « IMAP non configuré » (base restaurée sans IMAP) ; scheduler démarré avec « mails auto/2min » ; grille Leads 6 colonnes à 1560px, 3×2 à 1440px, 1 colonne à 390px sans débordement ; indicateur Auto affiché, aucun toast d'erreur, console navigateur propre ; mode sombre OK.
+
+Stage Summary:
+- Les mails se synchronisent désormais AUTOMATIQUEMENT : à l'ouverture de la boîte (immédiat), toutes les 2 minutes côté serveur (même page fermée), liste rafraîchie chaque minute à l'écran.
+- Les PLUS RÉCENTS arrivent d'abord (fini février 2025 en premier) ; les mails de moins de 48 h ne sont jamais bloqués par le quota ; rien n'est jamais supprimé.
+- Le pipeline Leads est compact : toutes les étapes visibles, colonnes à hauteur fixe avec défilement interne — la page ne s'allonge plus quel que soit le nombre de leads.
+- Pour activer la réception réelle : ressaisir IMAP (et SMTP) dans la configuration de la boîte (perdus au reset sandbox).
