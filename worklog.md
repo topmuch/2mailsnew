@@ -1065,3 +1065,21 @@ Work Log:
 Stage Summary:
 - Le correctif est déjà sur GitHub (09446ae) ; le blocage restant est 100 % côté UI de la plateforme de déploiement qui garde sa copie locale du vieux Dockerfile.
 - Procédure fournie : app → champ Dockerfile → tout sélectionner → coller la nouvelle version (fournie dans le chat) → Save → Deploy.
+
+---
+Task ID: 39
+Agent: Z.ai Code (principal)
+Task: « dans les emails il impossible de derouler le message recu » + « met un bouton mode maintenance dans paramettre »
+
+Work Log:
+- Scroll e-mails : le ReadPane avait déjà overflow-y-auto, mais DEUX maillons de la chaîne de hauteurs étaient cassés (1) <main> du shell sans min-h-0 → refusait de rétrécir (min-height:auto) sous le shell borné lg:h-dvh/overflow-hidden → contenu clippé inaccessible ; (2) la grille 3 colonnes de mail-view sans contrainte de ligne → piste auto = hauteur du contenu, les sections dépassaient la grille et les scrolls internes ne s'activaient jamais. Correctifs : main → « flex min-h-0 flex-1 min-w-0 flex-col » (sans effet sur les autres vues : le shell n'y est pas overflow-hidden) ; grille → lg:grid-rows-[minmax(0,1fr)]. Mobile inchangé (overlay fixed inset-0 + page scroll).
+- Preuve programmatique : mail de test inséré en base (corps HTML 40 paragraphes), panneau de lecture mesuré au navigateur — contenu 4 862 px dans un panneau borné à 391 px, scrollable trouvé, scrollTop 500 px vérifié puis remis à zéro ; capture d'écran ; mail de test supprimé après usage.
+- Mode maintenance : champ Prisma Setting.maintenanceMode (Boolean, défaut false) + db:push + redémarrage COMPLET du serveur (pkill + double-fork, leçon appliquée) ; API /api/settings PUT accepte body.maintenanceMode (GET le renvoie déjà, ligne entière) ; Settings interface + maintenanceMode.
+- Vue Paramètres : carte « Mode maintenance » (icône Wrench, Switch, Badge « Actif », carte teintée ambre quand actif) — le changement est appliqué IMMÉDIATEMENT (PUT dédié + mise à jour du settings-store + invalidateCompanyCache), pas besoin du bouton Enregistrer ; retour à l'état précédent si erreur ; descriptions dynamiques.
+- Shell : gate après auth — settings.maintenanceMode && !isAdmin → MaintenanceScreen plein écran (icône ambre pulsante, message avec nom de société, contacts téléphone/e-mail, boutons Réessayer (reload store immédiat) et Se déconnecter) ; re-vérification automatique toutes les 30 s → l'accès revient tout seul quand l'admin désactive ; l'ADMIN n'est JAMAIS bloqué.
+- Vérifié au navigateur (Agent Browser) : toggle ON → switch checked + Badge Actif + API maintenanceMode=True ; employé de test créé (emp-test/EMPLOYE) → login → écran « Application en maintenance » affiché (capture) ; admin reconnecté → accès complet normal ; toggle OFF → API maintenanceMode=False ; employé de test supprimé, mail de test supprimé ; lint 0/0 ; dev.log propre.
+
+Stage Summary:
+- Le corps des e-mails reçus défile désormais dans son panneau (desktop comme mobile) : cause = piste de grille en hauteur auto + main sans min-h-0, corrigés sans toucher aux autres vues.
+- Mode maintenance opérationnel de bout en bout : interrupteur Paramètres (immédiat), employés bloqués par un écran clair avec contact, reprise automatique ≤ 30 s après désactivation, admin toujours en mesure d'accéder à l'app.
+- Poussé sur 2mailsnew : 09446ae..17b2671.
