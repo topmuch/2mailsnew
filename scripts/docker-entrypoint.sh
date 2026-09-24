@@ -22,12 +22,17 @@ DB_DIR="$(dirname "$DB_PATH")"
 mkdir -p "$DB_DIR"
 echo "• Base de données : $DATABASE_URL"
 
-# 2. Schéma Prisma — pas de --accept-data-loss : en cas d'évolution destructrice
-#    du schéma, l'erreur est visible dans les logs Coolify au lieu d'écraser des données.
-#    CLI Prisma isolée (image multi-stage) ; repli sur node_modules si présent.
+# 2. Schéma Prisma — --accept-data-loss REQUIS : avec SQLite, Prisma reconstruit
+#    la table (copie des données) dès qu'une contrainte change (ex. ajout de la
+#    contrainte unique shareToken sur une colonne NOUVELLE → toutes les lignes
+#    existantes auront NULL, aucune violation possible, aucune perte réelle).
+#    Sans ce drapeau, l'avertissement générique de Prisma fait échouer le
+#    démarrage du conteneur (set -e) → Coolify rollback. Même drapeau que le
+#    db push du build (Dockerfile). CLI Prisma isolée (image multi-stage) ;
+#    repli sur node_modules si présent.
 PRISMA_CLI="/app/prisma-cli/node_modules/prisma/build/index.js"
 [ -f "$PRISMA_CLI" ] || PRISMA_CLI="/app/node_modules/prisma/build/index.js"
-node "$PRISMA_CLI" db push --skip-generate
+node "$PRISMA_CLI" db push --skip-generate --accept-data-loss
 
 # 3. Compte administrateur (admin / ADMIN_PASSWORD ou admin123 par défaut)
 node /app/scripts/seed-admin.mjs

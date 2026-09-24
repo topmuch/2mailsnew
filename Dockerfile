@@ -64,7 +64,11 @@ RUN mkdir -p /opt/prisma-cli && cd /opt/prisma-cli \
 # ── STAGE 2 : exécution (image finale légère, ~700 Mo au lieu de ~2,3 Go) ───
 FROM node:20-alpine
 
-RUN apk add --no-cache libc6-compat sqlite tzdata
+# curl : requis par le healthcheck Coolify (sondage /api/health) — le
+# HEALTHCHECK Docker du fichier utilise node/fetch, mais Coolify peut
+# exécuter son propre sondage avec curl/wget ; sans curl dans l'image,
+# le conteneur est déclaré « not healthy » → rollback.
+RUN apk add --no-cache libc6-compat sqlite tzdata curl
 
 WORKDIR /app
 
