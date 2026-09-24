@@ -314,3 +314,195 @@
 .btn-shine:disabled::after {
   display: none;
 }
+
+/* ─── Documents : rendu du contenu riche (éditeur, PDF, impression) ──────── */
+/* Couleurs hexadécimales uniquement (compatibilité html2canvas pour le PDF) */
+.doc-content {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.65;
+  position: relative;
+}
+.doc-content:focus,
+.doc-content:focus-visible {
+  outline: none;
+}
+.doc-content h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.25;
+  margin: 1.1rem 0 0.8rem;
+}
+.doc-content h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 1.05rem 0 0.6rem;
+}
+.doc-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0.9rem 0 0.5rem;
+}
+.doc-content p {
+  margin: 0.5rem 0;
+}
+.doc-content ul {
+  list-style: disc;
+  padding-left: 1.6rem;
+  margin: 0.5rem 0;
+}
+.doc-content ol {
+  list-style: decimal;
+  padding-left: 1.6rem;
+  margin: 0.5rem 0;
+}
+.doc-content li {
+  margin: 0.22rem 0;
+}
+.doc-content li > p {
+  margin: 0.1rem 0;
+}
+.doc-content blockquote {
+  border-left: 4px solid #1f3fbf;
+  background: #f8fafc;
+  padding: 0.35rem 1rem;
+  margin: 0.7rem 0;
+  color: #374151;
+}
+.doc-content hr {
+  border: none;
+  border-top: 1.5px solid #d1d5db;
+  margin: 1.15rem 0;
+}
+.doc-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8rem 0;
+  table-layout: fixed;
+}
+.doc-content th,
+.doc-content td {
+  border: 1px solid #cbd5e1;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+.doc-content th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #0f172a;
+}
+.doc-content img {
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0;
+}
+.doc-content a {
+  color: #1f3fbf;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.doc-content mark {
+  padding: 0 0.12em;
+  border-radius: 2px;
+}
+.doc-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.doc-content .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 63, 191, 0.12);
+  pointer-events: none;
+  z-index: 1;
+}
+.doc-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #1f3fbf;
+  pointer-events: none;
+}
+.doc-content.resize-cursor {
+  cursor: col-resize;
+}
+
+/* Papier en-tête (export PDF + impression) — couleurs explicites */
+.doc-print-root {
+  background: #ffffff;
+  color: #1f2937;
+}
+.doc-letterhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 2.5px solid #1f3fbf;
+  padding-bottom: 10px;
+  margin-bottom: 18px;
+}
+.doc-lh-left {
+  flex-shrink: 0;
+}
+.doc-lh-left img {
+  width: 64px;
+  height: auto;
+  display: block;
+}
+.doc-lh-right {
+  min-width: 0;
+}
+.doc-lh-name {
+  color: #1f3fbf;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.2;
+}
+.doc-lh-tagline {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 12px;
+  margin-top: 1px;
+}
+.doc-lh-line {
+  color: #6b7280;
+  font-size: 11px;
+  margin-top: 1px;
+}
+
+/* Impression : seul le document sort sur papier */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .doc-print-root,
+  .doc-print-root * {
+    visibility: visible !important;
+  }
+  .doc-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .doc-content table {
+    page-break-inside: auto;
+  }
+  .doc-content tr,
+  .doc-content img {
+    page-break-inside: avoid;
+  }
+}
+
+/* force-rebuild-41 */

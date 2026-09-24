@@ -20,8 +20,9 @@ model Client {
   notes       String?
   createdAt   DateTime @default(now())
 
-  invoices Invoice[]
-  orders   Order[]
+  invoices  Invoice[]
+  orders    Order[]
+  documents CrmDocument[] // documents rédigés (devis, contrats…) rattachés à ce client
 }
 
 // ─── Catégories (dynamiques) ────────────────────────────────────────────────
@@ -373,7 +374,30 @@ model CrmLead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  documents CrmDocument[] // documents rédigés (devis, proposition…) rattachés à ce lead
+
   @@index([status])
+}
+
+// ─── Documents rédigés (éditeur type Word, export .docx / PDF) ───────────────
+
+model CrmDocument {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("") // HTML de l'éditeur riche (TipTap)
+  template  String   @default("BLANK") // BLANK | DEVIS | LETTRE | PV | CONTRAT
+  clientId  String? // lien optionnel vers un client (facturation)
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leadId    String? // lien optionnel vers un lead (pipeline commercial)
+  lead      CrmLead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  status    String   @default("BROUILLON") // BROUILLON | FINAL
+  author    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([leadId])
+  @@index([updatedAt])
 }
 
 model CrmProject {

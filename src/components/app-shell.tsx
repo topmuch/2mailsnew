@@ -29,6 +29,7 @@ import {
   Contact,
   FileSignature,
   FileText,
+  Files,
   FolderKanban,
   Globe2,
   History,
@@ -72,6 +73,7 @@ import CalendarView from "@/components/calendar-view";
 import { QuickAddButton } from "@/components/quick-add-button";
 import BlogNotesView from "@/components/blog-notes-view";
 import FavoritesView from "@/components/favorites-view";
+import DocumentsView from "@/components/documents-view";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
@@ -99,6 +101,7 @@ type ViewId =
   | "mails"
   | "blog-notes"
   | "favoris"
+  | "documents"
   | "crm"
   | "crm-qrbags"
   | "crm-qrtags"
@@ -142,6 +145,7 @@ const NAV: {
   // ─── Notes & Favoris ───
   { id: "blog-notes", label: "Blog note (notes partagées)", short: "Blog note", icon: NotebookPen, section: "Notes & Favoris" },
   { id: "favoris", label: "Favoris (liens internet)", short: "Favoris", icon: Star, section: "Notes & Favoris" },
+  { id: "documents", label: "Documents (éditeur Word & PDF)", short: "Documents", icon: Files, section: "Notes & Favoris" },
   // ─── Ventes ───
   { id: "factures", label: "Factures", short: "Factures", icon: FileText, section: "Ventes" },
   { id: "proforma", label: "Factures proforma", short: "Proforma", icon: FileSignature, section: "Ventes" },
@@ -677,6 +681,7 @@ export function AppShell() {
               {view === "clients" && <ClientsView />}
               {view === "blog-notes" && <BlogNotesView />}
               {view === "favoris" && <FavoritesView />}
+              {view === "documents" && <DocumentsView />}
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
