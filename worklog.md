@@ -1145,3 +1145,24 @@ Stage Summary:
 - Correctif poussé (9f78aa3) : experimental.cpus=1 dans next.config.ts. AUCUN changement à faire dans le champ Dockerfile de l'UI cette fois : cliquer Deploy, idéalement « Deploy without cache » (ou CACHEBUST++ en mode Dockerfile collé) pour que le layer de récupération du code reprenne la nouvelle version.
 - La phase « Generating static pages using 1 worker » sera plus lente à l'écran du build : c'est NORMAL, ne pas interrompre.
 - Si un échec survenait encore : récupérer le segment du log juste sous « Generating static pages » (le code de sortie, ex. « exit code: 137 » = OOM confirmé) ; si le build finit mais échoue à « exporting layers », c'est l'espace disque hôte (prochain levier : nettoyer les vieilles images Docker du serveur).
+
+---
+Task ID: 44
+Agent: Z.ai Code (principal)
+Task: « ajouter l'URL externe téléchargeable des documents créés » — lien de partage public (consultation + PDF + Word) par jeton révocable
+
+Work Log:
+- Schéma : CrmDocument + shareToken (String? @unique, null = lien désactivé), sharedPdf (Bytes? = instantané PDF servi au lien), sharedPdfAt ; db:push + redémarrage complet du serveur (leçon appliquée).
+- Principe : chaque document peut recevoir un jeton aléatoire 32 hex (crypto.randomBytes) qui est la SEULE clé de routes 100 % publiques — le destinataire (client sur WhatsApp/e-mail) consulte et télécharge SANS compte ; lien révocable à tout moment ; aucun jeton brut ne sort jamais dans les JSON (serializeDoc résume en booléen `shared` + strie sharedPdf).
+- src/lib/doc-share.ts : publicBaseUrl (URL publique reconstruite depuis x-forwarded-host/proto → fonctionne derrière Coolify/le gateway de prévisualisation ; surcharge NEXT_PUBLIC_APP_URL), sharedDocUrl, serializeDoc, safeDocFilename (caractères sûrs + espaces uniques).
+- Routes : POST/GET/DELETE /api/documents/[id]/share (auth) — POST { pdfBase64?, rotate? } crée/met à jour le lien (rotate = nouveau jeton, les anciens liens meurent), PDF instantané ≤ ~9 Mo stocké en base ; DELETE révoque. Routes PUBLIQUES : GET /api/documents/shared/[token] → page de consultation HTML autonome (papier en-tête logo + coordonnées société, titre, auteur, date Dakar, contenu, boutons « Télécharger le PDF / Word (.docx) / Imprimer », noindex, impression propre, écran 🔒 404 si lien invalide/révoqué) ; GET /api/documents/shared/[token]/download?format=pdf|docx → le PDF instantané tel quel (attachment) ou un Word généré à la volée par le moteur docx existant (buildDocxBuffer) ; sans instantané PDF → redirection vers la page publique (Word + impression restent utilisables).
+- UI (documents-view.tsx) : bouton « Partager » dans la barre d'actions (teinté émeraude + badge « Lien actif » dans la liste quand partagé) ; dialog Partager (état via GET share) — pas encore partagé : bouton « Créer le lien » ; partagé : URL en lecture seule + Copier (clipboard + repli execCommand, toast), « Ouvrir », « Mettre à jour le PDF » (recapture l'instantané après modification), « Désactiver » ; badge PDF prêt/non généré + date de l'instantané.
+- Refactor exportPdf → buildPdfBlob (html2canvas-pro + jsPDF → Blob) réutilisé par l'export local ET la capture de l'instantané du lien (comportement d'export inchangé) ; flushSave avant capture ; blobToBase64 via FileReader.
+- documents/route.ts + documents/[id]/route.ts : réponses passées par serializeDoc (plus aucun octet PDF dans les JSON).
+- Vérifié : lint 0/0 ; curl — POST share {shared:true, url, pdfReady:true}, page publique 200 avec titre+logo, download?format=pdf → %PDF + Content-Disposition, download?format=docx → PK zip docx valide, DELETE → page et download 404, routes de partage sans auth → 401 ; navigateur (Agent Browser) — login admin → Documents → devis « Hôtel Terrou-Bi » → Partager → Créer le lien → URL affichée + badge « PDF prêt » + Copier (toast « Lien collé WhatsApp »), page publique dans un onglet séparé rendue parfaitement (logo 2M, boutons, devis avec données client) ; PDF servi = vrai instantané navigateur (855 Ko, %PDF-1.3) ; liste : shared:true ; dev.log propre.
+- Le lien du devis de démonstration est laissé ACTIF (03534526…) pour test immédiat ; désactivable d'un clic.
+
+Stage Summary:
+- Chaque document a désormais une URL externe téléchargeable : jeton secret + révocable, page de consultation avec logo 2M, PDF instantané exact + Word générés sans compte pour le destinataire — prêt pour WhatsApp/e-mail.
+- Sécurité : lien imdevinable (128 bits), révocable instantanément, renouvelable (rotate), aucune fuite du jeton ni des octets PDF via l'API interne.
+- Coût de la fonctionnalité : 3 nouvelles routes (1 auth + 2 publiques), 3 colonnes en base, un dialog — tout le reste (moteurs PDF/Word, en-tête logo) réutilise l'existant Task 41.
