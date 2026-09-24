@@ -1166,3 +1166,20 @@ Stage Summary:
 - Chaque document a désormais une URL externe téléchargeable : jeton secret + révocable, page de consultation avec logo 2M, PDF instantané exact + Word générés sans compte pour le destinataire — prêt pour WhatsApp/e-mail.
 - Sécurité : lien imdevinable (128 bits), révocable instantanément, renouvelable (rotate), aucune fuite du jeton ni des octets PDF via l'API interne.
 - Coût de la fonctionnalité : 3 nouvelles routes (1 auth + 2 publiques), 3 colonnes en base, un dialog — tout le reste (moteurs PDF/Word, en-tête logo) réutilise l'existant Task 41.
+
+---
+Task ID: 45
+Agent: Z.ai Code (principal)
+Task: Corriger l'échec de déploiement #5 — db push de démarrage bloqué par la contrainte unique shareToken (warning data-loss) + avertissement healthcheck Coolify
+
+Work Log:
+- Analyse du log Coolify fourni : BUILD PASSÉ (correctif OOM cpus:1 CONFIRMÉ — compilation Turbopack + génération statique OK, plus aucun OOM) puis échec au DÉMARRAGE du conteneur : `prisma db push` de l'entrypoint (volume /app/data/2mails.db) refuse d'ajouter la contrainte unique `shareToken` (« There might be data loss… Use the --accept-data-loss flag », ×8) → `set -e` tue le script → serveur jamais lancé → conteneur « not healthy » → rollback Coolify.
+- scripts/docker-entrypoint.sh : `db push --skip-generate --accept-data-loss` (même drapeau que le db push du build, Dockerfile ligne 48) + commentaire explicatif : colonne NOUVELLE → toutes les lignes existantes NULL → aucune violation possible ; SQLite → Prisma reconstruit la table en COPIANT les données (perte réelle nulle).
+- Dockerfile stage final : `apk add curl` (couvre l'avertissement Coolify « healthcheck needs a curl or wget command » — le HEALTHCHECK Docker reste node/fetch, mais Coolify peut exécuter son propre sondage avec curl → assurance à ~3 Mo contre un faux « not healthy »).
+- SIMULATION production complète (/tmp/mig-test, jetée après) : ancien schéma (sed des colonnes share) → base + 5 documents insérés en SQL brut (node:sqlite) → (1) db push SANS drapeau : ERREUR REPRODUITE À L'IDENTIQUE du log Coolify (diagnostic prouvé) ; (2) db push --accept-data-loss : sync OK en 19 ms, 5/5 documents préservés intégralement (titre, contenu HTML, template, statut, auteur), shareToken NULL (partage opt-in via bouton « Créer le lien » — choix de sécurité Task 44 conservé, aucun document existant n'est exposé automatiquement).
+- Lint 0/0 ; serveur local health 200 ; /tmp/mig-test supprimé.
+
+Stage Summary:
+- Cause exacte du 5e échec corrigée : entrypoint sans --accept-data-loss ; l'avertissement générique de Prisma sur l'ajout d'une contrainte unique (même sur colonne neuve) bloquait tout démarrage.
+- Données de production PRÉSERVÉES (preuve par simulation 5/5) ; le partage externe reste opt-in par document.
+- Prochaine étape attendue : redéploiement utilisateur (Deploy without cache conseillé) → conteneur healthy → application en ligne avec la fonctionnalité URL externe téléchargeable (Task 44).
