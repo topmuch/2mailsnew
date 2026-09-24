@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { nextNumber, NUMBER_PREFIXES } from "@/lib/constants";
+import { NUMBER_PREFIXES } from "@/lib/constants";
+import { generateDocumentNumber, withNumberRetry } from "@/lib/numbering";
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,16 +52,17 @@ export async function POST(request: NextRequest) {
     }
 
     const year = new Date().getFullYear();
-    const count = await db.order.count({
-      where: { number: { startsWith: `CMD-${year}-` } },
-    });
-    const number = nextNumber(NUMBER_PREFIXES.COMMANDE, count, year);
 
     const status = ["EN_COURS", "CONFIRMEE", "LIVREE", "ANNULEE"].includes(body.status)
       ? body.status
       : "EN_COURS";
 
-    const order = await db.order.create({
+    // Numérotation par MAXIMUM existant + relance (P2002) — plus de collision
+    // après suppression d'une commande.
+    const order = await withNumberRetry(
+      () => generateDocumentNumber("order", NUMBER_PREFIXES.COMMANDE, year),
+      (number) =>
+        db.order.create({
       data: {
         number,
         clientId: body.clientId || null,
@@ -82,7 +84,8 @@ export async function POST(request: NextRequest) {
         },
       },
       include: { items: true },
-    });
+        })
+    );
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     console.error("POST /api/orders", error);

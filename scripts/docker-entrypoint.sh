@@ -24,7 +24,10 @@ echo "• Base de données : $DATABASE_URL"
 
 # 2. Schéma Prisma — pas de --accept-data-loss : en cas d'évolution destructrice
 #    du schéma, l'erreur est visible dans les logs Coolify au lieu d'écraser des données.
-node /app/node_modules/prisma/build/index.js db push --skip-generate
+#    CLI Prisma isolée (image multi-stage) ; repli sur node_modules si présent.
+PRISMA_CLI="/app/prisma-cli/node_modules/prisma/build/index.js"
+[ -f "$PRISMA_CLI" ] || PRISMA_CLI="/app/node_modules/prisma/build/index.js"
+node "$PRISMA_CLI" db push --skip-generate
 
 # 3. Compte administrateur (admin / ADMIN_PASSWORD ou admin123 par défaut)
 node /app/scripts/seed-admin.mjs

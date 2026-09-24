@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { nextNumber, NUMBER_PREFIXES } from "@/lib/constants";
+import { NUMBER_PREFIXES } from "@/lib/constants";
+import { generateDocumentNumber, withNumberRetry } from "@/lib/numbering";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,12 +24,12 @@ export async function POST(_request: NextRequest, { params }: Params) {
     }
 
     const year = new Date().getFullYear();
-    const count = await db.invoice.count({
-      where: { type: "VENTE", number: { startsWith: `FV-${year}-` } },
-    });
-    const number = nextNumber(NUMBER_PREFIXES.VENTE, count, year);
 
-    const result = await db.$transaction(async (tx) => {
+    // Numérotation par MAXIMUM existant + relance (P2002)
+    const result = await withNumberRetry(
+      () => generateDocumentNumber("invoice", NUMBER_PREFIXES.VENTE, year, { type: "VENTE" }),
+      (number) =>
+        db.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
           number,
@@ -79,7 +80,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
       });
 
       return created;
-    });
+      })
+    );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

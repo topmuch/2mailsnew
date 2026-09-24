@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { nextNumber, NUMBER_PREFIXES } from "@/lib/constants";
+import { NUMBER_PREFIXES } from "@/lib/constants";
+import { generateDocumentNumber, withNumberRetry } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { getAuthUser } from "@/lib/auth";
 
@@ -107,18 +108,16 @@ export async function POST(request: NextRequest) {
 
     const year = new Date().getFullYear();
     const prefix = NUMBER_PREFIXES[type];
-    const count = await db.invoice.count({
-      where: {
-        type,
-        number: { startsWith: `${prefix}-${year}-` },
-      },
-    });
-    const number = nextNumber(prefix, count, year);
 
     const user = await getAuthUser(request);
     const userName = user?.name ?? null;
 
-    const invoice = await db.$transaction(async (tx) => {
+    // Numérotation par MAXIMUM existant + relance automatique en cas de
+    // collision (P2002) — plus d'« erreur serveur » après suppression de factures.
+    const invoice = await withNumberRetry(
+      () => generateDocumentNumber("invoice", prefix, year, { type }),
+      (number) =>
+        db.$transaction(async (tx) => {
       // Lire les produits AVANT décrément (snapshot prix d'achat + stock avant)
       const productMap = new Map<string, { purchasePrice: number; stock: number }>();
       for (const item of items) {
@@ -193,7 +192,8 @@ export async function POST(request: NextRequest) {
         }
       }
       return created;
-    });
+      })
+    );
 
     await logAudit(
       request,

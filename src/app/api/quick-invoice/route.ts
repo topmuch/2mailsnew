@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { nextNumber, NUMBER_PREFIXES } from "@/lib/constants";
+import { NUMBER_PREFIXES } from "@/lib/constants";
+import { generateDocumentNumber, withNumberRetry } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { getAuthUser } from "@/lib/auth";
 
@@ -39,12 +40,12 @@ export async function POST(request: NextRequest) {
     const amountPaid = paymentStatus === "PAYE" ? totalTTC : 0;
 
     const year = now.getFullYear();
-    const count = await db.invoice.count({
-      where: { type: "VENTE", number: { startsWith: `${NUMBER_PREFIXES.VENTE}-${year}-` } },
-    });
-    const number = nextNumber(NUMBER_PREFIXES.VENTE, count, year);
 
-    const invoice = await db.invoice.create({
+    // Numérotation par MAXIMUM existant + relance (P2002)
+    const invoice = await withNumberRetry(
+      () => generateDocumentNumber("invoice", NUMBER_PREFIXES.VENTE, year, { type: "VENTE" }),
+      (number) =>
+        db.invoice.create({
       data: {
         number,
         type: "VENTE",
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest) {
         },
       },
       include: { items: true },
-    });
+        })
+    );
 
     await logAudit(
       request,
