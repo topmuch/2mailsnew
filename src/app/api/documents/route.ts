@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { TEMPLATE_KEYS } from "@/lib/doc-templates";
+import { serializeDoc } from "@/lib/doc-share";
 
 // ─── Documents rédigés (éditeur type Word, export .docx / PDF) ───────────────
 // GET  → liste (liens client/lead inclus, plus récents d'abord)
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
       include: DOC_INCLUDE,
     });
-    return NextResponse.json({ documents });
+    return NextResponse.json({ documents: documents.map(serializeDoc) });
   } catch {
     return NextResponse.json({ error: "Chargement impossible" }, { status: 500 });
   }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       data: { title, content, template, status, clientId, leadId, author: user.name },
       include: DOC_INCLUDE,
     });
-    return NextResponse.json({ doc }, { status: 201 });
+    return NextResponse.json({ doc: serializeDoc(doc) }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Création impossible" }, { status: 500 });
   }

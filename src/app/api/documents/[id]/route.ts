@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { TEMPLATE_KEYS } from "@/lib/doc-templates";
+import { serializeDoc } from "@/lib/doc-share";
 
 // ─── Document individuel : lecture, modification, suppression ────────────────
 // GET    → le document (avec liens client/lead)
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     const { id } = await ctx.params;
     const doc = await db.crmDocument.findUnique({ where: { id }, include: DOC_INCLUDE });
     if (!doc) return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
-    return NextResponse.json({ doc });
+    return NextResponse.json({ doc: serializeDoc(doc) });
   } catch {
     return NextResponse.json({ error: "Chargement impossible" }, { status: 500 });
   }
@@ -74,7 +75,7 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
       }
     }
     const doc = await db.crmDocument.update({ where: { id }, data, include: DOC_INCLUDE });
-    return NextResponse.json({ doc });
+    return NextResponse.json({ doc: serializeDoc(doc) });
   } catch {
     return NextResponse.json({ error: "Modification impossible" }, { status: 500 });
   }

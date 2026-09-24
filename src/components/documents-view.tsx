@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  Copy,
+  ExternalLink,
   Files,
   FileDown,
   FilePlus2,
@@ -30,7 +32,9 @@ import {
   Printer,
   Quote,
   Redo2,
+  RefreshCw,
   Search,
+  Share2,
   Strikethrough,
   Table as TableIcon,
   Trash2,
@@ -134,6 +138,9 @@ interface DocItem {
   leadId: string | null;
   client: { id: string; name: string } | null;
   lead: { id: string; name: string; company: string | null } | null;
+  // Partage externe (résumé côté API : le jeton brut ne sort jamais)
+  shared?: boolean;
+  sharedPdfAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -569,6 +576,11 @@ export default function DocumentsView() {
   const [deleting, setDeleting] = useState<DocItem | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
+  // Partage externe (URL publique téléchargeable)
+  const [shareDoc, setShareDoc] = useState<DocItem | null>(null);
+  const [shareInfo, setShareInfo] = useState<{ url: string; pdfReady: boolean; sharedPdfAt: string | null } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+
   const printRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef({ title: "", content: "" });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -815,43 +827,52 @@ export default function DocumentsView() {
     }
   };
 
+  // Construit le PDF A4 (papier en-tête logo) du document ouvert → Blob.
+  // Utilisé par l'export local ET par l'instantané PDF du lien de partage.
+  const buildPdfBlob = async (): Promise<Blob | null> => {
+    if (!printRef.current) return null;
+    // html2canvas clone le document : revenir en haut évite un scroll négatif
+    // dans l'iframe de clonage (cause de blocage connu).
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    await new Promise((r) => setTimeout(r, 120));
+    // html2canvas-pro (fork maintenu, gère les couleurs modernes) + jsPDF :
+    // rendu canvas haute densité puis découpe A4 multi-pages.
+    const { default: html2canvas } = await import("html2canvas-pro");
+    const { jsPDF } = await import("jspdf");
+    const canvas = await html2canvas(printRef.current, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      imageTimeout: 8000,
+    });
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 12;
+    const imgW = pageW - margin * 2;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    const contentH = pageH - margin * 2;
+    pdf.addImage(canvas, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
+    let offset = 0;
+    let remaining = imgH - contentH;
+    while (remaining > 0.5) {
+      offset += contentH;
+      pdf.addPage();
+      pdf.addImage(canvas, "JPEG", margin, margin - offset, imgW, imgH, undefined, "FAST");
+      remaining -= contentH;
+    }
+    return pdf.output("blob");
+  };
+
   const exportPdf = async () => {
-    if (!activeDoc || !printRef.current) return;
+    if (!activeDoc) return;
     await flushSave();
     setPdfBusy(true);
     try {
-      // html2canvas clone le document : revenir en haut évite un scroll négatif
-      // dans l'iframe de clonage (cause de blocage connu).
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-      await new Promise((r) => setTimeout(r, 120));
-      // html2canvas-pro (fork maintenu, gère les couleurs modernes) + jsPDF :
-      // rendu canvas haute densité puis découpe A4 multi-pages.
-      const { default: html2canvas } = await import("html2canvas-pro");
-      const { jsPDF } = await import("jspdf");
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-        imageTimeout: 8000,
-      });
-      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-      const pageW = 210;
-      const pageH = 297;
-      const margin = 12;
-      const imgW = pageW - margin * 2;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      const contentH = pageH - margin * 2;
-      pdf.addImage(canvas, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
-      let offset = 0;
-      let remaining = imgH - contentH;
-      while (remaining > 0.5) {
-        offset += contentH;
-        pdf.addPage();
-        pdf.addImage(canvas, "JPEG", margin, margin - offset, imgW, imgH, undefined, "FAST");
-        remaining -= contentH;
-      }
-      pdf.save(`${activeDoc.title || "document"}.pdf`);
+      const blob = await buildPdfBlob();
+      if (!blob) throw new Error("PDF indisponible");
+      downloadBlob(blob, `${activeDoc.title || "document"}.pdf`);
       toast({ title: "PDF téléchargé", description: `${activeDoc.title}.pdf` });
     } catch {
       toast({ title: "Erreur", description: "Export PDF impossible", variant: "destructive" });
@@ -864,6 +885,114 @@ export default function DocumentsView() {
     if (!activeDoc) return;
     await flushSave();
     window.print();
+  };
+
+  // ─── Partage externe (URL publique téléchargeable, sans compte) ────────
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = String(reader.result ?? "");
+        resolve(dataUrl.slice(dataUrl.indexOf(",") + 1));
+      };
+      reader.onerror = () => reject(new Error("Lecture du PDF impossible"));
+      reader.readAsDataURL(blob);
+    });
+
+  const openShare = (doc: DocItem) => {
+    setShareDoc(doc);
+    setShareInfo(null);
+    setShareBusy(true);
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/documents/${doc.id}/share`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Erreur");
+        if (json.shared) {
+          setShareInfo({ url: json.url, pdfReady: !!json.pdfReady, sharedPdfAt: json.sharedPdfAt ?? null });
+        }
+      } catch {
+        toast({ title: "Erreur", description: "Vérification du partage impossible", variant: "destructive" });
+      } finally {
+        setShareBusy(false);
+      }
+    })();
+  };
+
+  // Crée (ou met à jour) le lien public : le PDF instantané est capturé depuis
+  // le papier en-tête logo pour que le destinataire voie exactement le document.
+  const saveShare = async (rotate: boolean, successTitle: string) => {
+    if (!shareDoc) return;
+    setShareBusy(true);
+    try {
+      await flushSave();
+      const blob = await buildPdfBlob();
+      const body: Record<string, unknown> = { rotate };
+      if (blob) body.pdfBase64 = await blobToBase64(blob);
+      const res = await authFetch(`/api/documents/${shareDoc.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      setShareInfo({ url: json.url, pdfReady: !!json.pdfReady, sharedPdfAt: json.sharedPdfAt ?? null });
+      setDocs((prev) =>
+        prev.map((d) =>
+          d.id === shareDoc.id ? { ...d, shared: true, sharedPdfAt: json.sharedPdfAt ?? null } : d,
+        ),
+      );
+      toast({ title: successTitle, description: "Copiez l'URL et envoyez-la à votre destinataire." });
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: err instanceof Error ? err.message : "Partage impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const revokeShare = async () => {
+    if (!shareDoc) return;
+    setShareBusy(true);
+    try {
+      const res = await authFetch(`/api/documents/${shareDoc.id}/share`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      setShareInfo(null);
+      setDocs((prev) =>
+        prev.map((d) =>
+          d.id === shareDoc.id ? { ...d, shared: false, sharedPdfAt: null } : d,
+        ),
+      );
+      toast({ title: "Lien désactivé", description: "L'URL publique ne fonctionne plus." });
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: err instanceof Error ? err.message : "Désactivation impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareInfo) return;
+    try {
+      await navigator.clipboard.writeText(shareInfo.url);
+      toast({ title: "Lien copié", description: "Collez-le dans WhatsApp, l'e-mail…" });
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = shareInfo.url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+      toast({ title: "Lien copié" });
+    }
   };
 
   // ─── Suppression ───────────────────────────────────────────────────────────
@@ -1001,6 +1130,12 @@ export default function DocumentsView() {
                           Final
                         </Badge>
                       )}
+                      {doc.shared && (
+                        <span className="inline-flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
+                          <Share2 className="h-3 w-3" aria-hidden />
+                          Lien actif
+                        </span>
+                      )}
                       <span className="truncate">
                         {doc.author ?? "—"} • {formatRelativeFr(doc.updatedAt)}
                       </span>
@@ -1107,6 +1242,18 @@ export default function DocumentsView() {
                 <Button onClick={exportPdf} disabled={pdfBusy} variant="outline" size="sm">
                   {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileDown className="h-4 w-4" aria-hidden />}
                   PDF
+                </Button>
+                <Button
+                  onClick={() => openShare(activeDoc)}
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    activeDoc.shared &&
+                      "border-emerald-400/60 text-emerald-700 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400",
+                  )}
+                  aria-label="Partager par lien externe"
+                >
+                  <Share2 className="h-4 w-4" aria-hidden /> Partager
                 </Button>
                 <Button onClick={printDoc} variant="ghost" size="sm">
                   <Printer className="h-4 w-4" aria-hidden /> Imprimer
@@ -1248,6 +1395,98 @@ export default function DocumentsView() {
               Créer le document
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Partage externe (URL publique téléchargeable) ─── */}
+      <Dialog open={!!shareDoc} onOpenChange={(o) => !o && setShareDoc(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1F3FBF] text-white" aria-hidden>
+                <Share2 className="h-4 w-4" />
+              </span>
+              Partager par lien externe
+            </DialogTitle>
+            <DialogDescription className="line-clamp-1">{shareDoc?.title}</DialogDescription>
+          </DialogHeader>
+          {shareBusy && !shareInfo ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Vérification du partage…
+            </div>
+          ) : shareInfo ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  readOnly
+                  value={shareInfo.url}
+                  className="font-mono text-xs"
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="URL publique du document"
+                />
+                <Button size="icon" variant="secondary" onClick={copyShareUrl} aria-label="Copier le lien" className="shrink-0">
+                  <Copy className="h-4 w-4" aria-hidden />
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {shareInfo.pdfReady ? (
+                  <Badge variant="outline" className="border-emerald-400/60 text-emerald-700 dark:text-emerald-400">
+                    PDF prêt
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-400/60 text-amber-700 dark:text-amber-400">
+                    PDF non généré
+                  </Badge>
+                )}
+                {shareInfo.sharedPdfAt && <span>instantané du {formatRelativeFr(shareInfo.sharedPdfAt)}</span>}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Toute personne ayant ce lien consulte le document (papier en-tête logo) et télécharge le PDF ou le Word — sans compte.
+                Après une modification, cliquez sur «&nbsp;Mettre à jour le PDF&nbsp;» pour que le lien serve la nouvelle version.
+              </p>
+              <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => void revokeShare()}
+                  disabled={shareBusy}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden /> Désactiver
+                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void saveShare(false, "PDF du lien mis à jour")} disabled={shareBusy}>
+                    {shareBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
+                    Mettre à jour le PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-[#1F3FBF] text-white hover:bg-[#1a35a0]"
+                    onClick={() => window.open(shareInfo.url, "_blank", "noopener")}
+                  >
+                    <ExternalLink className="h-4 w-4" aria-hidden /> Ouvrir
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Créez une URL externe pour ce document : le destinataire la verra avec votre logo et pourra télécharger le PDF ou le
+                Word, sans compte ni installation. Idéal pour WhatsApp ou l'e-mail.
+              </p>
+              <DialogFooter>
+                <Button
+                  onClick={() => void saveShare(false, "Lien de partage créé")}
+                  disabled={shareBusy}
+                  className="bg-[#1F3FBF] text-white hover:bg-[#1a35a0]"
+                >
+                  {shareBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Share2 className="h-4 w-4" aria-hidden />}
+                  Créer le lien
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

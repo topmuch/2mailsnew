@@ -395,6 +395,14 @@ model CrmDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ── Partage externe : lien public téléchargeable (sans compte) ────────────
+  // shareToken = jeton aléatoire du lien (null → lien désactivé/inexistant)
+  // sharedPdf  = instantané PDF (généré côté navigateur lors de l'activation
+  //              du lien, servi tel quel au destinataire)
+  shareToken  String?   @unique
+  sharedPdf   Bytes?
+  sharedPdfAt DateTime?
+
   @@index([clientId])
   @@index([leadId])
   @@index([updatedAt])
