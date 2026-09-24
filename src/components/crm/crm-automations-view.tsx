@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +48,12 @@ const TYPE_META: Record<string, { label: string; className: string }> = {
 
 type ConfigState = CrmAutomationConfig & { reportMorningTime: string; reportEveningTime: string };
 
+const REMINDER_SLOTS: { key: "J1" | "H1" | "H15"; label: string }[] = [
+  { key: "J1", label: "J-1 à 18h" },
+  { key: "H1", label: "H-1 (1h avant)" },
+  { key: "H15", label: "H-15 min" },
+];
+
 const DEFAULT_CONFIG: ConfigState = {
   ownerName: "Monsieur Diop",
   recipientEmail: "",
@@ -59,6 +66,7 @@ const DEFAULT_CONFIG: ConfigState = {
   coach14Enabled: true,
   coach17Enabled: true,
   remindersEnabled: true,
+  reminderSlots: "H1",
   dailyGoal: "",
 };
 
@@ -139,6 +147,14 @@ export default function CrmAutomationsView({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const patch = (p: Partial<ConfigState>) => setConfig((c) => ({ ...c, ...p }));
+
+  const toggleReminderSlot = (slot: "J1" | "H1" | "H15", on: boolean | "indeterminate") => {
+    const active = new Set(config.reminderSlots.split(",").map((s) => s.trim()).filter(Boolean));
+    if (on === true) active.add(slot);
+    else active.delete(slot);
+    // ordre canonique J1 → H1 → H15 pour un stockage stable
+    patch({ reminderSlots: REMINDER_SLOTS.map((s) => s.key).filter((k) => active.has(k)).join(",") });
+  };
 
   const statusCards = [
     {
@@ -329,12 +345,33 @@ export default function CrmAutomationsView({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
             {/* Rappels */}
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium">⏰ Rappels de RDV</p>
-                <p className="text-xs text-muted-foreground">J-1 à 18h · H-1 · H-15min (sur le calendrier existant)</p>
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">⏰ Rappels de RDV</p>
+                  <p className="text-xs text-muted-foreground">1 e-mail max par RDV et créneau — jamais de doublon</p>
+                </div>
+                <Switch checked={config.remindersEnabled} onCheckedChange={(v) => patch({ remindersEnabled: v })} disabled={!isAdmin} aria-label="Activer les rappels de rendez-vous" />
               </div>
-              <Switch checked={config.remindersEnabled} onCheckedChange={(v) => patch({ remindersEnabled: v })} disabled={!isAdmin} aria-label="Activer les rappels de rendez-vous" />
+              <div className="grid grid-cols-3 gap-2">
+                {REMINDER_SLOTS.map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium cursor-pointer has-[[data-state=checked]]:border-gold/50 has-[[data-state=checked]]:bg-gold/5"
+                  >
+                    <Checkbox
+                      checked={config.reminderSlots.split(",").map((s) => s.trim()).includes(key)}
+                      onCheckedChange={(v) => toggleReminderSlot(key, v)}
+                      disabled={!isAdmin || !config.remindersEnabled}
+                      aria-label={`Rappel ${label}`}
+                    />
+                    <span className="leading-tight">{label}</span>
+                  </label>
+                ))}
+              </div>
+              {!config.reminderSlots.trim() && config.remindersEnabled && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">Aucun créneau coché : aucun rappel ne sera envoyé.</p>
+              )}
             </div>
           </div>
 

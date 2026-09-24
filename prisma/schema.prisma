@@ -450,6 +450,7 @@ model CrmAutomationConfig {
   coach14Enabled       Boolean  @default(true)
   coach17Enabled       Boolean  @default(true)
   remindersEnabled     Boolean  @default(true)
+  reminderSlots        String   @default("H1") // créneaux de rappel RDV actifs : "J1" (J-1 18h), "H1" (1h avant), "H15" (15min avant) — CSV, vide = aucun
   dailyGoal            String   @default("") // objectif du jour (vide → objectif aléatoire)
   updatedAt            DateTime @updatedAt
 }

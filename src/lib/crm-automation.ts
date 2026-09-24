@@ -4,8 +4,11 @@ import { ensureCoachMessagesSeeded } from "@/lib/crm-coach-seed";
 
 // ─── Automatisations CRM : rapports quotidiens, coach virtuel, rappels RDV ──
 // Contrainte horaire du prompt : arrêt le samedi à 13h, reprise le lundi.
-// Dimanche = repos total. Toutes les exécutions sont idempotentes
-// (CrmSentMessage @@unique([type, dedupeKey])).
+// Dimanche = repos total. Toutes les exécutions sont idempotentes :
+// la clé (type, dedupeKey) est VÉRIFIÉE AVANT l'envoi (alreadySent), puis
+// journalisée après (CrmSentMessage @@unique([type, dedupeKey])) — un même
+// e-mail ne peut donc partir qu'une seule fois, même sur une fenêtre de
+// plusieurs minutes ou après redémarrage du serveur.
 
 // ── isBusinessHours : vrai hors dimanche et hors samedi ≥ 13h ───────────────
 
@@ -104,6 +107,20 @@ async function logSent(data: {
   }).catch(() => {
     // Clé (type, dedupeKey) déjà utilisée → envoi déjà effectué, on ignore
   });
+}
+
+/**
+ * Anti-doublon : true si un envoi (ou une tentative, même échouée) a déjà été
+ * journalisé pour cette clé. À appeler AVANT tout envoi — sinon chaque tick
+ * de la fenêtre renverrait l'e-mail (cause des doublons de rappels RDV).
+ */
+async function alreadySent(type: string, dedupeKey: string): Promise<boolean> {
+  if (!dedupeKey) return false;
+  const existing = await db.crmSentMessage.findUnique({
+    where: { type_dedupeKey: { type, dedupeKey } },
+    select: { id: true },
+  });
+  return Boolean(existing);
 }
 
 // Gabarit HTML commun (charte vert & or 2MAILS)
@@ -407,12 +424,18 @@ async function sendReminder(
   subject: string,
   now: Date,
   config: Awaited<ReturnType<typeof getAutomationConfig>>,
+  force = false,
 ): Promise<boolean> {
+  const dedupeKey = `REM-${event.id}-${slot}-${event.date.toISOString().slice(0, 10)}${force ? `-TEST-${now.getTime()}` : ""}`;
+  // Anti-doublon : un seul envoi par RDV + créneau + jour (même si le tick
+  // repasse 20 fois dans la fenêtre, ou après redémarrage du serveur).
+  if (!force && (await alreadySent("REMINDER", dedupeKey))) return false;
+
   const setting = await db.setting.findFirst();
   const to = recipientEmail(config, setting?.email);
   if (!to) {
     await logSent({
-      type: "REMINDER", subject, dedupeKey: `REM-${event.id}-${slot}-${event.date.toISOString().slice(0, 10)}`,
+      type: "REMINDER", subject, dedupeKey,
       content: event.title, ok: false, error: "Aucun e-mail destinataire configuré (Automatisations ou Paramètres société)",
     });
     return false;
@@ -421,20 +444,24 @@ async function sendReminder(
   const body = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:5px solid #d4af37;border-radius:10px;padding:16px 20px;">
       <p style="margin:0;font-size:15px;"><b>${esc(event.title)}</b>${details}</p>
     </div>`;
-  const dedupeKey = `REM-${event.id}-${slot}-${event.date.toISOString().slice(0, 10)}`;
   const res = await sendAutomationEmail(to, subject, wrapEmailHtml("Rappel de rendez-vous", body));
   await logSent({ type: "REMINDER", subject, dedupeKey, content: event.title, ok: res.ok, error: res.error });
   return res.ok;
 }
 
-/** Cherche les rappels dus à l'instant et les envoie (idempotent par dedupeKey). */
-export async function runReminders(now: Date, config?: Awaited<ReturnType<typeof getAutomationConfig>>) {
+/** Cherche les rappels dus à l'instant et les envoie (idempotent par dedupeKey).
+ *  Seuls les créneaux cochés dans reminderSlots (J1, H1, H15) sont actifs. */
+export async function runReminders(now: Date, config?: Awaited<ReturnType<typeof getAutomationConfig>>, force = false) {
   const cfg = config ?? (await getAutomationConfig());
   const sent: string[] = [];
+  const slotsActive = new Set(
+    (cfg.reminderSlots ?? "H1").split(",").map((s) => s.trim()).filter(Boolean),
+  );
+  if (!slotsActive.size) return sent; // aucun créneau coché → aucun rappel
 
   // J-1 à 18h : tous les RDV de demain, fenêtre 18h00–18h14
   const curHm = hhmm(now);
-  if (curHm >= "18:00" && curHm <= "18:14") {
+  if (slotsActive.has("J1") && curHm >= "18:00" && curHm <= "18:14") {
     const tomorrowStart = dayStart(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     const tomorrowEnd = dayEnd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     const events = await db.calendarEvent.findMany({
@@ -442,29 +469,31 @@ export async function runReminders(now: Date, config?: Awaited<ReturnType<typeof
     });
     for (const e of events) {
       const at = e.startTime ? ` à ${e.startTime.replace(":", "h")}` : "";
-      const ok = await sendReminder(e, "J1", `⏰ Rappel : RDV demain${at} — ${e.title}`, now, cfg);
+      const ok = await sendReminder(e, "J1", `⏰ Rappel : RDV demain${at} — ${e.title}`, now, cfg, force);
       if (ok) sent.push(`J-1 ${e.title}`);
     }
   }
 
   // H-1 et H-15 : basés sur l'heure exacte de l'événement (nécessite startTime)
-  const eventsWithTime = await db.calendarEvent.findMany({
-    where: {
-      date: { gte: dayStart(now), lte: dayEnd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) },
-      startTime: { not: null },
-      done: false,
-    },
-  });
-  for (const e of eventsWithTime) {
-    const t = eventDateTime(e);
-    if (!t) continue;
-    const deltaMin = Math.round((t.getTime() - now.getTime()) / 60000);
-    if (deltaMin >= 50 && deltaMin <= 71) {
-      const ok = await sendReminder(e, "H1", `⏰ Dans 1 heure : ${e.title}`, now, cfg);
-      if (ok) sent.push(`H-1 ${e.title}`);
-    } else if (deltaMin >= 8 && deltaMin <= 21) {
-      const ok = await sendReminder(e, "H15", `⏰ Dans 15 minutes : ${e.title}`, now, cfg);
-      if (ok) sent.push(`H-15 ${e.title}`);
+  if (slotsActive.has("H1") || slotsActive.has("H15")) {
+    const eventsWithTime = await db.calendarEvent.findMany({
+      where: {
+        date: { gte: dayStart(now), lte: dayEnd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) },
+        startTime: { not: null },
+        done: false,
+      },
+    });
+    for (const e of eventsWithTime) {
+      const t = eventDateTime(e);
+      if (!t) continue;
+      const deltaMin = Math.round((t.getTime() - now.getTime()) / 60000);
+      if (slotsActive.has("H1") && deltaMin >= 50 && deltaMin <= 71) {
+        const ok = await sendReminder(e, "H1", `⏰ Dans 1 heure : ${e.title}`, now, cfg, force);
+        if (ok) sent.push(`H-1 ${e.title}`);
+      } else if (slotsActive.has("H15") && deltaMin >= 8 && deltaMin <= 21) {
+        const ok = await sendReminder(e, "H15", `⏰ Dans 15 minutes : ${e.title}`, now, cfg, force);
+        if (ok) sent.push(`H-15 ${e.title}`);
+      }
     }
   }
   return sent;
@@ -491,6 +520,11 @@ export async function runDueJobs(now = new Date(), opts?: { force?: boolean }): 
     dedupeKey: string,
     content: { subject: string; html: string },
   ): Promise<boolean> => {
+    // Anti-doublon : déjà envoyé (ou tenté) pour cette clé → on ignore
+    if (!force && (await alreadySent(type, dedupeKey))) {
+      skipped.push(`${type} : déjà envoyé (${dedupeKey})`);
+      return false;
+    }
     if (!to) {
       await logSent({ type, subject: content.subject, dedupeKey, content: "—", ok: false, error: "Aucun e-mail destinataire configuré (Automatisations ou Paramètres société)" });
       errors.push(`${type} : aucun destinataire configuré`);
@@ -547,9 +581,63 @@ export async function runDueJobs(now = new Date(), opts?: { force?: boolean }): 
 
   // Rappels de RDV (vérifiés à chaque tick ; fenêtres + dedupeKey internes)
   if (config.remindersEnabled) {
-    const reminders = await runReminders(now, config);
+    const reminders = await runReminders(now, config, force);
     ran.push(...reminders);
   }
 
   return { ran, skipped, errors };
+}
+
+// ── Test manuel (boutons « Tests manuels » de l'admin Automatisations) ──────
+// Envoi immédiat avec des clés dédoublées -TEST-<timestamp> : un test ne
+// consomme JAMAIS le rappel/l'envoi réel du jour.
+
+export async function runManualTest(
+  kind: string,
+  now = new Date(),
+): Promise<{ ok: boolean; preview?: string; error?: string }> {
+  const config = await getAutomationConfig();
+  const setting = await db.setting.findFirst();
+  const to = recipientEmail(config, setting?.email);
+  if (!to) {
+    return { ok: false, error: "Aucun e-mail destinataire configuré (Automatisations ou Paramètres société)" };
+  }
+  const ts = now.getTime();
+  const sendTest = async (
+    dedupeKey: string,
+    subject: string,
+    html: string,
+    contentLabel: string,
+  ): Promise<{ ok: boolean; preview?: string; error?: string }> => {
+    const res = await sendAutomationEmail(to, subject, html);
+    await logSent({ type: "TEST", subject, dedupeKey, content: contentLabel, ok: res.ok, error: res.error });
+    return res.ok ? { ok: true, preview: subject } : { ok: false, error: res.error ?? "Échec d'envoi" };
+  };
+
+  switch (kind) {
+    case "MORNING": {
+      const c = await generateMorningReport(now);
+      return sendTest(`TEST-MORNING-${ts}`, c.subject, c.html, "Test manuel — briefing du jour");
+    }
+    case "EVENING": {
+      const c = await generateEveningReport(now);
+      return sendTest(`TEST-EVENING-${ts}`, c.subject, c.html, "Test manuel — bilan du jour");
+    }
+    case "COACH_11":
+    case "COACH_14":
+    case "COACH_17": {
+      const slot = kind === "COACH_11" ? "11h" : kind === "COACH_14" ? "14h" : "17h";
+      const msg = await getRandomCoachMessage(slot, now);
+      if (!msg) return { ok: false, error: `Aucun message coach actif pour le créneau ${slot}` };
+      return sendTest(`TEST-${kind}-${ts}`, msg.subject, msg.html, `Test manuel — coach ${slot}`);
+    }
+    case "REMINDERS": {
+      const sent = await runReminders(now, config, true);
+      return sent.length
+        ? { ok: true, preview: `Rappel(s) envoyé(s) : ${sent.join(", ")}` }
+        : { ok: true, preview: "Aucun RDV dans une fenêtre de rappel actuellement (J-1 18h, H-1 ou H-15min) — rien à envoyer." };
+    }
+    default:
+      return { ok: false, error: "Type de test inconnu" };
+  }
 }

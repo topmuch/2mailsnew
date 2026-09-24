@@ -580,6 +580,7 @@ export interface CrmAutomationConfig {
   coach14Enabled: boolean;
   coach17Enabled: boolean;
   remindersEnabled: boolean;
+  reminderSlots: string;
   dailyGoal: string;
 }
 

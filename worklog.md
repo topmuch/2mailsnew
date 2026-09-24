@@ -986,3 +986,26 @@ Stage Summary:
 - Cause comprise : reset du sandbox (pas une régression de l'app) → base SQLite recréée vide, d'où « notifications reçues mais aucun changement » (session invalide + données disparues).
 - App entièrement restaurée et vérifiée ; script scripts/restore-demo.ts réutilisable (bun run scripts/restore-demo.ts) ; base versionnée dans git pour la résilience.
 - À communiquer : ressaisir adresse/téléphone/RC/NINEA/logo dans Paramètres si souhaité ; les notifications sont des alertes calculées en direct qui disparaissent d'elles-mêmes quand le problème est réglé (facture payée, tâche terminée).
+
+---
+Task ID: 36
+Agent: Z.ai Code (principal)
+Task: « Duplication des e-mails de notification de RDV — 5 reçus au lieu d'un » → correction de l'anti-doublon + créneaux de rappel configurables
+
+Work Log:
+- Diagnostic : dans sendReminder (src/lib/crm-automation.ts), l'e-mail partait AVANT l'écriture de la clé d'idempotence (dedupeKey). La contrainte unique CrmSentMessage @@unique([type, dedupeKey]) ne bloquait que la JOURNALISATION, pas l'ENVOI. La fenêtre H-1 couvre ~21 min et le tick tourne chaque minute → jusqu'à 21 envois du même rappel (l'utilisateur en a reçu 5 : 5 ticks dans la fenêtre). Même défaut latent dans deliver() (rapports/coach, risque en cas de double tick).
+- Correctif principal : nouveau helper alreadySent(type, dedupeKey) (findUnique sur type_dedupeKey) appelé AVANT tout envoi dans sendReminder ET deliver(). Un même e-mail ne peut plus partir qu'une seule fois, même sur une fenêtre de plusieurs minutes ou après redémarrage du serveur (une tentative FAILED bloque aussi les retries anti-spam).
+- Nouveau champ Prisma CrmAutomationConfig.reminderSlots (String, défaut "H1") : créneaux de rappel actifs J1 (J-1 18h) / H1 (1h avant) / H15 (15 min avant), CSV validé côté API (ordre canonique, tokens inconnus rejetés). Défaut "H1" = 1 seul e-mail par RDV, conforme à l'attente utilisateur ; J-1 et H-15 restent activables (rien supprimé).
+- runReminders : gate par reminderSlots (slots vides → aucun rappel ; J1/H1/H15 vérifiés individuellement).
+- API /api/crm/automation/config : GET expose reminderSlots, PUT normalise (majuscules, trim, filtrage J1/H1/H15, dédoublonnage).
+- Vue Automatisations : carte « Rappels de RDV » enrichie de 3 checkboxes (J-1 à 18h, H-1 (1h avant), H-15 min) avec style or au check, avertissement si aucun créneau coché, sous-titre « 1 e-mail max par RDV et créneau — jamais de doublon » ; types.ts mis à jour.
+- Découverte + correction au passage : les boutons « Tests manuels » appelaient /api/crm/automation/test qui N'EXISTAIT PAS (404). Route créée : POST admin-only, helper runManualTest() dans crm-automation.ts (MORNING/EVENING/COACH_11/14/17/REMINDERS), clés dédoublées -TEST-<timestamp> → un test ne consomme JAMAIS l'envoi réel du jour.
+- Vérification programmatique (script temporaire supprimé après usage, SMTP vide dans la base restaurée → aucun vrai e-mail risqué) : 3 ticks H-1 consécutifs → 1 seul enregistrement ✅ ; slots vides → 0 envoi ✅ ; H15 seul avec RDV à 60 min → ignoré ✅ ; force TEST → clé TEST distincte, clé réelle intacte ✅.
+- Vérifié au navigateur (Agent Browser) : API roundtrip GET/PUT (normalisation "h15, J1 ,H1,H1,bogus" → "J1,H1,H15") ; checkboxes persistées après save+reload (J1,H1 en base puis retour à H1) ; bouton « Vérifier rappels » répond (message « Aucun RDV dans une fenêtre ») ; historique des envois journalise le tick Coach 11h réel en 1 seul exemplaire ; mode sombre OK ; mobile 390px sans débordement ; lint 0/0.
+- db:push effectué + redémarrage COMPLET du serveur (pkill + double-fork) — leçon précédente appliquée.
+
+Stage Summary:
+- Cause des 5 e-mails identifiée et corrigée définitivement : vérification de la clé d'idempotence AVANT l'envoi (sendReminder + deliver).
+- Par défaut, un RDV génère désormais UN SEUL rappel (H-1) ; J-1 18h et H-15min réactivables dans CRM Unifié → Automatisations → Rappels de RDV.
+- Les boutons « Tests manuels » de l'admin fonctionnent à nouveau (route créée) et n'interfèrent pas avec les envois automatiques.
+- Rappel contexte : SMTP vide depuis le reset sandbox (Paramètres → Boîte mail à ressaisir) — tant que SMTP n'est pas reconfiguré, les envois automatiques échouent proprement et sont journalisés une seule fois (statut Échec dans l'historique).

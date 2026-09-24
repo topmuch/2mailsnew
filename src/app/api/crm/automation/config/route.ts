@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
         coach14Enabled: config.coach14Enabled,
         coach17Enabled: config.coach17Enabled,
         remindersEnabled: config.remindersEnabled,
+        reminderSlots: config.reminderSlots ?? "H1",
         dailyGoal: config.dailyGoal,
       },
       status: {
@@ -89,6 +90,15 @@ export async function PUT(request: NextRequest) {
     if (typeof body.coach14Enabled === "boolean") data.coach14Enabled = body.coach14Enabled;
     if (typeof body.coach17Enabled === "boolean") data.coach17Enabled = body.coach17Enabled;
     if (typeof body.remindersEnabled === "boolean") data.remindersEnabled = body.remindersEnabled;
+    if (typeof body.reminderSlots === "string") {
+      const allowed = ["J1", "H1", "H15"];
+      const tokens = body.reminderSlots
+        .split(",")
+        .map((s: string) => s.trim().toUpperCase())
+        .filter((s: string) => allowed.includes(s));
+      // ordre canonique + dédoublonnage ; vide = aucun créneau actif
+      data.reminderSlots = allowed.filter((s) => tokens.includes(s)).join(",");
+    }
     if (typeof body.dailyGoal === "string") data.dailyGoal = body.dailyGoal.trim().slice(0, 300);
 
     const config = await db.crmAutomationConfig.upsert({
