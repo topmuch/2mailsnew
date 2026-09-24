@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
-      - DATABASE_URL=file:/app/data/lampfall.db
+      - DATABASE_URL=file:/app/data/2mails.db
       - TZ=Africa/Dakar
       # Recommandé en production : chaîne aléatoire (openssl rand -hex 32)
       - AUTH_SECRET=${AUTH_SECRET:-lampfall-facturation-secret-2024}

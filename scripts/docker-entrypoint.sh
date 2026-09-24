@@ -29,6 +29,6 @@ node /app/node_modules/prisma/build/index.js db push --skip-generate
 # 3. Compte administrateur (admin / ADMIN_PASSWORD ou admin123 par défaut)
 node /app/scripts/seed-admin.mjs
 
-# 4. Serveur Next.js
+# 4. Serveur Next.js (build standalone : .next/standalone/server.js)
 echo "• Serveur Next.js sur le port $PORT (santé : /api/health)"
-exec node /app/server.js
+exec node /app/.next/standalone/server.js

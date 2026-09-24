@@ -16,7 +16,7 @@ Guide complet pour installer l'application de facturation **ETS LAMP FALL** sur 
 - Le dépôt GitHub du code : `https://github.com/topmuch/Lampfall` (ou `https://github.com/topmuch/2mailsnew`)
 - Un sous-domaine ou domaine pointant vers l'IP du serveur (enregistrement DNS **A**), ex. `facture.mondomaine.sn` — optionnel mais recommandé (HTTPS automatique)
 
-> ℹ️ Si le dépôt GitHub est **privé**, connecter d'abord GitHub dans Coolify (*Settings → Sources → GitHub App*) ou rendre le dépôt public.
+> ℹ️ Le dépôt GitHub `topmuch/2mailsnew` est **privé** : rien à configurer — le `Dockerfile` embarque un jeton d'accès (`ARG GIT_TOKEN`) et clone le code lui-même. Si le jeton expire ou change : le passer en **Build Arg** `GIT_TOKEN` dans Coolify (*Environment Variables → Build Args*), ou le mettre à jour directement dans le `Dockerfile`.
 
 ---
 
@@ -24,7 +24,7 @@ Guide complet pour installer l'application de facturation **ETS LAMP FALL** sur 
 
 | Fichier | Rôle |
 |---|---|
-| `Dockerfile` | Build multi-stage (Bun → Node 20) : installe les dépendances, génère le client Prisma, construit Next.js en mode *standalone* |
+| `Dockerfile` | Build simple étage (Node 20 + Bun) : clone du dépôt privé via `GIT_TOKEN`, dépendances, client Prisma, build Next.js *standalone* (assets statiques copiés), sonde `/api/health` intégrée |
 | `.dockerignore` | Exclut `node_modules`, la base locale et les fichiers d'atelier du contexte de build |
 | `scripts/docker-entrypoint.sh` | Au démarrage du conteneur : crée le dossier de données, applique le schéma Prisma (`db push`), crée le compte admin si absent, lance le serveur |
 | `scripts/seed-admin.mjs` | Crée les paramètres société et le compte administrateur (idempotent) |
@@ -46,7 +46,7 @@ Guide complet pour installer l'application de facturation **ETS LAMP FALL** sur 
 ### 3.1 Créer la ressource
 
 1. Dans Coolify : **New Resource** → **Docker Based** → **Dockerfile**
-2. Choix de la source : connecter le dépôt GitHub `topmuch/Lampfall`, branche `main`
+2. Choix de la source : dépôt GitHub `topmuch/2mailsnew`, branche `main` (le `Dockerfile` gère l'authentification du dépôt privé tout seul)
 3. Coolify détecte automatiquement le `Dockerfile` à la racine
 
 ### 3.2 Configurer le port
@@ -62,7 +62,7 @@ Dans l'onglet **Environment Variables** de la ressource :
 |---|---|---|
 | `AUTH_SECRET` | chaîne aléatoire (`openssl rand -hex 32`) | 🔒 recommandé |
 | `ADMIN_PASSWORD` | mot de passe admin initial | 🔒 recommandé |
-| `DATABASE_URL` | `file:/app/data/lampfall.db` | non (défaut dans l'image) |
+| `DATABASE_URL` | `file:/app/data/2mails.db` | non (défaut dans l'image) |
 | `TZ` | `Africa/Dakar` | non (défaut dans l'image) |
 | `PORT` | `3000` | non (défaut dans l'image) |
 
@@ -92,7 +92,7 @@ Cliquer **Deploy**. Le premier build dure quelques minutes (téléchargement des
 
 ## 4. Méthode B — Déploiement « Docker Compose »
 
-1. **New Resource** → **Docker Compose** → dépôt `topmuch/Lampfall`, branche `main`
+1. **New Resource** → **Docker Compose** → dépôt `topmuch/2mailsnew`, branche `main`
 2. Coolify lit `docker-compose.yml` : le service `lampfall`, le volume `lampfall-data` (`/app/data`) et le healthcheck sont déjà déclarés
 3. Renseigner si besoin `AUTH_SECRET` et `ADMIN_PASSWORD` (variables d'environnement de la ressource)
 4. **Deploy**, puis associer le domaine au **port 3000** dans l'onglet *Domains*
@@ -111,7 +111,8 @@ Cliquer **Deploy**. Le premier build dure quelques minutes (téléchargement des
 
 ## 6. Mises à jour
 
-- Pousser le nouveau code sur GitHub (`main`), puis dans Coolify : **Redeploy**
+- Pousser le nouveau code sur GitHub (`main`), puis dans Coolify **Deploy → « Deploy without cache »** (le layer `git clone` est mis en cache par Docker — sans cela, l'ancien code serait réutilisé). Alternative : incrémenter la valeur `CACHEBUST` en tête du `Dockerfile` (1, 2, 3…) avant de redeployer normalement.
+- Si le jeton `GIT_TOKEN` expire (`fatal: could not read Username for 'https://github.com'`), le remplacer (Build Arg ou dans le `Dockerfile`).
 - Au redémarrage, le conteneur applique automatiquement l'évolution du schéma Prisma (`db push`) — **les données du volume `/app/data` sont conservées**
 - En cas d'évolution **destructrice** du schéma, `db push` échoue volontairement (sans `--accept-data-loss`) : le log Coolify affiche l'erreur au lieu de supprimer des données
 
@@ -121,7 +122,7 @@ Cliquer **Deploy**. Le premier build dure quelques minutes (téléchargement des
 
 - **Coolify** : la ressource peut sauvegarder le volume `/app/data` (onglet *Backups* → planifier un `backup` S3 ou local)
 - **Dans l'application** : menu *Sauvegarde* → export JSON complet téléchargeable (à faire régulièrement)
-- La base est un unique fichier : `/app/data/lampfall.db` (copiable tel quel)
+- La base est un unique fichier : `/app/data/2mails.db` (copiable tel quel)
 
 ---
 
@@ -129,10 +130,11 @@ Cliquer **Deploy**. Le premier build dure quelques minutes (téléchargement des
 
 | Symptôme | Vérification |
 |---|---|
+| « could not read Username for 'https://github.com' » au build | Jeton `GIT_TOKEN` expiré/invalide — le remplacer (Build Arg ou dans le `Dockerfile`) |
 | Conteneur « unhealthy » | Logs du conteneur dans Coolify ; tester `https://…/api/health` |
-| « Environment variable not found: DATABASE_URL » | Garder la valeur par défaut `file:/app/data/lampfall.db` |
+| « Environment variable not found: DATABASE_URL » | Garder la valeur par défaut `file:/app/data/2mails.db` |
 | Données perdues après redéploiement | Le volume `/app/data` n'a pas été ajouté (§ 3.4) |
-| Logo flou / erreur optimisation d'image | Vérifier que le build est complet (le `Dockerfile` copie `sharp`) |
+| Logo flou / erreur optimisation d'image | `sharp` est une dépendance du projet (installé par `bun install`) ; vérifier que le build est complet |
 | Impossible de se connecter | Premier démarrage : `admin/admin123` ; sinon recréer via les logs du seed |
 | Page blanche après déploiement | Vérifier le port 3000 dans *Settings → General* |
 
@@ -141,6 +143,6 @@ Cliquer **Deploy**. Le premier build dure quelques minutes (téléchargement des
 ## 9. Notes techniques
 
 - **SQLite = une seule instance** : ne pas activer le scaling horizontal (répliques multiples) sur cette ressource
-- Fuseau horaire du conteneur : `Africa/Dakar` (défaut)
-- L'image finale tourne sous **Node.js 20 slim** (Debian) ; le build utilise **Bun** avec le `bun.lock` du projet (installations reproductibles)
+- Fuseau horaire du conteneur : `Africa/Dakar` (`tzdata` installé dans l'image)
+- Image unique **Node.js 20 Alpine** ; le build utilise **Bun** avec le `bun.lock` du projet (installations reproductibles)
 - Le mode *standalone* de Next.js réduit fortement la taille de l'image (`output: "standalone"` dans `next.config.ts`)
