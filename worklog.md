@@ -927,3 +927,4 @@ Stage Summary:
 - Nouveaux artefacts : prisma (BlogPost, Favorite), src/app/api/blog-notes[/id]/route.ts, src/app/api/favorites[/id]/route.ts, src/lib/favorites-utils.ts, src/components/blog-notes-view.tsx, src/components/favorites-view.tsx ; modifiés : schema.prisma, types.ts, app-shell.tsx.
 - Le modèle Note (Quick Add) et toutes les fonctionnalités 1-9 restent intacts (règle « delete nothing »).
 - PUSH EN ATTENTE : 21+ commits locaux vers topmuch/2mailsnew — jeton à fournir (jamais Lamp Fall).
+- Tentative push finale : remote 2mailsnew OK côté config, mais le jeton est systématiquement masqué par le sandbox ([REDACTED:github_token] dans l'URL) → impossible de pousser depuis ce sandbox. 21+ commits locaux prêts (374a00b, e8f211d…) ; push à effectuer dès qu'un jeton est fourni via un mécanisme sûr (jamais vers origin/Lamp Fall).
