@@ -236,6 +236,9 @@ model Setting {
   mailDailyImportLimit Int @default(15) // nb max de mails importés du serveur IMAP par jour (anti-saturation)
   monthlyGoal  Float     @default(0) // objectif de chiffre d'affaires mensuel (FCFA) — widget progression du dashboard
   maintenanceMode Boolean @default(false) // mode maintenance : écran de blocage pour les non-admins, l'admin garde l'accès complet
+  // ── Signature mail + cachet officiel (Task 46) ────────────────────────────
+  mailSignature String  @default("") // signature ajoutée en bas des mails envoyés (boîte mail)
+  cachet        String? // data-URL du cachet officiel (tampon) apposé sur les documents
   lastMailSync DateTime?
   updatedAt   DateTime @updatedAt
 }
@@ -268,6 +271,11 @@ model Mail {
   messageId String? // identifiant serveur (dédoublonnage IMAP)
   read      Boolean  @default(false)
   starred   Boolean  @default(false)
+  // ── Envoi programmé + pièces jointes (Task 46) ──────────────────────────
+  status      String    @default("SENT") // SENT = envoyé | PLANIFIE = en attente (dossier PLANIFIES) | ECHEC = échec d'envoi programmé
+  scheduledAt DateTime? // date/heure d'envoi programmé (status PLANIFIE)
+  sendError   String?   // dernier message d'erreur (status ECHEC)
+  attachments String?   // JSON [{name, mime, size, data(base64)}] — pièces jointes du message
   sentAt    DateTime @default(now())
   createdAt DateTime @default(now())
 }
@@ -402,6 +410,7 @@ model CrmDocument {
   shareToken  String?   @unique
   sharedPdf   Bytes?
   sharedPdfAt DateTime?
+  showCachet  Boolean   @default(true) // apposer le cachet société (Setting.cachet) sur ce document
 
   @@index([clientId])
   @@index([leadId])
@@ -573,4 +582,24 @@ model Favorite {
 
   @@index([category])
   @@index([pinned])
+}
+
+// ─── Hosting : noms de domaine achetés et renouvellements (Task 46) ──────────
+// Rappels automatiques par e-mail à J-30, J-15, J-2 et jour J (scheduler, via
+// lib/hosting-notify.ts) + notification WhatsApp manuelle par domaine (wa.me).
+
+model HostingDomain {
+  id             String   @id @default(cuid())
+  domain         String // ex. « 2mails.sn »
+  registrar      String   @default("") // registrar chez qui le domaine est acheté
+  clientName     String? // client rattaché (optionnel, pour la notification WhatsApp)
+  clientPhone    String? // téléphone WhatsApp du client (optionnel, format international)
+  renewalDate    DateTime // prochaine date de renouvellement / expiration
+  price          Float    @default(0) // prix annuel (FCFA, 0 = non renseigné)
+  notes          String?
+  notifiedStages String   @default("") // étapes déjà notifiées ce cycle : CSV « 30,15,2,0 » (réinitialisé si renewalDate change)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([renewalDate])
 }

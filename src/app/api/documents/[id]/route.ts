@@ -42,6 +42,7 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
       clientId?: string | null;
       leadId?: string | null;
       status?: string;
+      showCachet?: boolean;
     } = {};
     if (body.title !== undefined) {
       const title = body.title.toString().trim();
@@ -55,6 +56,9 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
     if (body.status !== undefined && ["BROUILLON", "FINAL"].includes(body.status)) {
       data.status = body.status;
     }
+    // Cachet société : apposer ou non le cachet officiel (Setting.cachet) sur
+    // ce document (PDF, Word, page publique) — Task 46-c
+    if (body.showCachet !== undefined) data.showCachet = Boolean(body.showCachet);
     // Liens : null détache le document, une valeur doit exister en base
     if (body.clientId !== undefined) {
       if (body.clientId === null || body.clientId === "") {

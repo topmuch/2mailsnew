@@ -35,6 +35,7 @@ import {
   RefreshCw,
   Search,
   Share2,
+  Stamp,
   Strikethrough,
   Table as TableIcon,
   Trash2,
@@ -94,10 +95,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { authFetch } from "@/lib/auth-client";
+import { authFetch, getCachedUser } from "@/lib/auth-client";
 import { formatRelativeFr } from "@/components/crm/crm-shared";
 import { useSettingsStore } from "@/lib/settings-store";
+import type { Settings } from "@/lib/types";
 import {
   nextDocNumber,
   templateDefaultTitle,
@@ -141,6 +144,8 @@ interface DocItem {
   // Partage externe (résumé côté API : le jeton brut ne sort jamais)
   shared?: boolean;
   sharedPdfAt?: string | null;
+  // Cachet officiel : apposer le cachet société sur ce document (Task 46-c)
+  showCachet?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -190,6 +195,10 @@ const HIGHLIGHT_SWATCHES = [
 ];
 
 const fcfa = (v: number) => `${new Intl.NumberFormat("fr-FR").format(Math.round(v))} FCFA`;
+
+// Le champ cachet (data-URL du tampon officiel) est renvoyé par GET /api/settings
+// (ligne Setting complète) — extension locale du type partagé (Task 46-c).
+type SettingsWithCachet = Settings & { cachet?: string | null };
 
 // Bouton compact de la barre d'outils (forward refs/props Radix pour asChild)
 function TBtn({
@@ -581,11 +590,24 @@ export default function DocumentsView() {
   const [shareInfo, setShareInfo] = useState<{ url: string; pdfReady: boolean; sharedPdfAt: string | null } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
 
+  // Cachet officiel (téléversement admin + apposition par document) — Task 46-c
+  const [user] = useState(() => getCachedUser());
+  const isAdmin = user?.role === "ADMIN";
+  const [cachetOpen, setCachetOpen] = useState(false);
+  const [cachetDraft, setCachetDraft] = useState<string | null>(null); // image choisie, non encore enregistrée
+  const [cachetBusy, setCachetBusy] = useState(false);
+  const cachetInputRef = useRef<HTMLInputElement | null>(null);
+
   const printRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef({ title: "", content: "" });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeDoc = docs.find((d) => d.id === activeId) ?? null;
+
+  // Cachet officiel : partagé via le magasin settings (chargé une fois par le shell)
+  const settingsAll = settings as SettingsWithCachet | null;
+  const cachet = settingsAll?.cachet ?? null;
+  const cachetPreview = cachetDraft ?? cachet; // aperçu dialog : brouillon sinon cachet enregistré
 
   const load = useCallback(async () => {
     try {
@@ -716,6 +738,78 @@ export default function DocumentsView() {
       setDocs((prev) => prev.map((d) => (d.id === activeDoc.id ? json.doc : d)));
     } catch {
       toast({ title: "Erreur", description: "Changement de statut impossible", variant: "destructive" });
+    }
+  };
+
+  // ─── Cachet officiel (Task 46-c) ─────────────────────────────────────────
+  const onCachetFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Format invalide", description: "Choisissez une image (PNG, JPEG…).", variant: "destructive" });
+      return;
+    }
+    // ~3,5 Mo de data-URL côté serveur ≈ 2,5 Mo de fichier (le base64 gonfle d'un tiers)
+    if (file.size > 2.5 * 1024 * 1024) {
+      toast({ title: "Image trop lourde", description: "Le cachet doit peser moins de 2,5 Mo.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (src) setCachetDraft(src);
+    };
+    reader.onerror = () =>
+      toast({ title: "Erreur", description: "Lecture du fichier impossible", variant: "destructive" });
+    reader.readAsDataURL(file);
+  };
+
+  const saveCachet = async (value: string | null) => {
+    setCachetBusy(true);
+    try {
+      // Le PUT /api/settings met à jour tous les champs texte fournis : on
+      // renvoie les paramètres actuels pour ne rien écraser.
+      let current = settingsAll;
+      if (!current) {
+        await useSettingsStore.getState().load();
+        current = useSettingsStore.getState().settings as SettingsWithCachet | null;
+      }
+      const res = await authFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(current ?? {}), cachet: value }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      useSettingsStore.getState().setSettings(json as Settings);
+      setCachetDraft(null);
+      toast({
+        title: value ? "Cachet enregistré" : "Cachet supprimé",
+        description: value ? "Activez « Cachet » sur un document pour l'apposer." : undefined,
+      });
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: err instanceof Error ? err.message : "Enregistrement du cachet impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setCachetBusy(false);
+    }
+  };
+
+  const changeShowCachet = async (show: boolean) => {
+    if (!activeDoc) return;
+    try {
+      const res = await authFetch(`/api/documents/${activeDoc.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showCachet: show }),
+      });
+      if (!res.ok) throw new Error();
+      const json = (await res.json()) as { doc: DocItem };
+      setDocs((prev) => prev.map((d) => (d.id === activeDoc.id ? json.doc : d)));
+      toast({ title: show ? "Cachet apposé" : "Cachet retiré", description: activeDoc.title });
+    } catch {
+      toast({ title: "Erreur", description: "Modification du cachet impossible", variant: "destructive" });
     }
   };
 
@@ -1231,7 +1325,17 @@ export default function DocumentsView() {
               </div>
 
               {/* Éditeur */}
-              <DocEditor key={activeDoc.id} doc={activeDoc} onHtmlChange={handleHtmlChange} />
+              <div className="relative">
+                <DocEditor key={activeDoc.id} doc={activeDoc} onHtmlChange={handleHtmlChange} />
+                {/* Aperçu du cachet en bas à droite du papier (Task 46-c) */}
+                {(activeDoc.showCachet ?? true) && cachet && (
+                  <img
+                    src={cachet}
+                    alt="Cachet société"
+                    className="pointer-events-none absolute bottom-3 right-5 w-[130px] max-w-[30%] -rotate-6 opacity-90 drop-shadow-md"
+                  />
+                )}
+              </div>
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2 border-t bg-muted/30 p-3">
@@ -1258,6 +1362,33 @@ export default function DocumentsView() {
                 <Button onClick={printDoc} variant="ghost" size="sm">
                   <Printer className="h-4 w-4" aria-hidden /> Imprimer
                 </Button>
+                {isAdmin && (
+                  <Button
+                    onClick={() => {
+                      setCachetDraft(null);
+                      setCachetOpen(true);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    aria-label="Gérer le cachet officiel"
+                  >
+                    <Stamp className="h-4 w-4" aria-hidden /> Cachet
+                  </Button>
+                )}
+                <div className="mx-1 h-6 w-px bg-border" aria-hidden />
+                {/* Apposition du cachet sur CE document (persisté via l'API) */}
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                  title={cachet ? "Apposer le cachet société sur ce document" : "Aucun cachet téléversé — bouton « Cachet » (admin)"}
+                >
+                  <Switch
+                    checked={activeDoc.showCachet ?? true}
+                    onCheckedChange={(v) => void changeShowCachet(v)}
+                    disabled={!cachet}
+                    aria-label="Apposer le cachet"
+                  />
+                  Cachet
+                </span>
                 <div className="flex-1" />
                 <Button
                   onClick={() => void persist({ title: liveRef.current.title, content: liveRef.current.content })}
@@ -1490,6 +1621,82 @@ export default function DocumentsView() {
         </DialogContent>
       </Dialog>
 
+      {/* ─── Cachet officiel (téléversement admin) ─── */}
+      <Dialog open={cachetOpen} onOpenChange={setCachetOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1F3FBF] text-white" aria-hidden>
+                <Stamp className="h-4 w-4" />
+              </span>
+              Cachet officiel
+            </DialogTitle>
+            <DialogDescription>
+              Tampon de la société apposé en bas à droite des documents (PDF, Word, page publique) quand «&nbsp;Cachet&nbsp;» est activé.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex min-h-[120px] items-center justify-center overflow-hidden rounded-xl border border-dashed bg-muted/30 p-4">
+              {cachetPreview ? (
+                <img
+                  src={cachetPreview}
+                  alt="Aperçu du cachet"
+                  className="max-h-[130px] w-auto max-w-full -rotate-6 object-contain drop-shadow-md"
+                />
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  Aucun cachet pour l&apos;instant — téléversez une image (PNG avec fond transparent recommandé).
+                </p>
+              )}
+            </div>
+            <input
+              ref={cachetInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onCachetFile(f);
+                e.target.value = "";
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => cachetInputRef.current?.click()} disabled={cachetBusy}>
+                <ImagePlus className="h-4 w-4" aria-hidden /> Choisir une image
+              </Button>
+              {cachetDraft && (
+                <Badge variant="outline" className="border-amber-400/60 text-amber-700 dark:text-amber-400">
+                  Nouvelle image — non enregistrée
+                </Badge>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {cachet ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => void saveCachet(null)}
+                disabled={cachetBusy}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden /> Supprimer
+              </Button>
+            ) : (
+              <span aria-hidden />
+            )}
+            <Button
+              onClick={() => void saveCachet(cachetDraft)}
+              disabled={cachetBusy || !cachetDraft}
+              className="bg-[#1F3FBF] text-white hover:bg-[#1a35a0]"
+            >
+              {cachetBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Confirmation suppression ─── */}
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
@@ -1546,6 +1753,24 @@ export default function DocumentsView() {
             </div>
           </div>
           <div className="doc-content" dangerouslySetInnerHTML={{ __html: liveRef.current.content || activeDoc.content }} />
+          {/* Cachet officiel en bas à droite — DANS le DOM capturé par html2canvas
+              pour figurer dans le PDF exporté et l'instantané du partage (Task 46-c) */}
+          {(activeDoc.showCachet ?? true) && cachet && (
+            <img
+              src={cachet}
+              alt=""
+              style={{
+                position: "absolute",
+                right: "16px",
+                bottom: "6px",
+                width: "145px",
+                maxWidth: "38%",
+                height: "auto",
+                transform: "rotate(-6deg)",
+                opacity: 0.92,
+              }}
+            />
+          )}
         </div>
       )}
     </div>

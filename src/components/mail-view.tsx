@@ -3,16 +3,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Ban,
   CheckCircle2,
+  ChevronDown,
+  Clock,
   Inbox,
   Info,
   Loader2,
   MailOpen,
+  Paperclip,
   PlugZap,
   Plus,
   RefreshCw,
   Reply,
+  RotateCcw,
   Search,
   Send,
   Settings2,
@@ -20,6 +26,7 @@ import {
   Trash2,
   Undo2,
   Wand2,
+  X,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -41,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -53,9 +61,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useDebouncedValue, useFetch } from "@/hooks/use-fetch";
 import { authFetch } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import type { Mail, MailConfig, MailCounts } from "@/lib/types";
+import type { Mail, MailAttachment, MailConfig, MailCounts } from "@/lib/types";
 
 type MailFolder = Mail["folder"];
+
+/** Limite totale des pièces jointes côté client : 9 Mo (tailles réelles des fichiers). */
+const MAX_ATTACHMENTS_BYTES = 9 * 1024 * 1024;
 
 // ─── Helpers d'affichage ────────────────────────────────────────────────────
 
@@ -84,6 +95,41 @@ function fullDateFr(value: string): string {
 
 function excerpt(body: string): string {
   return body.replace(/\s+/g, " ").trim().slice(0, 140);
+}
+
+/** Taille de fichier lisible (o / Ko / Mo). */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 o";
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) {
+    const ko = bytes / 1024;
+    return `${ko >= 100 ? Math.round(ko) : Math.round(ko * 10) / 10} Ko`;
+  }
+  const mo = bytes / (1024 * 1024);
+  return `${mo >= 100 ? Math.round(mo) : Math.round(mo * 10) / 10} Mo`;
+}
+
+/** Nombre de pièces jointes d'un mail (JSON stocké/en allégé). */
+function attachmentCount(mail: Pick<Mail, "attachments">): number {
+  if (!mail.attachments) return 0;
+  try {
+    const parsed = JSON.parse(mail.attachments) as unknown;
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Date/heure programmée lisible (fr-FR, fuseau local) : « 12 févr. à 14:30 ». */
+function formatScheduledFr(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /** Couleur d'avatar dérivée du nom (palette bleutée premium). */
@@ -154,16 +200,22 @@ function MailListItem({
   onSelect,
   onToggleStar,
   onDelete,
+  onRetry,
+  onCancel,
 }: {
   mail: Mail;
   active: boolean;
   onSelect: (mail: Mail) => void;
   onToggleStar: (mail: Mail) => void;
   onDelete: (mail: Mail) => void;
+  onRetry?: (mail: Mail) => void;
+  onCancel?: (mail: Mail) => void;
 }) {
   const isOut = mail.direction === "OUT";
   const party = isOut ? mail.to : mail.fromName || mail.from;
   const initial = (party || "?").charAt(0).toUpperCase();
+  const isScheduled = mail.folder === "PLANIFIES";
+  const attCount = attachmentCount(mail);
 
   return (
     <div
@@ -201,44 +253,112 @@ function MailListItem({
             {party || "(inconnu)"}
           </span>
           <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-            {relativeTimeFr(mail.sentAt)}
+            {/* Programmés : date/heure d'envoi planifiée ; autres : date de réception/envoi */}
+            {isScheduled && mail.scheduledAt
+              ? formatScheduledFr(mail.scheduledAt)
+              : relativeTimeFr(mail.sentAt)}
           </span>
         </div>
-        <p className={cn("truncate text-sm", mail.read ? "text-foreground/85" : "font-semibold text-foreground", active && "text-primary")}>
-          {mail.subject || "(sans objet)"}
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className={cn("min-w-0 flex-1 truncate text-sm", mail.read ? "text-foreground/85" : "font-semibold text-foreground", active && "text-primary")}>
+            {mail.subject || "(sans objet)"}
+          </p>
+          {/* Statut des envois programmés : ambre = en attente, rouge = échec */}
+          {isScheduled && mail.status === "PLANIFIE" && (
+            <Badge
+              className="shrink-0 gap-1 border-amber-300 bg-amber-100 text-[10px] text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
+              title={`Envoi programmé${mail.scheduledAt ? ` le ${fullDateFr(mail.scheduledAt)}` : ""}`}
+            >
+              <Clock className="h-3 w-3" /> Programmé
+            </Badge>
+          )}
+          {isScheduled && mail.status === "ECHEC" && (
+            <Badge
+              className="shrink-0 gap-1 border-destructive/40 bg-destructive/10 text-[10px] text-destructive"
+              title={mail.sendError || "Échec de l'envoi"}
+            >
+              <AlertTriangle className="h-3 w-3" /> Échec
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {excerpt(mail.body) || "—"}
           </p>
-          {/* Suppression rapide : toujours visible sur mobile, au survol sur desktop */}
-          <button
-            type="button"
-            aria-label={mail.folder === "TRASH" ? "Supprimer définitivement" : "Supprimer ce message"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(mail);
-            }}
-            className="shrink-0 rounded-full p-1 text-muted-foreground/40 opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label={mail.starred ? "Retirer des favoris" : "Marquer comme favori"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleStar(mail);
-            }}
-            className="shrink-0 rounded-full p-1 transition-colors hover:bg-gold-soft/70"
-          >
-            <Star
-              className={cn(
-                "h-4 w-4",
-                mail.starred ? "fill-gold text-gold" : "text-muted-foreground/40"
+          {/* Pièces jointes : trombone (listes Envoyés et Programmés) */}
+          {attCount > 0 && (
+            <span
+              className="inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground"
+              title={`${attCount} pièce${attCount > 1 ? "s" : ""} jointe${attCount > 1 ? "s" : ""}`}
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              {attCount}
+            </span>
+          )}
+          {/* Actions envoi programmé : réessayer (échec) + annuler */}
+          {isScheduled ? (
+            <>
+              {mail.status === "ECHEC" && onRetry && (
+                <button
+                  type="button"
+                  aria-label="Réessayer l'envoi maintenant"
+                  title="Réessayer l'envoi maintenant"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry(mail);
+                  }}
+                  className="shrink-0 rounded-full p-1 text-muted-foreground/40 opacity-100 transition-all hover:bg-primary/10 hover:text-primary lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
               )}
-            />
-          </button>
+              {onCancel && (
+                <button
+                  type="button"
+                  aria-label="Annuler l'envoi programmé"
+                  title="Annuler l'envoi programmé"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel(mail);
+                  }}
+                  className="shrink-0 rounded-full p-1 text-muted-foreground/40 opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                >
+                  <Ban className="h-4 w-4" />
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Suppression rapide : toujours visible sur mobile, au survol sur desktop */}
+              <button
+                type="button"
+                aria-label={mail.folder === "TRASH" ? "Supprimer définitivement" : "Supprimer ce message"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(mail);
+                }}
+                className="shrink-0 rounded-full p-1 text-muted-foreground/40 opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label={mail.starred ? "Retirer des favoris" : "Marquer comme favori"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleStar(mail);
+                }}
+                className="shrink-0 rounded-full p-1 transition-colors hover:bg-gold-soft/70"
+              >
+                <Star
+                  className={cn(
+                    "h-4 w-4",
+                    mail.starred ? "fill-gold text-gold" : "text-muted-foreground/40"
+                  )}
+                />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -342,6 +462,42 @@ function ReadPane({
             {plain || (detailFailed ? "(contenu indisponible)" : "(message vide)")}
           </p>
         )}
+        {/* Pièces jointes du message (noms + tailles ; contenu uniquement côté serveur) */}
+        {(() => {
+          const json = detail?.attachments ?? mail.attachments ?? null;
+          let atts: Array<{ name: string; size: number }> = [];
+          if (json) {
+            try {
+              const parsed = JSON.parse(json) as Array<{ name?: string; size?: number }>;
+              if (Array.isArray(parsed)) {
+                atts = parsed.map((a) => ({ name: a.name ?? "", size: a.size ?? 0 }));
+              }
+            } catch {
+              atts = [];
+            }
+          }
+          if (!atts.length) return null;
+          return (
+            <div className="mt-4 space-y-1.5 border-t pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {atts.length} pièce{atts.length > 1 ? "s" : ""} jointe{atts.length > 1 ? "s" : ""}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {atts.map((a, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 py-1 text-xs"
+                    title={a.name}
+                  >
+                    <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="max-w-[180px] truncate">{a.name || "(sans nom)"}</span>
+                    <span className="shrink-0 text-muted-foreground">{formatBytes(a.size)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t bg-muted/30 p-3">
         <Button size="sm" onClick={() => onReply(mail)} className="gap-1.5">
@@ -404,6 +560,7 @@ function TestRow({
 interface ConfigForm {
   mailFromName: string;
   mailDailyImportLimit: string;
+  mailSignature: string;
   smtpHost: string;
   smtpPort: string;
   smtpUser: string;
@@ -430,6 +587,7 @@ function MailConfigDialog({
   const [form, setForm] = useState<ConfigForm>({
     mailFromName: "",
     mailDailyImportLimit: "15",
+    mailSignature: "",
     smtpHost: "",
     smtpPort: "587",
     smtpUser: "",
@@ -450,6 +608,7 @@ function MailConfigDialog({
       setForm({
         mailFromName: config.mailFromName ?? "",
         mailDailyImportLimit: String(config.mailDailyImportLimit ?? 15),
+        mailSignature: config.mailSignature ?? "",
         smtpHost: config.smtpHost ?? "",
         smtpPort: String(config.smtpPort ?? 587),
         smtpUser: config.smtpUser ?? "",
@@ -493,6 +652,7 @@ function MailConfigDialog({
       const payload: Record<string, unknown> = {
         mailFromName: form.mailFromName.trim(),
         mailDailyImportLimit: Number(form.mailDailyImportLimit) || 15,
+        mailSignature: form.mailSignature.slice(0, 2000),
         smtpHost: form.smtpHost.trim(),
         smtpPort: Number(form.smtpPort) || 587,
         smtpUser: form.smtpUser.trim(),
@@ -608,6 +768,28 @@ function MailConfigDialog({
               onChange={(e) => set("mailFromName", e.target.value)}
               placeholder="2MAILS"
             />
+          </div>
+
+          {/* ─── Signature par défaut des mails ─── */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="mailSignature">Signature des emails</Label>
+              <span className="text-[11px] text-muted-foreground">
+                {form.mailSignature.length}/2000
+              </span>
+            </div>
+            <Textarea
+              id="mailSignature"
+              value={form.mailSignature}
+              onChange={(e) => set("mailSignature", e.target.value.slice(0, 2000))}
+              placeholder={"Cordialement,\nETS LAMP FALL — Plomberie · Sanitaire · Luminaire\n+221 77 000 00 00"}
+              rows={4}
+              className="resize-y"
+            />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Ajoutée automatiquement en bas de chaque message rédigé (préremplie, modifiable au
+              cas par cas avant l&apos;envoi).
+            </p>
           </div>
 
           {/* ─── Limite quotidienne d'importation (anti-saturation) ─── */}
@@ -830,7 +1012,7 @@ export default function MailView() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [mails, setMails] = useState<Mail[]>([]);
-  const [counts, setCounts] = useState<MailCounts>({ inbox: 0, unread: 0, sent: 0, trash: 0 });
+  const [counts, setCounts] = useState<MailCounts>({ inbox: 0, unread: 0, sent: 0, trash: 0, planifies: 0 });
   const [loading, setLoading] = useState(true);
 
   const query = useMemo(() => {
@@ -845,7 +1027,7 @@ export default function MailView() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Chargement impossible");
       setMails(Array.isArray(json.mails) ? (json.mails as Mail[]) : []);
-      setCounts(json.counts ?? { inbox: 0, unread: 0, sent: 0, trash: 0 });
+      setCounts(json.counts ?? { inbox: 0, unread: 0, sent: 0, trash: 0, planifies: 0 });
     } catch (e) {
       console.error("Chargement des mails", e);
       toast({
@@ -919,6 +1101,15 @@ export default function MailView() {
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
   const [sending, setSending] = useState(false);
+  // Envoi programmé (Task 46-b) : date/heure optionnelle (input datetime-local)
+  const [composeSchedule, setComposeSchedule] = useState("");
+  // Pièces jointes converties en base64 côté client
+  const [composeAttachments, setComposeAttachments] = useState<MailAttachment[]>([]);
+  const [readingFiles, setReadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Signature (préremplie depuis la configuration, éditable pour ce mail)
+  const [composeSignature, setComposeSignature] = useState("");
+  const [signatureOpen, setSignatureOpen] = useState(false);
 
   // Configuration dialog
   const [configOpen, setConfigOpen] = useState(false);
@@ -928,11 +1119,89 @@ export default function MailView() {
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  /** Réinitialise complètement le formulaire de rédaction. */
+  const resetCompose = () => {
+    setComposeTo("");
+    setComposeSubject("");
+    setComposeBody("");
+    setComposeSchedule("");
+    setComposeAttachments([]);
+    setComposeSignature(config?.mailSignature ?? "");
+    setSignatureOpen(false);
+  };
+
   const openCompose = (prefill?: { to?: string; subject?: string }) => {
     setComposeTo(prefill?.to ?? "");
     setComposeSubject(prefill?.subject ?? "");
     setComposeBody("");
+    setComposeSchedule("");
+    setComposeAttachments([]);
+    setComposeSignature(config?.mailSignature ?? "");
+    setSignatureOpen(false);
     setComposeOpen(true);
+  };
+
+  /** Taille totale (octets réels) des pièces jointes sélectionnées. */
+  const attachmentsTotal = useMemo(
+    () => composeAttachments.reduce((sum, a) => sum + (a.size || 0), 0),
+    [composeAttachments]
+  );
+
+  /** Lecture des fichiers choisis → base64 (FileReader), avec garde-fou 9 Mo au total. */
+  const addFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setReadingFiles(true);
+    try {
+      const next: MailAttachment[] = [];
+      let total = attachmentsTotal;
+      for (const file of Array.from(files)) {
+        if (total + file.size > MAX_ATTACHMENTS_BYTES) {
+          toast({
+            title: "Pièces jointes trop volumineuses",
+            description: `"${file.name}" dépasse la limite de 9 Mo au total (${formatBytes(
+              total + file.size
+            )} > 9 Mo).`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = String(reader.result ?? "");
+            // dataURL → base64 pur (on retire le préfixe "data:...;base64,")
+            resolve(result.includes(",") ? result.slice(result.indexOf(",") + 1) : result);
+          };
+          reader.onerror = () => reject(new Error(`Lecture impossible : ${file.name}`));
+          reader.readAsDataURL(file);
+        });
+        next.push({
+          name: file.name,
+          mime: file.type || "application/octet-stream",
+          size: file.size,
+          data: base64,
+        });
+        total += file.size;
+      }
+      if (next.length) {
+        setComposeAttachments((prev) => [...prev, ...next]);
+        toast({
+          title:
+            next.length === 1
+              ? "Pièce jointe ajoutée"
+              : `${next.length} pièces jointes ajoutées`,
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Lecture des fichiers impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setReadingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const sendMail = async () => {
@@ -944,6 +1213,28 @@ export default function MailView() {
       });
       return;
     }
+
+    // Programmation : date future obligatoire
+    const scheduled = Boolean(composeSchedule);
+    let scheduledIso: string | undefined;
+    if (scheduled) {
+      const d = new Date(composeSchedule);
+      if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+        toast({
+          title: "Date invalide",
+          description: "Choisissez une date et une heure d'envoi dans le futur.",
+          variant: "destructive",
+        });
+        return;
+      }
+      scheduledIso = d.toISOString();
+    }
+
+    // Signature : apposée en fin de message (format « -- » classique des clients mail)
+    const finalBody = composeSignature.trim()
+      ? `${composeBody}\n\n--\n${composeSignature}`
+      : composeBody;
+
     setSending(true);
     try {
       const res = await authFetch("/api/mails", {
@@ -952,20 +1243,34 @@ export default function MailView() {
         body: JSON.stringify({
           to: composeTo.trim(),
           subject: composeSubject.trim(),
-          body: composeBody,
+          body: finalBody,
+          attachments: composeAttachments.length ? composeAttachments : undefined,
+          scheduledAt: scheduledIso,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Envoi impossible");
-      toast({
-        title: json.delivered
-          ? "Message envoyé"
-          : "Message enregistré localement (SMTP non configuré)",
-        description: json.delivered
-          ? `Envoyé à ${composeTo.trim()}.`
-          : "Configurez votre boîte pour envoyer de vrais emails.",
-      });
+      if (json.scheduled) {
+        const when = new Date(composeSchedule).toLocaleString("fr-FR", {
+          dateStyle: "full",
+          timeStyle: "short",
+        });
+        toast({
+          title: "Envoi programmé",
+          description: `Le message partira automatiquement le ${when}.`,
+        });
+      } else {
+        toast({
+          title: json.delivered
+            ? "Message envoyé"
+            : "Message enregistré localement (SMTP non configuré)",
+          description: json.delivered
+            ? `Envoyé à ${composeTo.trim()}.`
+            : "Configurez votre boîte pour envoyer de vrais emails.",
+        });
+      }
       setComposeOpen(false);
+      resetCompose();
       await loadMails();
     } catch (e) {
       toast({
@@ -975,6 +1280,68 @@ export default function MailView() {
       });
     } finally {
       setSending(false);
+    }
+  };
+
+  /** Réessaye un envoi programmé en échec : reprogrammé immédiatement (scheduler). */
+  const retryScheduled = async (mail: Mail) => {
+    setMails((prev) =>
+      prev.map((m) => (m.id === mail.id ? { ...m, status: "PLANIFIE" as const, sendError: null } : m))
+    );
+    try {
+      const res = await authFetch(`/api/mails/${mail.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Réessai impossible");
+      toast({
+        title: "Envoi reprogrammé",
+        description: "Le message partira dans moins d'une minute.",
+      });
+      await loadMails();
+    } catch (e) {
+      setMails((prev) =>
+        prev.map((m) =>
+          m.id === mail.id ? { ...m, status: "ECHEC" as const, sendError: mail.sendError } : m
+        )
+      );
+      toast({
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Réessai impossible",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Annulation d'un envoi programmé (confirmation puis exécution)
+  const [cancelTarget, setCancelTarget] = useState<Mail | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  const confirmCancelScheduled = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      const res = await authFetch(`/api/mails/${cancelTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Annulation impossible");
+      toast({ title: "Envoi programmé annulé" });
+      if (selectedId === cancelTarget.id) setSelectedId(null);
+      setCancelTarget(null);
+      await loadMails();
+    } catch (e) {
+      toast({
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Annulation impossible",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -1136,11 +1503,18 @@ export default function MailView() {
   }> = [
     { key: "INBOX", label: "Boîte de réception", icon: Inbox, badge: counts.unread },
     { key: "SENT", label: "Envoyés", icon: Send, badge: counts.sent },
+    { key: "PLANIFIES", label: "Programmés", icon: Clock, badge: counts.planifies },
     { key: "TRASH", label: "Corbeille", icon: Trash2, badge: counts.trash },
   ];
 
   const folderTitle =
-    folder === "INBOX" ? "Boîte de réception" : folder === "SENT" ? "Envoyés" : "Corbeille";
+    folder === "INBOX"
+      ? "Boîte de réception"
+      : folder === "SENT"
+        ? "Envoyés"
+        : folder === "PLANIFIES"
+          ? "Programmés"
+          : "Corbeille";
 
   const lastSyncLabel = config?.lastMailSync
     ? new Date(config.lastMailSync).toLocaleString("fr-FR", {
@@ -1281,8 +1655,8 @@ export default function MailView() {
                   </span>
                 )}
               </h2>
-              {/* Suppression en masse — desktop */}
-              {!loading && mails.length > 0 && (
+              {/* Suppression en masse — desktop (indisponible dans « Programmés ») */}
+              {!loading && mails.length > 0 && folder !== "PLANIFIES" && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -1299,8 +1673,8 @@ export default function MailView() {
                 </Button>
               )}
               {/* Actions mobiles (rail caché sur petit écran) */}
-              <div className={cn("flex items-center gap-1.5 lg:hidden", !loading && mails.length > 0 && "ml-auto")}>
-                {!loading && mails.length > 0 && (
+              <div className={cn("flex items-center gap-1.5 lg:hidden", !loading && mails.length > 0 && folder !== "PLANIFIES" && "ml-auto")}>
+                {!loading && mails.length > 0 && folder !== "PLANIFIES" && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -1413,7 +1787,9 @@ export default function MailView() {
                 <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
                   {folder === "INBOX"
                     ? "Les nouveaux messages arrivent automatiquement (vérification toutes les 2 minutes). Le bouton « Synchroniser » force une vérification immédiate."
-                    : "Les messages de ce dossier apparaîtront ici."}
+                    : folder === "PLANIFIES"
+                      ? "Rédigez un message et choisissez « Programmer l’envoi » avec une date et une heure : il partira automatiquement et apparaîtra ici en attendant."
+                      : "Les messages de ce dossier apparaîtront ici."}
                 </p>
               </div>
             ) : (
@@ -1425,6 +1801,8 @@ export default function MailView() {
                   onSelect={openMail}
                   onToggleStar={toggleStar}
                   onDelete={deleteMail}
+                  onRetry={retryScheduled}
+                  onCancel={setCancelTarget}
                 />
               ))
             )}
@@ -1503,11 +1881,13 @@ export default function MailView() {
 
       {/* ─── Dialog de rédaction ─── */}
       <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Nouveau message</DialogTitle>
             <DialogDescription>
-              Rédigez votre email — il sera enregistré dans « Envoyés ».
+              {composeSchedule
+                ? "Le message partira automatiquement à la date et l'heure choisies."
+                : "Rédigez votre email — il sera enregistré dans « Envoyés »."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1542,23 +1922,183 @@ export default function MailView() {
                 className="resize-y"
               />
             </div>
+
+            {/* ─── Programmer l'envoi ─── */}
+            <div className="space-y-1.5 rounded-xl border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="composeSchedule" className="text-sm font-medium">
+                  Programmer l&apos;envoi (optionnel)
+                </Label>
+                {composeSchedule && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                    onClick={() => setComposeSchedule("")}
+                  >
+                    <X className="h-3.5 w-3.5" /> Effacer
+                  </Button>
+                )}
+              </div>
+              <Input
+                id="composeSchedule"
+                type="datetime-local"
+                value={composeSchedule}
+                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+                  .toISOString()
+                  .slice(0, 16)}
+                onChange={(e) => setComposeSchedule(e.target.value)}
+                className="bg-background"
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {composeSchedule
+                  ? `Envoi automatique le ${new Date(composeSchedule).toLocaleString("fr-FR", {
+                      dateStyle: "full",
+                      timeStyle: "short",
+                    })}.`
+                  : "Laissez vide pour un envoi immédiat. Sinon, le message partira automatiquement à la date choisie."}
+              </p>
+            </div>
+
+            {/* ─── Pièces jointes ─── */}
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="sr-only"
+                aria-label="Ajouter des pièces jointes"
+                onChange={(e) => addFiles(e.target.files)}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-9 gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={readingFiles || sending}
+                >
+                  {readingFiles ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                  Joindre un fichier
+                </Button>
+                {composeAttachments.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {composeAttachments.length} fichier
+                    {composeAttachments.length > 1 ? "s" : ""} · {formatBytes(attachmentsTotal)} / 9
+                    Mo
+                  </span>
+                )}
+              </div>
+              {composeAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {composeAttachments.map((a, i) => (
+                    <span
+                      key={`${a.name}-${i}`}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border bg-muted/50 py-1 pl-2.5 pr-1 text-xs"
+                    >
+                      <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="max-w-[160px] truncate" title={a.name}>
+                        {a.name}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">{formatBytes(a.size)}</span>
+                      <button
+                        type="button"
+                        aria-label={`Retirer ${a.name}`}
+                        onClick={() =>
+                          setComposeAttachments((prev) => prev.filter((_, j) => j !== i))
+                        }
+                        className="shrink-0 rounded-full p-1 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ─── Signature (préremplie depuis la configuration, éditable ici) ─── */}
+            <Collapsible open={signatureOpen} onOpenChange={setSignatureOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  aria-expanded={signatureOpen}
+                >
+                  <ChevronDown
+                    className={cn("h-4 w-4 transition-transform", signatureOpen && "rotate-180")}
+                  />
+                  Signature
+                  {composeSignature.trim() ? (
+                    <Badge variant="secondary" className="ml-1 text-[10px]">
+                      ajoutée
+                    </Badge>
+                  ) : null}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <Textarea
+                  value={composeSignature}
+                  onChange={(e) => setComposeSignature(e.target.value)}
+                  placeholder="Votre signature (nom, société, téléphone…)"
+                  rows={4}
+                  className="resize-y text-sm"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Apposée en bas du message («&nbsp;--&nbsp;» + signature). Modifiable pour ce mail
+                  uniquement.
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setComposeOpen(false)} disabled={sending}>
               Annuler
             </Button>
-            <Button onClick={sendMail} disabled={sending} className="gap-1.5">
+            <Button onClick={sendMail} disabled={sending || readingFiles} className="gap-1.5">
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : composeSchedule ? (
+                <Clock className="h-4 w-4" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Envoyer
+              {composeSchedule ? "Programmer l'envoi" : "Envoyer"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Confirmation de l'annulation d'un envoi programmé ─── */}
+      <AlertDialog open={Boolean(cancelTarget)} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler cet envoi programmé ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              « {cancelTarget?.subject || "(sans objet)"} » à {cancelTarget?.to} sera supprimé
+              définitivement et ne sera jamais envoyé. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Ne pas annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelScheduled}
+              disabled={cancelling}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {cancelling && <Loader2 className="h-4 w-4 animate-spin" />}
+              Annuler l&apos;envoi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ─── Confirmation de la suppression en masse ─── */}
       <AlertDialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>

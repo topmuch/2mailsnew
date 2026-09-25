@@ -36,12 +36,14 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ token: 
         rc: setting?.rc,
         ninea: setting?.ninea,
         logo: setting?.logo,
+        cachet: setting?.cachet,
       };
       const buffer = await buildDocxBuffer({
         title: doc.title,
         html: doc.content,
         company,
         author: doc.author,
+        showCachet: doc.showCachet,
       });
       return new NextResponse(new Uint8Array(buffer), {
         headers: {

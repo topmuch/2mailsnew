@@ -344,7 +344,7 @@ export interface SalesReport {
 export interface Mail {
   id: string;
   direction: "IN" | "OUT";
-  folder: "INBOX" | "SENT" | "TRASH";
+  folder: "INBOX" | "SENT" | "TRASH" | "PLANIFIES";
   fromName: string | null;
   from: string;
   to: string;
@@ -355,8 +355,25 @@ export interface Mail {
   messageId: string | null;
   read: boolean;
   starred: boolean;
+  /** Statut d'envoi : SENT = parti | PLANIFIE = en attente | ECHEC = échec d'envoi programmé. */
+  status: "SENT" | "PLANIFIE" | "ECHEC";
+  /** Date/heure d'envoi programmé (mails PLANIFIE/ECHEC uniquement). */
+  scheduledAt: string | null;
+  /** Dernier message d'erreur d'envoi (status ECHEC). */
+  sendError: string | null;
+  /** JSON string [{name, mime, size, data(base64)}] — les listes omettent `data` (lourd). */
+  attachments: string | null;
   sentAt: string;
   createdAt: string;
+}
+
+/** Pièce jointe d'un mail (formulaire d'envoi / JSON stocké en base). */
+export interface MailAttachment {
+  name: string;
+  mime: string;
+  size: number;
+  /** Contenu en base64 (sans préfixe data:). */
+  data: string;
 }
 
 export interface MailCounts {
@@ -364,6 +381,7 @@ export interface MailCounts {
   unread: number;
   sent: number;
   trash: number;
+  planifies: number;
 }
 
 export interface MailConfig {
@@ -377,6 +395,8 @@ export interface MailConfig {
   imapUser: string;
   /** Nombre maximal de mails importés du serveur IMAP par jour (anti-saturation). */
   mailDailyImportLimit: number;
+  /** Signature ajoutée en bas des mails envoyés depuis la boîte (multi-lignes). */
+  mailSignature: string;
   smtpConfigured: boolean;
   imapConfigured: boolean;
   lastMailSync: string | null;

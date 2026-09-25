@@ -37,6 +37,7 @@ export interface CompanyInfo {
   rc?: string | null;
   ninea?: string | null;
   logo?: string | null; // data-URL du logo personnalisé (prioritaire)
+  cachet?: string | null; // data-URL du cachet officiel (tampon) — Task 46-c
 }
 
 const BRAND = "1F3FBF"; // bleu 2MAILS
@@ -135,6 +136,32 @@ async function logoImageRun(company: CompanyInfo): Promise<ImageRun | null> {
       type: "png",
       data: buf,
       transformation: { width: 72, height },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Cachet officiel (tampon) : ImageRun depuis la data-URL du Setting,
+ *  contraint à ~150 px — même pattern de décodage base64 que le logo.
+ *  Renvoie null si aucun cachet ou image inexploitable (export toujours sûr). */
+async function cachetImageRun(company: CompanyInfo): Promise<ImageRun | null> {
+  if (!company.cachet) return null;
+  const m = DATA_URL_RE.exec(company.cachet.trim());
+  if (!m) return null;
+  let ext = m[1].toLowerCase();
+  if (ext === "jpeg") ext = "jpg";
+  if (ext === "webp") return null; // format non supporté par Word
+  try {
+    const buf = Buffer.from(m[2], "base64");
+    const meta = await sharp(buf).metadata();
+    const w = meta.width ?? 150;
+    const h = meta.height ?? 150;
+    const scale = Math.min(1, 150 / w, 150 / h); // reste lisible sans déborder
+    return new ImageRun({
+      type: ext as "png" | "jpg" | "gif" | "bmp",
+      data: buf,
+      transformation: { width: Math.round(w * scale), height: Math.round(h * scale) },
     });
   } catch {
     return null;
@@ -519,6 +546,7 @@ export async function buildDocxBuffer(opts: {
   html: string;
   company: CompanyInfo;
   author?: string | null;
+  showCachet?: boolean; // apposer le cachet officiel en fin de document — Task 46-c
 }): Promise<Buffer> {
   const root = parse(opts.html ?? "");
   const blocks: Block[] = [];
@@ -526,6 +554,20 @@ export async function buildDocxBuffer(opts: {
     await convertBlock(node, blocks);
   }
   if (blocks.length === 0) blocks.push(new Paragraph({ children: [] }));
+
+  // Cachet officiel : dernière ligne du document, alignée à droite (tampon)
+  if (opts.showCachet) {
+    const cachet = await cachetImageRun(opts.company);
+    if (cachet) {
+      blocks.push(
+        new Paragraph({
+          children: [cachet as unknown as TextRun],
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 360 },
+        }),
+      );
+    }
+  }
 
   const header = await letterheadHeader(opts.company);
   const footer = pageFooter(opts.company);

@@ -25,12 +25,14 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
       rc: setting?.rc,
       ninea: setting?.ninea,
       logo: setting?.logo,
+      cachet: setting?.cachet,
     };
     const buffer = await buildDocxBuffer({
       title: doc.title,
       html: doc.content,
       company,
       author: doc.author,
+      showCachet: doc.showCachet,
     });
     // Nom de fichier propre : sans caractères problématiques
     const safe = doc.title.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "document";

@@ -48,6 +48,9 @@ body{margin:0;background:#eef1f6;font-family:system-ui,-apple-system,"Segoe UI",
 .doc img{max-width:100%}
 .doc hr{border:none;border-top:1px solid #cbd5e1;margin:1.2em 0}
 .hint{margin:12px 0 0;font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px}
+.cachet-zone{position:relative}
+.cachet{position:absolute;right:4px;bottom:0;width:145px;max-width:38%;height:auto;transform:rotate(-6deg);opacity:.92;filter:drop-shadow(0 1px 3px rgba(15,23,42,.25));pointer-events:none}
+.cachet-zone .doc{padding-bottom:30px}
 .foot{max-width:820px;margin:14px auto 0;padding:0 16px;color:#94a3b8;font-size:11.5px;text-align:center}
 @media (max-width:560px){.paper{padding:20px 16px}.head{flex-direction:column;gap:10px}}
 @media print{body{background:#fff}.bar,.hint,.foot{display:none!important}.wrap{padding:0;max-width:none}.paper{box-shadow:none;border-radius:0;padding:0}}
@@ -93,6 +96,10 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ token: 
     const pdfUrl = `?format=pdf`;
     const docxUrl = `?format=docx`;
 
+    // Cachet officiel : apposé en bas à droite si le document l'autorise et
+    // qu'un cachet est téléversé dans les paramètres (Task 46-c)
+    const showCachet = doc.showCachet && !!setting?.cachet;
+
     const buttons = [
       doc.sharedPdf
         ? `<a class="btn primary" href="${pdfUrl}" download>⬇ Télécharger le PDF</a>`
@@ -137,7 +144,10 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ token: 
     <h1 class="title">${title}</h1>
     <p class="meta">Document partagé par ${escapeHtml(nomSociete)}${doc.author ? ` · rédigé par ${escapeHtml(doc.author)}` : ""} · mis à jour le ${escapeHtml(updated)} (Dakar)</p>
     ${pdfHint}
-    <main class="doc">${doc.content || "<p><em>Document vide.</em></p>"}</main>
+    <div class="${showCachet ? "cachet-zone" : ""}">
+      <main class="doc">${doc.content || "<p><em>Document vide.</em></p>"}</main>
+      ${showCachet ? `<img class="cachet" src="${escapeHtml(setting!.cachet!)}" alt="Cachet ${escapeHtml(nomSociete)}">` : ""}
+    </div>
   </div>
   <p class="foot">Ce lien est privé — merci de ne pas le diffuser publiquement. ${escapeHtml(publicBaseUrl(request)).replace(/^https?:\/\//, "")}</p>
 </div>

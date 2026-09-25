@@ -31,6 +31,7 @@ import {
   FileText,
   Files,
   FolderKanban,
+  Globe,
   Globe2,
   History,
   KeyRound,
@@ -74,6 +75,7 @@ import { QuickAddButton } from "@/components/quick-add-button";
 import BlogNotesView from "@/components/blog-notes-view";
 import FavoritesView from "@/components/favorites-view";
 import DocumentsView from "@/components/documents-view";
+import HostingView from "@/components/hosting-view";
 import CrmDashboardView from "@/components/crm/crm-dashboard-view";
 import CrmItemsView from "@/components/crm/crm-items-view";
 import CrmClientsView from "@/components/crm/crm-clients-view";
@@ -99,6 +101,7 @@ type ViewId =
   | "rapports"
   | "calendrier"
   | "mails"
+  | "hosting"
   | "blog-notes"
   | "favoris"
   | "documents"
@@ -142,6 +145,7 @@ const NAV: {
   { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
   { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
+  { id: "hosting", label: "Hosting (domaines & renouvellements)", short: "Hosting", icon: Globe, section: "Communication" },
   // ─── Notes & Favoris ───
   { id: "blog-notes", label: "Blog note (notes partagées)", short: "Blog note", icon: NotebookPen, section: "Notes & Favoris" },
   { id: "favoris", label: "Favoris (liens internet)", short: "Favoris", icon: Star, section: "Notes & Favoris" },
@@ -682,6 +686,7 @@ export function AppShell() {
               {view === "blog-notes" && <BlogNotesView />}
               {view === "favoris" && <FavoritesView />}
               {view === "documents" && <DocumentsView />}
+              {view === "hosting" && <HostingView />}
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}

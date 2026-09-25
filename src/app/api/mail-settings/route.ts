@@ -27,6 +27,7 @@ function toConfig(setting: SettingRow | null): MailConfig {
     imapPort: setting?.imapPort ?? 993,
     imapUser,
     mailDailyImportLimit: setting?.mailDailyImportLimit ?? 15,
+    mailSignature: setting?.mailSignature ?? "",
     smtpConfigured: Boolean(smtpHost && smtpUser && smtpPass),
     imapConfigured: Boolean(imapHost && imapUser && imapPass),
     lastMailSync: setting?.lastMailSync ? setting.lastMailSync.toISOString() : null,
@@ -99,6 +100,11 @@ export async function PUT(request: NextRequest) {
         1,
         Math.min(500, numField(body.mailDailyImportLimit, current?.mailDailyImportLimit ?? 15))
       ),
+      // Signature des mails (multi-lignes, champ libre) : bornée à 2000 caractères
+      mailSignature:
+        body.mailSignature === undefined || body.mailSignature === null
+          ? (current?.mailSignature ?? "")
+          : String(body.mailSignature).slice(0, 2000),
     };
 
     const setting = await db.setting.upsert({

@@ -48,6 +48,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Logo trop volumineux (max ~2,5 Mo)" }, { status: 400 });
     }
 
+    // Cachet officiel (tampon apposé sur les documents) — mêmes garde-fous que
+    // le logo : data-URL image, ~3,5 Mo max en base64, null = suppression.
+    const cachet = body.cachet === null ? null : body.cachet ? body.cachet.toString() : undefined;
+    if (cachet && !cachet.startsWith("data:image/")) {
+      return NextResponse.json({ error: "Format de cachet invalide (image attendue)" }, { status: 400 });
+    }
+    if (cachet && cachet.length > 3_500_000) {
+      return NextResponse.json({ error: "Cachet trop volumineux (max ~2,5 Mo)" }, { status: 400 });
+    }
+
     const data: Record<string, unknown> = {
       nomSociete: clean(body.nomSociete, 120) || DEFAULTS.nomSociete,
       tagline: clean(body.tagline, 160),
@@ -58,6 +68,7 @@ export async function PUT(request: NextRequest) {
       ninea: clean(body.ninea, 80),
     };
     if (logo !== undefined) data.logo = logo;
+    if (cachet !== undefined) data.cachet = cachet;
 
     // Objectif de CA mensuel (widget de progression du dashboard) — optionnel
     if (body.monthlyGoal !== undefined) {

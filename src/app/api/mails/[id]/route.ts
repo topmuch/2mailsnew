@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
-const VALID_FOLDERS = ["INBOX", "SENT", "TRASH"];
+const VALID_FOLDERS = ["INBOX", "SENT", "TRASH", "PLANIFIES"];
 
 // ─── GET : détail d'un mail ─────────────────────────────────────────────────
 
@@ -44,6 +44,59 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return NextResponse.json({ mail });
   } catch (error) {
     console.error("PUT /api/mails/[id]", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ─── PATCH : actions sur les mails programmés (retry / cancel) ──────────────
+// - retry  : un mail en échec (ECHEC) repasse en PLANIFIE, programmé maintenant →
+//            le scheduler (src/lib/mail-schedule.ts) le reprend au prochain tick.
+// - cancel : annule un envoi programmé (PLANIFIE ou ECHEC) → suppression définitive.
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const action = typeof body.action === "string" ? body.action : "";
+
+    const existing = await db.mail.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Mail introuvable" }, { status: 404 });
+    }
+
+    if (action === "retry") {
+      if (existing.status !== "ECHEC") {
+        return NextResponse.json(
+          { error: "Seul un mail en échec peut être renvoyé" },
+          { status: 400 }
+        );
+      }
+      const mail = await db.mail.update({
+        where: { id },
+        data: {
+          status: "PLANIFIE",
+          folder: "PLANIFIES",
+          scheduledAt: new Date(), // repris par le scheduler au prochain tick
+          sendError: null,
+        },
+      });
+      return NextResponse.json({ mail });
+    }
+
+    if (action === "cancel") {
+      if (existing.status !== "PLANIFIE" && existing.status !== "ECHEC") {
+        return NextResponse.json(
+          { error: "Seul un mail programmé peut être annulé" },
+          { status: 400 }
+        );
+      }
+      const mail = await db.mail.delete({ where: { id } });
+      return NextResponse.json({ mail });
+    }
+
+    return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
+  } catch (error) {
+    console.error("PATCH /api/mails/[id]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

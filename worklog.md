@@ -1183,3 +1183,78 @@ Stage Summary:
 - Cause exacte du 5e échec corrigée : entrypoint sans --accept-data-loss ; l'avertissement générique de Prisma sur l'ajout d'une contrainte unique (même sur colonne neuve) bloquait tout démarrage.
 - Données de production PRÉSERVÉES (preuve par simulation 5/5) ; le partage externe reste opt-in par document.
 - Prochaine étape attendue : redéploiement utilisateur (Deploy without cache conseillé) → conteneur healthy → application en ligne avec la fonctionnalité URL externe téléchargeable (Task 44).
+
+---
+Task ID: 46-setup
+Agent: Z.ai Code (principal)
+Task: Préparation commune des 4 demandes (mails programmés/pièces jointes/signature, cachet documents, onglet Hosting) — schéma + scheduler + stubs
+
+Work Log:
+- Schéma : Mail + status (SENT|PLANIFIE|ECHEC), scheduledAt, sendError, attachments (JSON) ; Setting + mailSignature, cachet (data-URL) ; CrmDocument + showCachet (Boolean, défaut true) ; nouveau modèle HostingDomain (domain, registrar, clientName/Phone, renewalDate, price, notes, notifiedStages CSV « 30,15,2,0 »). db:push OK, client régénéré, redémarrage COMPLET (pkill + setsid), health 200.
+- src/lib/crm-scheduler.ts : tick minute étendu — processScheduledMails(now) à CHAQUE minute (indépendant des heures ouvrées) + checkHostingRenewals(now) toutes les 30 min ; logs dédiés.
+- Stubs créés : src/lib/mail-schedule.ts (Task 46-b l'implémente), src/lib/hosting-notify.ts (Task 46-d) — docstrings de spécification incluses.
+- GitHub ↔ local : synchronisés (2mailsnew/main = 1e88eb2 = HEAD local avant ce travail).
+
+Stage Summary:
+- Base + scheduler prêts ; agents parallèles 46-b (mail), 46-c (cachet), 46-d (hosting) dispatchés avec attribution stricte de fichiers (aucun chevauchement) ; intégration/verification/commit par le principal après leurs retours.
+
+---
+Task ID: 46-d
+Agent: full-stack-developer (46-d)
+Task: Onglet « Hosting » — noms de domaine achetés, suivi des renouvellements, rappels e-mail automatiques (J-30, J-15, J-2, jour J, idempotents) et bouton de relance WhatsApp (wa.me) prérempli.
+
+Work Log:
+- src/lib/hosting-notify.ts — implémentation complète de checkHostingRenewals(now) (stub 46-setup respecté, docstring conservée) : daysLeft en jours CALENDARIËLLES TZ Africa/Dakar (parties Y-M-D via Intl.DateTimeFormat en-CA, jamais les timestamps bruts — export dakarDaysLeft/dakarDayKey/formatRenewalFr réutilisés par les routes API) ; étapes cibles 30/15/2/0 ; pour chaque domaine dont l'étape la plus urgente atteinte est absente de notifiedStages → e-mail via sendAutomationEmail (SMTP de Setting, import de crm-automation — aucun doublon de mécanique), destinataire CrmAutomationConfig.recipientEmail sinon Setting.email ; sujet « ⏰ Renouvellement domaine X — J-n / expire aujourd'hui / expiré », corps HTML simple (tableau domaine/registrar/date fr-FR Dakar/prix FCFA fr-SN/client + encart action conseillée) ; journal CrmSentMessage {type:"HOSTING", channel:"EMAIL", dedupeKey:`hosting-<id>-<étape>-<renewal Y-M-D>`, status SENT/FAILED} — sur P2002 la ligne existante est MISE À JOUR avec le dernier résultat (un essai d'abord FAILED puis réussi corrige son statut au lieu d'échouer sur @@unique) ; succès → append de TOUTES les étapes atteintes au CSV notifiedStages (trié décroissant « 30,15,2,0 ») pour éviter le rattrapage en cascade ; expiré → étape « 0 » une seule fois ; échec → notifiedStages intact (nouvelle tentative au tick suivant) ; SMTP/destinataire absents → {errors:1} sans throw ; export buildHostingReminder() pour le rappel manuel.
+- API : src/app/api/hosting/route.ts — GET (liste triée renewalDate asc + daysLeft par domaine) et POST (validation domain + renewalDate requis, price ≥ 0, trims/limites de longueur, notifiedStages "" par défaut) ; src/app/api/hosting/[id]/route.ts — PUT (champs partiels ; renewalDate changé → notifiedStages reset "") + action optionnelle {action:"notify"} = rappel e-mail immédiat manuel (bypass étapes, dedupeKey `manual-<Date.now()>`, répond {sent, error, recipient, daysLeft}) ; DELETE. Auth getAuthUser sur toutes les routes, pattern des autres routes API respecté.
+- UI : src/components/hosting-view.tsx — en-tête + « Ajouter un domaine », 3 stats cards (total / à renouveler ≤ 30 j / expirés), liste triée par échéance : tableau desktop (max-h-96 scrollable) + cards mobile, badges d'urgence (Expiré & Aujourd'hui rouge, J-≤2 orange, J-≤15 ambre, J-≤30 jaune, sinon « À jour » vert), prix format fr-SN + « FCFA », date fr-FR, affichage discret des rappels déjà envoyés (« Rappels envoyés : J-30 · J-15 ») ; bouton WhatsApp vert (#25D366) → wa.me/<chiffres seuls du téléphone>?text=<message encodé> « Bonjour {client}, rappel : le domaine {domain} arrive à échéance le {date} (dans {n} jours). Merci de nous confirmer le renouvellement. — {nomSociete} » (nomSociete via settings-store ; variantes jour J / expiré) — désactivé sans téléphone (title explicatif + hint dans le dialog, pas de toast) ; bouton « Rappel » (BellRing) = notify manuel avec toast résultat ; dialog Ajouter/Modifier (domaine*, registrar, client, téléphone WhatsApp format international, date*, prix FCFA, notes ; note « changer la date réinitialise les rappels du cycle ») ; suppression AlertDialog ; skeletons, empty state accueillant, toasts useToast, authFetch — responsive vérifié 390 px (cards, zéro débordement).
+- app-shell.tsx : ViewId + « hosting », entrée NAV {hosting, « Hosting (domaines & renouvellements) », short Hosting, icon Globe, section Communication} juste après « mails », import HostingView, case de rendu {view === "hosting" && <HostingView />} — rien d'autre touché.
+- Vérifié : lint 0/0 ; curl — login, POST J-2 (2026-09-27 → daysLeft 2) et J+90 (daysLeft 90), GET trié + daysLeft, 401 sans jeton, 400 sans domaine/date invalide, PUT renewalDate → notifiedStages "30,15,2"→"" + daysLeft recalé (J-15), PUT action notify → sent:false « SMTP non configuré » + journal FAILED manual-*, DELETE ok ; script standalone bun (supprimé après) — chemin ÉCHEC : {errors:1} + CrmSentMessage FAILED sans throw, notifiedStages intact ; chemin SUCCÈS complet via mini-serveur SMTP local jetable (127.0.0.1:2525) : {notified:1, errors:0}, mail capturé (From 2MAILS, To contact@2mails.sn, sujet ⏰ … J-2, corps HTML), notifiedStages "30,15,2", 2e appel 31 min plus tard {notified:0} et journal toujours unique (idempotence) + FAILED→SENT correctement corrigé ; données temporaires SMTP retirées après test ; navigateur (agent-browser, session dédiée) : login → Hosting visible dans Communication après mails → stats/badges/prix/dates corrects → ajout boutique-awa.sn (J-5 ambre) → WhatsApp désactivé sans téléphone + hints dialog → URL wa.me interceptée sans navigation = https://wa.me/221770123456?text=Bonjour Hôtel Terrou-Bi, rappel : le domaine terroubi.sn arrive à échéance le 20 octobre 2026 (dans 25 jours). Merci de nous confirmer le renouvellement. — 2MAILS → édition pré-remplie → suppression confirmée → mobile 390 px sans débordement ; dev.log propre (GET /api/hosting 200, aucune erreur) ; lint relancé 0/0.
+
+Stage Summary:
+- Onglet « Hosting » livré dans Communication : suivi des domaines achetés (échéance, registrar, client, prix FCFA), badges d'urgence J-30→expiré, stats rapides, CRUD complet avec dialogs et confirmations.
+- Rappels e-mail automatiques J-30/J-15/J-2/jour J branchés sur le scheduler existant (toutes les 30 min) : idempotents par domaine+étape+cycle (notifiedStages + dedupeKey unique), tolérants aux pannes SMTP (retry au tick suivant, journal FAILED→SENT auto-corrigé, jamais de spam après expiration), testés bout en bout avec un SMTP local jetable.
+- Relance WhatsApp d'un clic : wa.me prérempli (téléphone nettoyé, message daté, signature société), bouton désactivé + hints quand le client n'a pas de numéro.
+- En base pour la démo : 2mails.sn (OVH, J+112, « À jour ») et terroubi.sn (Hôtel Terrou-Bi, J-25, badge jaune) — tous les domaines/journaux de test ont été supprimés ; SMTP remis vide (email société contact@2mails.sn conservé).
+- Points d'intégration : aucun fichier des tasks parallèles touché (schéma, scheduler, mail-*, settings-view intacts) ; la fonction exportée buildHostingReminder et les helpers Dakar sont réutilisables par le principal.
+
+---
+Task ID: 46-b
+Agent: full-stack-developer (46-b) — finalisé/vérifié par le principal (délai de contexte avant le rendu)
+Task: Boîte mail — envoi programmé (heure/jour) + pièces jointes + signature
+
+Work Log:
+- mails/route.ts : POST étendu (scheduledAt → Mail PLANIFIE/dossier PLANIFIES sans envoi ; sinon envoi SMTP avec attachments nodemailer ; total base64 ≤ 9 Mo) ; GET + dossier PLANIFIES (tri scheduledAt asc) + counts.planifies.
+- mail-schedule.ts : processScheduledMails implémenté — « claim » conditionnel (updateMany push scheduledAt +60 s, at-least-once, un seul worker), envoi SMTP avec PJ, succès → SENT/SENT/sentAt, échec → ECHEC + sendError, SMTP non configuré → archivage SENT (règle de l'envoi immédiat), MAX_PER_TICK 25.
+- mails/[id]/route.ts : PATCH actions retry (ECHEC→PLANIFIE maintenant) et cancel (suppression PLANIFIE/ECHEC).
+- mail-settings + types.ts : champ mailSignature (GET sans secrets / PUT admin).
+- mail-view.tsx : onglet « Programmés » (badges Programmé/Échec + date, Annuler/Réessayer), compose avec datetime-local « Programmer l'envoi » (bouton bascule Envoyer ↔ Programmer), pièces jointes (input multiple, chips nom/taille/retrait, base64, refus > 9 Mo), section Signature repliable préremplie (apposée en fin de body), trombone dans Envoyés.
+
+Stage Summary:
+- Vérifié par le principal : curl (programmation + PJ + liste + signature PUT/GET + cancel 200), scheduler AUTOMATIQUE confirmé (mail dû 17:48:18 parti au tick 17:49 → SENT), navigateur (dialog complet, bouton « Programmer l'envoi », dossier Programmés 3 avec badges/trombones, annulation). Lint 0/0. Mails de test nettoyés (2 démos PLANIFIE conservées).
+
+---
+Task ID: 46-c
+Agent: full-stack-developer (46-c) — finalisé/vérifié par le principal (délai de contexte avant le rendu)
+Task: Cachet officiel téléversé, visible dans les documents/contrats (éditeur, PDF, Word, page publique)
+
+Work Log:
+- settings/route.ts : PUT cachet (data-URL image, garde-fous type/2,5 Mo, null = suppression).
+- documents-view.tsx : bouton « Gérer le cachet officiel » (dialog : choisir image, aperçu, Supprimer, Enregistrer), switch « Apposer le cachet » par document (persisté PUT documents/[id] showCachet), cachet rendu en bas à droite du papier (~144 px, zone signatures) → présent dans l'aperçu ET capté par l'export PDF (html2canvas).
+- export-docx + docx-export.ts : image cachet insérée en fin de document quand showCachet && Setting.cachet.
+- Page publique shared/[token] : cachet affiché si document.showCachet (Setting.cachet servi par la route).
+
+Stage Summary:
+- Vérifié par le principal : tampon démo généré (double anneau rouge 144×144) poussé via PUT settings ; éditeur → cachet visible près « Signature Client », toggle ON/OFF confirmé (comptage img par signature base64) ; page publique → 1 cachet présent ; export-docx → image ajoutée au zip (taille +334 o avec cachet). Lint 0/0.
+
+---
+Task ID: 46-d
+Agent: full-stack-developer (46-d)
+Task: Onglet Hosting — domaines achetés, rappels e-mail J-30/J-15/J-2/jour J, bouton WhatsApp wa.me
+
+Work Log:
+- Voir section détaillée de l'agent (agent-ctx/46-d-hosting-agent.md) : hosting-notify.ts implémenté (daysLeft calendriel TZ Dakar, étapes 30/15/2/0 idempotentes via notifiedStages, e-mail via sendAutomationEmail, journal CrmSentMessage type HOSTING avec auto-correction FAILED→SENT), API hosting CRUD + action notify manuel, hosting-view.tsx (stats, badges urgence, WhatsApp wa.me message prérempli signé société, dialogs), app-shell.tsx (onglet Hosting section Communication après Boîte mail).
+- Vérifié par l'agent : cycle complet succès/échec via mini-SMTP local jetable (idempotence 2ᵉ appel {notified:0}), curl CRUD, navigateur (badges J-25/À jour, URL wa.me interceptée, mobile 390 px), lint 0/0.
+- Démo en base : 2mails.sn (OVH, J+112, À jour) + terroubi.sn (Hôtel Terrou-Bi, J-25).
+
+Stage Summary:
+- Rappels automatiques partiront dès que SMTP + destinataire seront configurés ; bouton « Rappel » manuel disponible par domaine.
