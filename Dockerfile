@@ -17,8 +17,23 @@
 # ── STAGE 1 : construction (jeté après le build) ────────────────────────────
 FROM node:20-alpine AS builder
 
-RUN apk add --no-cache git libc6-compat sqlite tzdata
-RUN npm install -g bun
+# Paquets builder : git (clone de secours) + libc6-compat (recommandé Next.js/Alpine)
+# + tzdata (fuseaux). « sqlite » RETIRÉ : Prisma embarque son propre moteur SQLite,
+# le paquet système était inutile.
+# ROBUSTESSE (échec déploiement #6 : « libc6-compat/sqlite/tzdata (no such package) »
+# alors que ces paquets existent bien dans le dépôt = index apk jamais chargé,
+# panne réseau transitoire du CDN dl-cdn.alpinelinux.org pendant le build) :
+# 3 tentatives espacées, puis bascule automatique sur le miroir de secours
+# dl-2.alpinelinux.org.
+RUN set -ex; \
+    PKGS="git libc6-compat tzdata"; \
+    apk add --no-cache $PKGS \
+      || { echo "apk: index indisponible → nouvel essai dans 20 s…"; sleep 20; apk add --no-cache $PKGS; } \
+      || { echo "apk: bascule sur le miroir dl-2.alpinelinux.org…"; \
+           sed -i 's/dl-cdn\.alpinelinux\.org/dl-2.alpinelinux.org/g' /etc/apk/repositories; \
+           sleep 5; apk add --no-cache $PKGS; }
+RUN npm install -g bun \
+    || { echo "npm: échec réseau → nouvel essai dans 20 s…"; sleep 20; npm install -g bun; }
 
 WORKDIR /app
 
@@ -68,7 +83,15 @@ FROM node:20-alpine
 # HEALTHCHECK Docker du fichier utilise node/fetch, mais Coolify peut
 # exécuter son propre sondage avec curl/wget ; sans curl dans l'image,
 # le conteneur est déclaré « not healthy » → rollback.
-RUN apk add --no-cache libc6-compat sqlite tzdata curl
+# « sqlite » RETIRÉ (moteur embarqué par Prisma) + même robustesse apk que le
+# builder : 3 tentatives puis miroir dl-2 en secours (échec déploiement #6).
+RUN set -ex; \
+    PKGS="libc6-compat tzdata curl"; \
+    apk add --no-cache $PKGS \
+      || { echo "apk: index indisponible → nouvel essai dans 20 s…"; sleep 20; apk add --no-cache $PKGS; } \
+      || { echo "apk: bascule sur le miroir dl-2.alpinelinux.org…"; \
+           sed -i 's/dl-cdn\.alpinelinux\.org/dl-2.alpinelinux.org/g' /etc/apk/repositories; \
+           sleep 5; apk add --no-cache $PKGS; }
 
 WORKDIR /app
 

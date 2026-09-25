@@ -1258,3 +1258,18 @@ Work Log:
 
 Stage Summary:
 - Rappels automatiques partiront dès que SMTP + destinataire seront configurés ; bouton « Rappel » manuel disponible par domaine.
+
+---
+Task ID: 47
+Agent: Z.ai Code (principal)
+Task: Échec déploiement #6 — « no such package » apk (libc6-compat/sqlite/tzdata) au build Coolify + confirmation synchro GitHub/local
+
+Work Log:
+- Synchro confirmée par API GitHub : HEAD distant = HEAD local = 855ea0c (Task 46 déjà poussée) → versions GitHub et locale identiques.
+- Analysé le log #6 : « Dockerfile:16 » avec « ARG DATABASE_URL » à la ligne 14 → Coolify construit une ANCIENNE version du Dockerfile (dans le fichier actuel, apk = ligne 20 et pas d'ARG DATABASE_URL ligne 14) → le Dockerfile collé dans l'UI Coolify est périmé, à remplacer par celui du dépôt.
+- Cause réseau : « no such package » pour des paquets qui existent = index apk jamais chargé (panne transitoire dl-cdn.alpinelinux.org pendant le build) ; « git » non listé car l'extrait du log est tronqué (ordre alphabétique).
+- Dockerfile durci : paquet « sqlite » retiré des 2 stages (Prisma embarque son propre moteur SQLite, paquet système inutile) ; apk en 3 tentatives espacées puis bascule automatique sur le miroir dl-2.alpinelinux.org (regex sed testée localement) ; « npm install -g bun » avec 1 réessai réseau.
+- Limite identifiée : la commande apk du vieux Dockerfile collé dans l'UI est identique à celle du builder actuel → le durci n'est efficace que si l'utilisateur met à jour le Dockerfile dans Coolify.
+
+Stage Summary:
+- Correctif poussé (robustesse apk + allègement). Succès du redéploiement conditionné au remplacement du Dockerfile périmé collé dans l'UI Coolify (ou « Dockerfile location = /Dockerfile ») puis « Deploy without cache ».
