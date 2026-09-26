@@ -1273,3 +1273,18 @@ Work Log:
 
 Stage Summary:
 - Correctif poussé (robustesse apk + allègement). Succès du redéploiement conditionné au remplacement du Dockerfile périmé collé dans l'UI Coolify (ou « Dockerfile location = /Dockerfile ») puis « Deploy without cache ».
+
+---
+Task ID: 48
+Agent: Z.ai Code (principal)
+Task: Resynchronisation du dépôt LOCAL depuis GitHub — le sandbox avait rembobiné le repo local à l'état Task 45 (commits réécrits b9c3c6f/1acca02) pendant que GitHub conservait tout (Task 46 + Task 47)
+
+Work Log:
+- Diagnostiqué : HEAD local rewinding (hosting-view.tsx / mail-schedule.ts / hosting-notify.ts absents, Dockerfile sans dl-2, db custom.db retombée à 1,3 Mo ancien schéma) ; GitHub 2mailsnew/main = 64269f9 complet. Diff HEAD local vs 1e88eb2 = seulement .zscripts/dev.pid (runtime) → aucun travail local unique à perdre.
+- Backup préventif de db/custom.db → /tmp/custom-backup-avant-sync.db (1 302 528 o).
+- git reset --hard 2mailsnew/main → local = 64269f9 : code Task 46/47 restauré + db custom.db restaurée (2,19 Mo, schéma complet, démos hosting/cachet/mails programmés).
+- bunx prisma generate (client v6.19.2) + db push → « The database is already in sync » (aucune migration nécessaire).
+- Redémarrage complet du serveur dev (pkill + setsid nohup) : health 200 ; sonde GET /api/hosting → 401 « Non authentifié » (route Task 46 correctement servie et protégée, table HostingDomain OK) ; scheduler actif avec colonnes scheduledAt/attachments/sendError.
+
+Stage Summary:
+- Local = GitHub = 64269f9 (à confirmer après push du présent worklog). Aucune donnée perdue (db locale ancienne identique en contenu à la base dont est issue la db Task 46 ; backup /tmp conservé). Si le sandbox rembobine à nouveau, re-appliquer : backup db → git reset --hard 2mailsnew/main → prisma generate → db push → restart serveur.
