@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
-import { dakarDaysLeft } from "@/lib/hosting-notify";
+import { dakarDaysLeft, renewalPublicUrl } from "@/lib/hosting-notify";
 
 // ─── Hosting : noms de domaine achetés & renouvellements (Task 46-d) ─────────
 // GET  → liste triée par renewalDate asc + daysLeft (jours calendaires Dakar)
+//        + renewalUrl (page publique) quand un jeton est actif (Task 49)
 // POST → création { domain (requis), registrar?, clientName?, clientPhone?,
-//                  renewalDate (requis), price?, notes? }
+//                  renewalDate (requis), price?, notes?, clientEmail?,
+//                  paymentUrl?, paymentLabel?, customReminder? }
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,25 @@ function parseBody(body: Record<string, unknown>, requireAll: boolean): { data?:
   if (body.notes !== undefined) {
     data.notes = body.notes.toString().trim().slice(0, 2000) || null;
   }
+  // ── Rappel client + paiement en ligne (Task 49) ───────────────────────
+  if (body.clientEmail !== undefined) {
+    const email = body.clientEmail.toString().trim().slice(0, 160);
+    if (email && !email.includes("@")) return { error: "L'e-mail du client doit contenir un @" };
+    data.clientEmail = email || null;
+  }
+  if (body.paymentUrl !== undefined) {
+    const url = body.paymentUrl.toString().trim().slice(0, 500);
+    if (url && !/^https?:\/\//i.test(url)) {
+      return { error: "Le lien de paiement doit commencer par http:// ou https://" };
+    }
+    data.paymentUrl = url || null;
+  }
+  if (body.paymentLabel !== undefined) {
+    data.paymentLabel = body.paymentLabel.toString().trim().slice(0, 40) || null;
+  }
+  if (body.customReminder !== undefined) {
+    data.customReminder = body.customReminder.toString().trim().slice(0, 5000) || null;
+  }
   return { data };
 }
 
@@ -52,12 +73,18 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser(request);
     if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    const [domains, now] = await Promise.all([
+    const [domains, setting, now] = await Promise.all([
       db.hostingDomain.findMany({ orderBy: { renewalDate: "asc" } }),
+      db.setting.findFirst(),
       Promise.resolve(new Date()),
     ]);
     return NextResponse.json({
-      domains: domains.map((d) => ({ ...d, daysLeft: dakarDaysLeft(d.renewalDate, now) })),
+      domains: domains.map((d) => ({
+        ...d,
+        daysLeft: dakarDaysLeft(d.renewalDate, now),
+        // URL de la page publique de renouvellement (null sans jeton actif)
+        renewalUrl: renewalPublicUrl(d.renewalToken, setting?.publicBaseUrl),
+      })),
     });
   } catch {
     return NextResponse.json({ error: "Chargement impossible" }, { status: 500 });

@@ -1,20 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import {
+  buildHostingClientReminder,
   buildHostingReminder,
   dakarDaysLeft,
+  markRenewed,
 } from "@/lib/hosting-notify";
 import { getAutomationConfig, sendAutomationEmail } from "@/lib/crm-automation";
+import { publicBaseUrl as requestPublicBaseUrl } from "@/lib/doc-share";
 
-// ─── Modification / suppression d'un domaine hébergé (Task 46-d) ─────────────
+// ─── Modification / suppression d'un domaine hébergé (Task 46-d, 49) ─────────
 // PUT    → mise à jour des champs ; SI renewalDate change → notifiedStages
 //          reset à "" (nouveau cycle de rappels J-30/15/2/J).
-//          Action optionnelle `notify` : rappel e-mail immédiat manuel
-//          (bypass des étapes, dedupeKey `manual-<Date.now()>`).
+//          Champs additionnels (Task 49) : clientEmail (doit contenir @),
+//          paymentUrl (http/https), paymentLabel, customReminder.
+//          Actions optionnelles :
+//            {action:"notify"}       → rappel e-mail immédiat manuel (admin +
+//                                      client si clientEmail renseigné)
+//            {action:"create-link"}  → génère le jeton de la page publique de
+//                                      renouvellement, renvoie {domain, url}
+//            {action:"revoke-link"}  → révoque le jeton public
+//            {action:"confirm-paid"} → marque RENOUVELÉ (+1 an, historique
+//                                      HostingRenewal), body.method optionnel
+//            {action:"dismiss-paid"} → efface le signalement « J'ai payé »
 // DELETE → suppression du domaine.
 
 export const dynamic = "force-dynamic";
+
+const PAYMENT_METHODS = ["Manuel", "Wave", "Autre"] as const;
+
+/** Setting société, créé avec ses valeurs par défaut si absent. */
+async function ensureSetting() {
+  const setting = await db.setting.findFirst();
+  if (setting) return setting;
+  return db.setting.create({ data: {} });
+}
 
 export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -25,6 +47,59 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
 
     const existing = await db.hostingDomain.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Domaine introuvable" }, { status: 404 });
+
+    // 0) Actions de gestion du lien public / paiement (Task 49)
+    if (body.action === "create-link") {
+      const setting = await ensureSetting();
+      let base = (setting.publicBaseUrl ?? "").trim().replace(/\/+$/, "");
+      if (!base) {
+        // La base publique est inconnue → on l'apprend depuis la requête
+        base = requestPublicBaseUrl(request);
+        await db.setting
+          .update({ where: { id: setting.id }, data: { publicBaseUrl: base } })
+          .catch(() => {
+            // apprentissage best-effort — ne bloque pas la création du lien
+          });
+      }
+      const renewalToken = randomBytes(24).toString("hex"); // 48 caractères hex
+      const updated = await db.hostingDomain.update({ where: { id }, data: { renewalToken } });
+      return NextResponse.json({
+        domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
+        url: `${base}/renouvellement/${renewalToken}`,
+      });
+    }
+
+    if (body.action === "revoke-link") {
+      const updated = await db.hostingDomain.update({
+        where: { id },
+        data: { renewalToken: null },
+      });
+      return NextResponse.json({
+        domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
+      });
+    }
+
+    if (body.action === "confirm-paid") {
+      const methodRaw = (body.method ?? "Manuel").toString().trim();
+      const method = (PAYMENT_METHODS as readonly string[]).includes(methodRaw)
+        ? methodRaw
+        : "Manuel";
+      const { domain: updated, renewal } = await markRenewed(id, method);
+      return NextResponse.json({
+        domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
+        renewal,
+      });
+    }
+
+    if (body.action === "dismiss-paid") {
+      const updated = await db.hostingDomain.update({
+        where: { id },
+        data: { paymentSignalAt: null },
+      });
+      return NextResponse.json({
+        domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
+      });
+    }
 
     // 1) Mise à jour éventuelle des champs
     const data: Record<string, unknown> = {};
@@ -56,6 +131,30 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
       data.price = price;
     }
     if (body.notes !== undefined) data.notes = body.notes.toString().trim().slice(0, 2000) || null;
+    // ── Rappel client + paiement en ligne (Task 49) ─────────────────────────
+    if (body.clientEmail !== undefined) {
+      const email = body.clientEmail.toString().trim().slice(0, 160);
+      if (email && !email.includes("@")) {
+        return NextResponse.json({ error: "L'e-mail du client doit contenir un @" }, { status: 400 });
+      }
+      data.clientEmail = email || null;
+    }
+    if (body.paymentUrl !== undefined) {
+      const url = body.paymentUrl.toString().trim().slice(0, 500);
+      if (url && !/^https?:\/\//i.test(url)) {
+        return NextResponse.json(
+          { error: "Le lien de paiement doit commencer par http:// ou https://" },
+          { status: 400 },
+        );
+      }
+      data.paymentUrl = url || null;
+    }
+    if (body.paymentLabel !== undefined) {
+      data.paymentLabel = body.paymentLabel.toString().trim().slice(0, 40) || null;
+    }
+    if (body.customReminder !== undefined) {
+      data.customReminder = body.customReminder.toString().trim().slice(0, 5000) || null;
+    }
     if (dateChanged) data.notifiedStages = ""; // nouveau cycle → rappels réarmés
 
     const updated = await db.hostingDomain.update({ where: { id }, data });
@@ -63,6 +162,9 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
     // 2) Rappel e-mail manuel immédiat (bypass des étapes automatiques)
     if (body.action === "notify") {
       const daysLeft = dakarDaysLeft(updated.renewalDate, new Date());
+      const setting = await db.setting.findFirst();
+
+      // ── Mail ADMIN (comportement existant, inchangé) ──────────────────────
       const reminder = buildHostingReminder({
         domain: updated.domain,
         registrar: updated.registrar,
@@ -73,16 +175,16 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
         manual: true,
       });
       const config = await getAutomationConfig();
-      const setting = await db.setting.findFirst();
       const to = (config.recipientEmail || setting?.email || "").trim();
+      let sent = false;
+      let error: string | undefined = undefined;
       if (!to.includes("@")) {
-        return NextResponse.json({
-          domain: updated,
-          sent: false,
-          error: "Aucun destinataire e-mail configuré (Automatisations ou Paramètres société)",
-        });
+        error = "Aucun destinataire e-mail configuré (Automatisations ou Paramètres société)";
+      } else {
+        const result = await sendAutomationEmail(to, reminder.subject, reminder.html);
+        sent = result.ok;
+        error = result.error;
       }
-      const result = await sendAutomationEmail(to, reminder.subject, reminder.html);
       await db.crmSentMessage
         .create({
           data: {
@@ -91,19 +193,69 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
             content: reminder.text.slice(0, 4000),
             channel: "EMAIL",
             dedupeKey: `manual-${Date.now()}`,
-            status: result.ok ? "SENT" : "FAILED",
-            error: result.ok ? null : (result.error ?? "Erreur inconnue"),
+            status: sent ? "SENT" : "FAILED",
+            error: sent ? null : (error ?? "Erreur inconnue"),
           },
         })
         .catch(() => {
           // journalisation best-effort — ne bloque pas la réponse
         });
+
+      // ── Mail CLIENT (Task 49 — en plus, sans bloquer l'admin) ─────────────
+      let clientSent: boolean | null = null;
+      let clientError: string | undefined = undefined;
+      const clientEmail = (updated.clientEmail ?? "").trim();
+      if (clientEmail.includes("@")) {
+        try {
+          const clientReminder = buildHostingClientReminder(
+            {
+              domain: updated.domain,
+              clientName: updated.clientName,
+              renewalDate: updated.renewalDate,
+              price: updated.price,
+              daysLeft,
+              customReminder: updated.customReminder,
+              paymentLabel: updated.paymentLabel,
+              renewalToken: updated.renewalToken,
+            },
+            setting,
+          );
+          const clientResult = await sendAutomationEmail(
+            clientEmail,
+            clientReminder.subject,
+            clientReminder.html,
+          );
+          clientSent = clientResult.ok;
+          clientError = clientResult.error;
+          await db.crmSentMessage
+            .create({
+              data: {
+                type: "HOSTING",
+                subject: clientReminder.subject,
+                content: clientReminder.text.slice(0, 4000),
+                channel: "EMAIL",
+                dedupeKey: `manual-client-${Date.now()}`,
+                status: clientResult.ok ? "SENT" : "FAILED",
+                error: clientResult.ok ? null : (clientResult.error ?? "Erreur inconnue"),
+              },
+            })
+            .catch(() => {
+              // journalisation best-effort
+            });
+        } catch (e) {
+          clientSent = false;
+          clientError = e instanceof Error ? e.message : "Erreur inconnue";
+        }
+      }
+
       return NextResponse.json({
         domain: updated,
-        sent: result.ok,
-        error: result.error,
+        sent,
+        error,
         recipient: to,
         daysLeft,
+        clientSent,
+        clientError,
       });
     }
 

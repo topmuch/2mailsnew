@@ -239,6 +239,11 @@ model Setting {
   // ── Signature mail + cachet officiel (Task 46) ────────────────────────────
   mailSignature String  @default("") // signature ajoutée en bas des mails envoyés (boîte mail)
   cachet        String? // data-URL du cachet officiel (tampon) apposé sur les documents
+  // ── Hosting : rappel client paramétrable + paiement en ligne (Task 49) ────
+  hostingReminderSubject String  @default("") // sujet du rappel client ("" = sujet par défaut du code)
+  hostingReminderBody    String  @default("") // corps du rappel client ("" = modèle par défaut), variables {client} {domaine} {dateRenouvellement} {joursRestants} {prix} {lienPaiement} {societe} {telephone}
+  hostingAdminCopy       Boolean @default(true) // envoyer aussi le récap admin (rappels hosting)
+  publicBaseUrl          String  @default("") // origine publique (ex. https://crm…) apprise à la création d'un lien externe — utilisée par les mails automatiques
   lastMailSync DateTime?
   updatedAt   DateTime @updatedAt
 }
@@ -598,8 +603,31 @@ model HostingDomain {
   price          Float    @default(0) // prix annuel (FCFA, 0 = non renseigné)
   notes          String?
   notifiedStages String   @default("") // étapes déjà notifiées ce cycle : CSV « 30,15,2,0 » (réinitialisé si renewalDate change)
+  // ── Rappel client paramétrable + paiement en ligne (Task 49) ──────────────
+  clientEmail    String? // e-mail du client — destinataire du rappel de renouvellement
+  renewalToken   String?  @unique // jeton de la page publique de renouvellement (opt-in, révocable)
+  paymentUrl     String? // lien de paiement générique (Wave par défaut)
+  paymentLabel   String? // libellé du bouton de paiement (défaut « Wave »)
+  customReminder String? // message de rappel personnalisé (surcharge le modèle global)
+  paymentSignalAt DateTime? // « J'ai payé » signalé depuis la page publique (en attente de vérification admin)
+  clientNotifiedStages String @default("") // étapes rappel CLIENT déjà envoyées ce cycle : CSV « 30,15,2,0 » (indépendant de notifiedStages=admin)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  renewals       HostingRenewal[]
+
   @@index([renewalDate])
+}
+
+// Historique des renouvellements : 1 ligne par année renouvelée (Task 49)
+model HostingRenewal {
+  id         String        @id @default(cuid())
+  domainId   String
+  domain     HostingDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  renewedFor String // période couverte, ex. « 2026-2027 »
+  amount     Float         @default(0) // montant du renouvellement (FCFA)
+  method     String        @default("Manuel") // Manuel | Wave | Autre
+  createdAt  DateTime      @default(now())
+
+  @@index([domainId])
 }

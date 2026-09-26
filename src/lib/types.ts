@@ -257,6 +257,15 @@ export interface Settings {
   monthlyGoal?: number;
   /** Mode maintenance : bloque l'accès de l'application aux non-admins */
   maintenanceMode?: boolean;
+  // ── Hosting : rappel client + lien public (Task 49) ──────────────────────
+  /** Sujet du rappel de renouvellement envoyé au client ("" = défaut code). */
+  hostingReminderSubject?: string;
+  /** Corps du rappel client ("" = modèle par défaut), variables {client} {domaine} {dateRenouvellement} {joursRestants} {prix} {lienPaiement} {societe} {telephone}. */
+  hostingReminderBody?: string;
+  /** Envoyer aussi le récap admin lors des rappels hosting automatiques. */
+  hostingAdminCopy?: boolean;
+  /** Origine publique apprise (ex. https://crm.exemple.com) pour les liens externes. */
+  publicBaseUrl?: string;
   updatedAt?: string;
 }
 

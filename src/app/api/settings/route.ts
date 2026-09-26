@@ -81,6 +81,27 @@ export async function PUT(request: NextRequest) {
       data.maintenanceMode = Boolean(body.maintenanceMode);
     }
 
+    // ── Hosting : modèle de rappel client + lien public (Task 49) ───────────
+    if (body.hostingReminderSubject !== undefined) {
+      data.hostingReminderSubject = clean(body.hostingReminderSubject, 5000);
+    }
+    if (body.hostingReminderBody !== undefined) {
+      data.hostingReminderBody = clean(body.hostingReminderBody, 8000);
+    }
+    if (body.hostingAdminCopy !== undefined) {
+      data.hostingAdminCopy = Boolean(body.hostingAdminCopy);
+    }
+    if (body.publicBaseUrl !== undefined) {
+      const base = clean(body.publicBaseUrl, 300).replace(/\/+$/, "");
+      if (base && !/^https?:\/\//i.test(base)) {
+        return NextResponse.json(
+          { error: "URL publique invalide (doit commencer par http:// ou https://)" },
+          { status: 400 },
+        );
+      }
+      data.publicBaseUrl = base;
+    }
+
     const settings = await db.setting.update({ where: { id: "main" }, data });
     return NextResponse.json(settings);
   } catch (error) {
