@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-// ─── Page publique de renouvellement — interactions client (Task 49) ─────────
+// ─── Page publique de renouvellement — interactions client (Task 49/49-b) ────
 // Carte centrée mobile-first : échéance + montant, bouton de paiement Wave
 // (fond #1DC8FF, texte noir, ≥ 48 px de haut pour le tactile), bouton
 // « J'ai effectué le paiement » → POST /api/hosting/public/<token>/paid
 // (URL relative, jamais d'URL absolue en dur).
+// Task 49-b : signal SILENCIEUX au clic sur le bouton de paiement — le clic
+// sur « Payer avec Wave » déclenche le même signal (badge admin + notif)
+// sans aucune action supplémentaire du client ; le bouton « J'ai effectué
+// le paiement » reste en secours (paiement par un autre canal, clic raté).
 
 interface RenewalPublicClientProps {
   token: string;
@@ -42,32 +46,71 @@ export default function RenewalPublicClient({
   const [signaledAtLabel, setSignaledAtLabel] = useState(initialSignaledLabel);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  // Verrou anti double-signal partagé (clic Wave + bouton manuel), sans
+  // re-rendu : un simple ref suffit.
+  const signalingRef = useRef(false);
 
   const payLabel = paymentLabel || "Wave";
 
+  const applySignaled = (iso?: string) => {
+    setSignaled(true);
+    setSignaledAtLabel(
+      iso
+        ? new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Africa/Dakar",
+            dateStyle: "long",
+            timeStyle: "short",
+          }).format(new Date(iso))
+        : signaledAtLabel,
+    );
+  };
+
+  const postPaid = async (source: "wave" | "button") => {
+    const res = await fetch(`/api/hosting/public/${token}/paid`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+      // keepalive : le signal part même si l'onglet est fermé juste après le
+      // clic (webview WhatsApp, navigation immédiate vers la page de paiement)
+      keepalive: true,
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      already?: boolean;
+      signaledAt?: string;
+      error?: string;
+    };
+    return { res, json };
+  };
+
+  // Signal silencieux au clic sur « Payer avec Wave » (Task 49-b) : le POST
+  // part en arrière-plan SANT bloquer la navigation vers la page de paiement
+  // (target=_blank conservé). Aucun message d'erreur affiché au client en cas
+  // d'échec — le bouton « J'ai effectué le paiement » reste le secours.
+  const handlePayClick = () => {
+    if (signaled || signalingRef.current) return;
+    signalingRef.current = true;
+    postPaid("wave")
+      .then(({ res, json }) => {
+        if (res.ok && json.ok) applySignaled(json.signaledAt);
+      })
+      .catch(() => {
+        // silencieux — pas de feedback d'erreur pour le client
+      })
+      .finally(() => {
+        signalingRef.current = false;
+      });
+    // volontairement sans await : la navigation part immédiatement
+  };
+
   const signalPaid = async () => {
-    if (submitting || signaled) return;
+    if (submitting || signaled || signalingRef.current) return;
     setSubmitting(true);
     setFeedback(null);
     try {
-      const res = await fetch(`/api/hosting/public/${token}/paid`, { method: "POST" });
-      const json = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        already?: boolean;
-        signaledAt?: string;
-        error?: string;
-      };
+      const { res, json } = await postPaid("button");
       if (res.ok && json.ok) {
-        setSignaled(true);
-        setSignaledAtLabel(
-          json.signaledAt
-            ? new Intl.DateTimeFormat("fr-FR", {
-                timeZone: "Africa/Dakar",
-                dateStyle: "long",
-                timeStyle: "short",
-              }).format(new Date(json.signaledAt))
-            : signaledAtLabel,
-        );
+        applySignaled(json.signaledAt);
       } else {
         setFeedback(json.error || "Signalement impossible — contactez-nous par téléphone.");
       }
@@ -134,6 +177,8 @@ export default function RenewalPublicClient({
                 href={paymentUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handlePayClick}
+                aria-label={`Payer avec ${payLabel} — le paiement sera signalé automatiquement`}
                 className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#1DC8FF] px-4 text-base font-bold text-black transition-[filter] hover:brightness-95 active:brightness-90"
               >
                 💠 Payer avec {payLabel}
@@ -156,7 +201,7 @@ export default function RenewalPublicClient({
               </div>
             )}
 
-            {/* Signaler le paiement */}
+            {/* Signaler le paiement (secours — le clic Wave signale déjà) */}
             <button
               type="button"
               onClick={signalPaid}

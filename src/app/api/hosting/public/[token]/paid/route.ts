@@ -5,8 +5,12 @@ import { publicBaseUrl as requestPublicBaseUrl } from "@/lib/doc-share";
 
 // ─── Page publique de renouvellement : signaler « J'ai payé » (Task 49) ──────
 // POST /api/hosting/public/<token>/paid — SANS authentification : le jeton
-// aléatoire de la page publique est la seule clé. Le client signale son
-// paiement, l'admin le vérifie ensuite dans Wave (ou autre) et confirme via
+// aléatoire de la page publique est la seule clé. Deux sources (Task 49-b) :
+//  - source "wave"   : signal SILENCIEUX déclenché automatiquement quand le
+//                      client clique sur « Payer avec Wave » (aucune action
+//                      supplémentaire demandée au client) ;
+//  - source "button" : bouton « J'ai effectué le paiement » (secours).
+// L'admin est notifié puis vérifie dans Wave (ou autre) et confirme via
 // l'action `confirm-paid` de PUT /api/hosting/[id].
 // Garde-fous : token inconnu → 404 ; rate-limit mémoire 1 signal / 30 s /
 // token ; notification admin best-effort (ne bloque jamais la réponse).
@@ -52,6 +56,18 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ token:
     }
 
     const signaledAt = new Date();
+
+    // Source du signal : "wave" = clic silencieux sur le bouton de paiement,
+    // "button" = bouton « J'ai effectué le paiement », absent = appel direct
+    // (ancien client, curl). Corps JSON optionnel et tolérant aux erreurs.
+    let source: "wave" | "button" = "button";
+    try {
+      const body = (await request.json()) as { source?: string } | null;
+      if (body?.source === "wave") source = "wave";
+    } catch {
+      // pas de corps JSON exploitable → source par défaut
+    }
+
     const updated = await db.hostingDomain.update({
       where: { id: domain.id },
       data: { paymentSignalAt: signaledAt },
@@ -70,10 +86,20 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ token:
           : "à confirmer";
         const label = (domain.paymentLabel ?? "").trim() || "Wave";
         const clientLabel = domain.clientName?.trim() || "client";
+        // Libellé selon la source : clic sur le bouton de paiement (silencieux)
+        // ou signalement explicite du client.
+        const actionText =
+          source === "wave"
+            ? `a cliqué sur « Payer avec ${label} »`
+            : "a signalé avoir effectué le paiement";
+        const journalText =
+          source === "wave"
+            ? `Paiement signalé (clic ${label}) — ${domain.domain} (${clientLabel}) — ${prix}`
+            : `Paiement signalé — ${domain.domain} (${clientLabel}) — ${prix} — à vérifier dans ${label}`;
         const subject = `💳 Paiement signalé — ${domain.domain} (${clientLabel}) — ${prix} — à vérifier dans ${label}`;
         const base = (setting?.publicBaseUrl ?? "").trim().replace(/\/+$/, "") || requestPublicBaseUrl(request);
         const html = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2937;">
-  <p style="margin:0 0 10px;">Le client a signalé un paiement depuis la page publique de renouvellement :</p>
+  <p style="margin:0 0 10px;">Le client ${actionText} depuis la page publique de renouvellement :</p>
   <table style="width:100%;border-collapse:collapse;font-size:14px;">
     <tr><td style="padding:6px 10px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;">Domaine</td><td style="padding:6px 10px;border:1px solid #e5e7eb;"><strong>${domain.domain}</strong></td></tr>
     <tr><td style="padding:6px 10px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;">Client</td><td style="padding:6px 10px;border:1px solid #e5e7eb;">${domain.clientName?.trim() || "—"}</td></tr>
@@ -89,7 +115,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ token:
             data: {
               type: "HOSTING",
               subject,
-              content: `Paiement signalé — ${domain.domain} (${clientLabel}) — ${prix} — à vérifier dans ${label}`,
+              content: journalText,
               channel: "EMAIL",
               dedupeKey: `paid-${token}`,
               status: result.ok ? "SENT" : "FAILED",

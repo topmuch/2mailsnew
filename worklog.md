@@ -1306,3 +1306,19 @@ Work Log:
 
 Stage Summary:
 - Boucle complète livrée : rappel client paramétrable (global + par domaine, variables) → page publique de renouvellement avec paiement Wave → « J'ai payé » notifie l'admin → « Marquer renouvelé » repousse d'un an + historique. Les rappels automatiques J-30/15/2/J partent au client dès que SMTP est configuré (copie admin contrôlée par switch). Redéploiement Coolify toujours en attente côté utilisateur.
+
+---
+Task ID: 49-b
+Agent: Z.ai Code (principal)
+Task: Signal silencieux du paiement au clic sur « Payer avec Wave » (page publique de renouvellement)
+
+Work Log:
+- Demande utilisateur : « est-ce que c'est possible de signaler le paiement en silencieux dès que la personne clique sur payer par wave » → oui, implémenté (aucune suppression, only-add).
+- renewal-client.tsx : le clic sur « Payer avec Wave » déclenche POST /api/hosting/public/<token>/paid avec {source:"wave"} en fire-and-forget (keepalive:true — le signal part même si l'onglet/webview se ferme aussitôt), sans bloquer la navigation target=_blank ni afficher d'erreur au client ; UI mise à jour à la réponse (bandeau vert « Paiement signalé — en cours de vérification », bouton manuel désactivé) ; bouton « J'ai effectué le paiement » conservé en secours (autre canal, clic raté) ; verrou anti double-signal partagé (useRef) ; aria-label explicitant le signalement automatique.
+- API paid : corps JSON optionnel {source} tolérant (absent → "button", compatible ancien client) ; libellé notif/journal selon la source : « a cliqué sur "Payer avec Wave" » vs « a signalé avoir effectué le paiement » ; garde-fous inchangés (404 token inconnu, rate-limit 30 s/token, idempotence paymentSignalAt, notif admin best-effort).
+- Vérifié agent-browser (E2E réel) : clic Wave → nouvel onglet pay.wave.com ouvert ET signal enregistré en base (paymentSignalAt renseigné) ET bandeau vert + bouton désactivé au retour sur l'onglet ; 2e POST → {ok,already:true} ; token invalide → 404 ; 0 erreur JS ; lint 0/0 ; dev.log propre.
+- Notification admin non tentée en local (destinataire/SMTP non configurés → journal non écrit, comportement by-design Task 49) ; le badge Hosting « Paiement signalé » fonctionne indépendamment du SMTP.
+- Démo terroubi.sn restaurée (paymentSignalAt=null), scripts de test supprimés, navigateur fermé.
+
+Stage Summary:
+- Le client clique une seule fois sur « Payer avec Wave » : le paiement est signalé en silence à l'admin (badge + e-mail dès que SMTP/destinataire seront ressaisis) et la page affiche le bandeau vert sans action supplémentaire. La confirmation finale reste manuelle (« Marquer renouvelé ») — un clic prouve l'intention de payer, pas la réception des fonds ; l'admin peut « Ignorer » un faux signal. Nuance : {lienPaiement} des rappels pointe vers la page publique, donc les clics partant de l'e-mail sont aussi capturés.
