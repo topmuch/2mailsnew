@@ -76,15 +76,15 @@
   --chart-3: oklch(0.6 0.19 25);
   --chart-4: oklch(0.44 0.06 258);
   --chart-5: oklch(0.64 0.1 265);
-  /* Sidebar bleu marque #1F3FBF, écriture blanche (demande utilisateur) */
-  --sidebar: #1f3fbf;
+  /* Sidebar bleu marine marque #0B366B, écriture blanche ; élément actif vert #4AC87F (demande utilisateur) */
+  --sidebar: #0b366b;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #3a5ce8;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #4ac87f;
+  --sidebar-primary-foreground: #06301c;
   --sidebar-accent: rgb(255 255 255 / 14%);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 20%);
-  --sidebar-ring: #8fa6f5;
+  --sidebar-ring: #4ac87f;
 }
 
 /* ─── Thème sombre : nuit bleutée, cyan lumineux ────────────────────────── */
@@ -115,15 +115,15 @@
   --chart-3: oklch(0.68 0.18 25);
   --chart-4: oklch(0.62 0.055 258);
   --chart-5: oklch(0.7 0.1 265);
-  /* Sidebar bleu marque (version nuit légèrement plus profonde), écriture blanche */
-  --sidebar: #1b36ac;
+  /* Sidebar bleu marine marque (identique en mode sombre), écriture blanche ; actif vert #4AC87F */
+  --sidebar: #0b366b;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #3a5ce8;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #4ac87f;
+  --sidebar-primary-foreground: #06301c;
   --sidebar-accent: rgb(255 255 255 / 12%);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 16%);
-  --sidebar-ring: #7e96f0;
+  --sidebar-ring: #4ac87f;
 }
 
 @layer base {

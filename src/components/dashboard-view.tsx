@@ -196,7 +196,7 @@ function VBars({
   }
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
-    <div className="flex h-52 items-stretch gap-1.5 sm:h-60 sm:gap-3" role="img" aria-label="Graphique en barres">
+    <div className="flex h-52 items-stretch gap-1.5 sm:h-64 sm:gap-3 xl:h-72" role="img" aria-label="Graphique en barres">
       {items.map((it) => {
         const hPct = Math.max(it.value > 0 ? 3 : 1.5, (it.value / max) * 100);
         return (
@@ -407,12 +407,8 @@ export function DashboardView({
             <Skeleton key={i} className="h-20 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
           ))}
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Skeleton className="h-72 w-full rounded-lg bg-white/70 dark:bg-[#1E2634] lg:col-span-2" />
-          <Skeleton className="h-72 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
-        </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {Array.from({ length: 2 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-72 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
           ))}
         </div>
@@ -549,10 +545,10 @@ export function DashboardView({
         />
       </div>
 
-      {/* ═══ Calendrier des ventes LARGE (2/3 de la largeur) + tranches ════ */}
-      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-3">
-        {/* ─── Période calendaire (large, comme la maquette) ─── */}
-        <BiCard title="Période calendaire" className="lg:col-span-2">
+      {/* ═══ Calendrier des ventes PLEINE LARGEUR + tranches ═══════════════ */}
+      <div className="grid gap-3.5 sm:gap-4">
+        {/* ─── Période calendaire (pleine largeur, comme la maquette) ─── */}
+        <BiCard title="Période calendaire">
           {/* Bandeau des mois (navy) */}
           <div className="flex items-stretch overflow-hidden rounded" role="tablist" aria-label="Mois de l'année">
             <button
@@ -681,8 +677,8 @@ export function DashboardView({
         </BiCard>
       </div>
 
-      {/* ═══ Top 5 clients + Total Revenue par mois ═════════════════════════ */}
-      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-2">
+      {/* ═══ Top 5 clients + Total Revenue par mois (pleine largeur) ════════ */}
+      <div className="grid gap-3.5 sm:gap-4">
         {/* ─── Top 5 - Revenue par client (barres verticales orange) ─── */}
         <BiCard
           title="Top 5 - Revenue par client"
@@ -709,11 +705,10 @@ export function DashboardView({
       <NextActionWidget onNavigate={onNavigate} />
       <MonthlyGoalCard isAdmin={isAdmin} />
 
-      {/* ═══ Dernières factures + statut des factures ═══════════════════════ */}
-      <div className="grid gap-3.5 lg:grid-cols-3 sm:gap-4">
+      {/* ═══ Dernières factures + statut des factures (pleine largeur) ══════ */}
+      <div className="grid gap-3.5 sm:gap-4">
         <BiCard
           title="Dernières factures"
-          className="lg:col-span-2"
           right={
             <button
               type="button"
@@ -817,8 +812,8 @@ export function DashboardView({
         </BiCard>
       </div>
 
-      {/* ═══ Revenu par catégorie + alertes de stock ════════════════════════ */}
-      <div className="grid gap-3.5 lg:grid-cols-2 sm:gap-4">
+      {/* ═══ Revenu par catégorie + alertes de stock (pleine largeur) ═══════ */}
+      <div className="grid gap-3.5 sm:gap-4">
         <BiCard
           title="Revenu par catégorie"
           right={

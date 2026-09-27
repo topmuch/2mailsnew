@@ -1371,3 +1371,17 @@ Work Log:
 
 Stage Summary:
 - Le calendrier des ventes occupe désormais 2/3 de la largeur centrale (grandes tuiles dorées) et le mode sombre s'applique à tout le nouveau design BI (canevas, cartes, textes, liserés navy éclaircis, widget priorités) sans altérer le mode clair. Deux fichiers modifiés : dashboard-view.tsx, next-action-widget.tsx.
+
+---
+Task ID: 53
+Agent: Z.ai Code (principal)
+Task: Dashboard 100 % pleine largeur (toutes les sections empilées) + sidebar #0B366B avec élément actif #4AC87F
+
+Work Log:
+- Demandes utilisateur : « tout doit être en large pas seulement le calendrier » (Objectif du mois, Dernières factures, Statut des factures, Revenu par catégorie, Alertes de stock, Top 5…) + « couleur du sidebar #0b366b » + « menu sélectionné #4ac87f ».
+- Pleine largeur (dashboard-view.tsx) : les 3 grilles restantes sont dépliées en colonne unique — calendrier des ventes + tranches de facturation (suppression du 2/3+1/3), Top 5 clients + Revenue par mois (suppression du duo 2 colonnes), Dernières factures + Statut des factures (suppression du 2/3+donut), Revenu par catégorie + Alertes de stock. Objectif du mois / Mes 3 priorités / KPI / bande Aujourd'hui étaient déjà pleine largeur. Barres verticales rehaussées (sm:h-64 xl:h-72) pour équilibrer les graphiques pleine largeur ; squelette de chargement aligné.
+- Sidebar (globals.css) : tokens mis à jour dans les DEUX thèmes — --sidebar #1F3FBF/#1B36AC → #0B366B, --sidebar-primary #3A5CE8 → #4AC87F (pilule active), --sidebar-primary-foreground blanc → #06301C (texte foncé sur vert clair pour la lisibilité, ratio ≈ 6:1), --sidebar-ring → #4AC87F. La sidebar (desktop + Sheet mobile), le header mobile, le footer et la puce « section en cours » suivent automatiquement (tous en bg-sidebar/sidebar-primary). Liseré blanc nav-luxe-active conservé sur l'onglet actif.
+- Vérifié agent-browser (re-login admin) : light — sidebar marine, Dashboard en pilule verte, calendrier/tranches/top5/mensuel/priorités/objectif/factures/donut/catégories/stock tous pleine largeur, accès rapides en rangée de 3, footer marine ; dark — identique avec dashboard sombre ; mobile iPhone 14 — KPI empilés + calendrier pleine largeur. 0 erreur JS, lint 0/0, dev.log propre.
+
+Stage Summary:
+- Le tableau de bord BI est désormais une colonne unique : chaque section (calendrier, tranches, top clients, revenue mensuel, priorités, objectif, dernières factures, statut, catégories, alertes) occupe toute la largeur. Sidebar bleu marine #0B366B identique clair/sombre avec onglet actif vert #4AC87F. Fichiers modifiés : dashboard-view.tsx, globals.css.
