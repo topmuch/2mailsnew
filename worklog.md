@@ -1422,3 +1422,19 @@ Work Log:
 
 Stage Summary:
 - Cause racine éliminée : le plafond max-w-6xl (1152px) du conteneur principal. Toutes les vues s'étendent désormais de la limite du sidebar au bord de la page (marges mesurées 0.0px), canevas BI inclus, avec marges internes fines comme la maquette. Fichier modifié : app-shell.tsx.
+
+---
+Task ID: 54
+Agent: Z.ai Code (principal)
+Task: Refonte du mode sombre en version « luxe bleuté » (nuit saphir, surfaces velours navy)
+
+Work Log:
+- Demande utilisateur : « refait le mode sombre en version luxe bleuté ». L'ancien dark (canvas #131822, cartes #1E2634, chroma très faible) était presque gris, peu bleuté.
+- Tokens globals.css .dark enrichis en saturation/hue 258→264 : --background oklch(0.175 0.05 264) ≈ nuit saphir #0B1730, --card oklch(0.235 0.062 264) ≈ velours navy #152648, --popover légèrement au-dessus, --secondary/muted/accent bleutés (C 0.055-0.068), --muted-foreground bleu-gris oklch(0.68 0.03 250), liserés --border/--input bleu acier translucide (oklch(0.78 0.05 252 / 15-19%)) au lieu de blanc pur, --foreground bleuté oklch(0.93 0.015 245). Primaire cyan lumineux, destructive, gold (calendrier), charts et sidebar (#0B366B + actif #4AC87F) INCHANGÉS.
+- .dark .shadow-luxe : ombres noires → bleu nuit oklch(0.08-0.1 / hue 262-264) pour l'effet velours.
+- dashboard-view.tsx : dark:bg-[#131822]→#0B1730 (canevas), dark:bg-[#1E2634]→#152648 (cartes/KPI/bande/header/skeletons), biNavy dark #9DAFCC→#A5BFDF (liserés/pastilles), et bascule complète des gris chauds stone→slate (bleutés) en dark : text-slate-50/100/200/300/400/500/600, hover:bg-slate-700/60, hover:text-slate-200, divide-slate-700/70, bg-slate-700/70 (piste progression), bg-slate-800/60 (ligne Total), border-slate-700 (alertes stock), scrollbar-thumb slate-600 (3 dialogs). clients-view.tsx : badge type → border-slate-500/50 text-slate-300.
+- Cohérence app entière : toutes les vues à tokens (Factures, Clients, Mail, Dialogs, etc.) héritent automatiquement de la palette saphir via --background/--card/--border.
+- Vérifié agent-browser : dark — dashboard (haut : KPI + calendrier or sur saphir + tranches ; milieu : priorités/objectif/factures/donut ; bas : catégories/stock/accès rapides) + vue Factures (tableaux/inputs/badges bleutés) ; light — strictement identique à la maquette (aucun changement du clair). 0 erreur JS, 0 dark:stone restant (grep), lint 0/0.
+
+Stage Summary:
+- Mode sombre « luxe bleuté » : nuit saphir #0B1730 + surfaces velours navy #152648 + liserés bleu acier, gris chauds stone remplacés par slate bleuté, ombres teintées — l'app entière (tokens) et le dashboard BI (hardcodés) sont alignés ; mode clair et sidebar marque intacts. Fichiers modifiés : globals.css, dashboard-view.tsx, clients-view.tsx.

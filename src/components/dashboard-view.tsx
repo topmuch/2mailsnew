@@ -96,13 +96,13 @@ function BiCard({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col rounded-lg bg-white p-4 text-stone-800 dark:bg-[#1E2634] dark:text-stone-100",
+        "flex min-w-0 flex-col rounded-lg bg-white p-4 text-stone-800 dark:bg-[#152648] dark:text-slate-100",
         CARD_SHADOW,
         className,
       )}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-extrabold tracking-tight text-stone-900 sm:text-base dark:text-stone-50">{title}</h3>
+        <h3 className="text-sm font-extrabold tracking-tight text-stone-900 sm:text-base dark:text-slate-50">{title}</h3>
         {right}
       </div>
       <div className="min-h-0 flex-1">{children}</div>
@@ -128,13 +128,13 @@ function BiKpi({
   color: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white py-4 pl-3 pr-2 dark:bg-[#1E2634] sm:gap-2.5 sm:pl-3.5" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
+    <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white py-4 pl-3 pr-2 dark:bg-[#152648] sm:gap-2.5 sm:pl-3.5" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
       <span aria-hidden className="w-3 shrink-0 self-stretch rounded-full sm:w-3.5" style={{ background: color }} />
       <Icon className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" style={{ color }} aria-hidden />
       <div className="min-w-0 flex-1 text-center">
         <p className="text-[11px] font-semibold leading-tight text-stone-400">{label}</p>
         <p
-          className="mt-0.5 truncate text-[17px] font-extrabold leading-tight tabular-nums text-stone-800 dark:text-stone-100"
+          className="mt-0.5 truncate text-[17px] font-extrabold leading-tight tabular-nums text-stone-800 dark:text-slate-100"
           title={fullTitle ?? value}
         >
           {value}
@@ -165,12 +165,12 @@ function MiniStat({
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
         <span className="truncate">{label}</span>
       </p>
-      <p className="truncate text-base font-extrabold tabular-nums text-stone-800 sm:text-lg dark:text-stone-100" title={value}>
+      <p className="truncate text-base font-extrabold tabular-nums text-stone-800 sm:text-lg dark:text-slate-100" title={value}>
         {value}
       </p>
       {sub && <p className="truncate text-[10px] text-stone-400">{sub}</p>}
       {typeof progress === "number" && (
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-700/70">
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-slate-700/70">
           <div
             className="h-full rounded-full transition-all"
             style={{ width: `${Math.min(100, Math.max(0, progress))}%`, background: color }}
@@ -203,7 +203,7 @@ function VBars({
           <div key={it.name} className="flex min-w-0 flex-1 flex-col items-center" title={`${it.name} : ${formatMoney(it.value)}`}>
             {/* valeur au-dessus de la barre */}
             <div className="flex h-4 w-full items-end justify-center sm:h-5">
-              <span className="whitespace-nowrap text-[8.5px] font-bold tabular-nums text-stone-700 sm:text-[10.5px] dark:text-stone-200">
+              <span className="whitespace-nowrap text-[8.5px] font-bold tabular-nums text-stone-700 sm:text-[10.5px] dark:text-slate-200">
                 {fmtAxis(it.value)}
               </span>
             </div>
@@ -215,7 +215,7 @@ function VBars({
               />
             </div>
             {/* nom */}
-            <p className="mt-1.5 w-full truncate text-center text-[10px] font-semibold text-stone-700 dark:text-stone-200" title={it.name}>
+            <p className="mt-1.5 w-full truncate text-center text-[10px] font-semibold text-stone-700 dark:text-slate-200" title={it.name}>
               {it.name}
             </p>
           </div>
@@ -257,16 +257,16 @@ function BiQuickLink({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-w-0 items-center gap-2.5 rounded-lg bg-white p-3.5 text-left transition-shadow hover:shadow-md sm:gap-3 dark:bg-[#1E2634]"
+      className="flex min-w-0 items-center gap-2.5 rounded-lg bg-white p-3.5 text-left transition-shadow hover:shadow-md sm:gap-3 dark:bg-[#152648]"
       style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}
     >
       <span aria-hidden className="w-3 shrink-0 self-stretch rounded-full sm:w-3.5" style={{ background: color }} />
       <Icon className="h-7 w-7 shrink-0" style={{ color }} aria-hidden />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[11px] font-semibold text-stone-400">{label}</span>
-        <span className="block truncate text-lg font-extrabold tabular-nums text-stone-800 dark:text-stone-100">{value}</span>
+        <span className="block truncate text-lg font-extrabold tabular-nums text-stone-800 dark:text-slate-100">{value}</span>
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-stone-300 dark:text-stone-600" aria-hidden />
+      <ChevronRight className="h-4 w-4 shrink-0 text-stone-300 dark:text-slate-600" aria-hidden />
     </button>
   );
 }
@@ -292,7 +292,7 @@ export function DashboardView({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   // Navy « texte / bordure » trop sombre sur fond sombre → version éclaircie en dark
-  const biNavy = dark ? "#9DAFCC" : BI.navy;
+  const biNavy = dark ? "#A5BFDF" : BI.navy;
   const biTitle = dark ? "#FF6B5E" : BI.title;
   const [year, setYear] = useState(now.getFullYear());
   // Mois affiché dans le calendrier AAAA-MM (piloté par le bandeau de mois)
@@ -400,16 +400,16 @@ export function DashboardView({
   // ─── Chargement initial ───────────────────────────────────────────────────
   if (loading && !stats) {
     return (
-      <div className="space-y-4 rounded-xl bg-[#E8EAF1] p-3 dark:bg-[#131822] sm:p-4">
-        <Skeleton className="h-14 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
+      <div className="space-y-4 rounded-xl bg-[#E8EAF1] p-3 dark:bg-[#0B1730] sm:p-4">
+        <Skeleton className="h-14 w-full rounded-lg bg-white/70 dark:bg-[#152648]" />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
+            <Skeleton key={i} className="h-20 w-full rounded-lg bg-white/70 dark:bg-[#152648]" />
           ))}
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-72 w-full rounded-lg bg-white/70 dark:bg-[#1E2634]" />
+            <Skeleton key={i} className="h-72 w-full rounded-lg bg-white/70 dark:bg-[#152648]" />
           ))}
         </div>
       </div>
@@ -419,17 +419,17 @@ export function DashboardView({
 
   return (
     <div
-      className="space-y-4 rounded-xl bg-[#E8EAF1] p-3 dark:bg-[#131822] sm:space-y-5 sm:p-4"
+      className="space-y-4 rounded-xl bg-[#E8EAF1] p-3 dark:bg-[#0B1730] sm:space-y-5 sm:p-4"
       style={{ opacity: loading ? 0.6 : 1, transition: "opacity 150ms" }}
     >
       {/* ═══ Barre de titre : titre rouge centré + actions à droite ═════════ */}
-      <header className="relative flex flex-col items-center gap-2.5 rounded-lg bg-white px-3 py-3 dark:bg-[#1E2634] sm:px-4 sm:pr-48" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
+      <header className="relative flex flex-col items-center gap-2.5 rounded-lg bg-white px-3 py-3 dark:bg-[#152648] sm:px-4 sm:pr-48" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => changeYear(-1)}
             aria-label="Année précédente"
-            className="rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-700/60 dark:hover:text-stone-200"
+            className="rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-slate-700/60 dark:hover:text-slate-200"
           >
             <ChevronLeft className="h-5 w-5" aria-hidden />
           </button>
@@ -440,7 +440,7 @@ export function DashboardView({
             type="button"
             onClick={() => changeYear(1)}
             aria-label="Année suivante"
-            className="rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-700/60 dark:hover:text-stone-200"
+            className="rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-slate-700/60 dark:hover:text-slate-200"
           >
             <ChevronRight className="h-5 w-5" aria-hidden />
           </button>
@@ -517,7 +517,7 @@ export function DashboardView({
       </div>
 
       {/* ═══ Bande « Aujourd'hui » (ventes, encaissements, taux) ════════════ */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-3 rounded-lg bg-white p-3 dark:bg-[#1E2634] dark:divide-stone-700/70 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-stone-200" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
+      <div className="grid grid-cols-2 gap-x-2 gap-y-3 rounded-lg bg-white p-3 dark:bg-[#152648] dark:divide-slate-700/70 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-stone-200" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
         <MiniStat
           label="Ventes du jour"
           value={formatMoney(stats.today.sales)}
@@ -591,7 +591,7 @@ export function DashboardView({
           {/* Jours de la semaine + tuiles dorées */}
           <div className="mt-3 grid grid-cols-7 gap-1.5 sm:gap-2">
             {WEEKDAYS.map((d, i) => (
-              <p key={`${d}-${i}`} className="text-center text-[9px] font-bold uppercase text-stone-400 dark:text-stone-500" aria-hidden>
+              <p key={`${d}-${i}`} className="text-center text-[9px] font-bold uppercase text-stone-400 dark:text-slate-500" aria-hidden>
                 {d}
               </p>
             ))}
@@ -607,7 +607,7 @@ export function DashboardView({
                   title={hasSales ? `${d.count} vente(s) — ${formatMoney(d.total)}` : `${d.day} — aucune vente`}
                   className={cn(
                     "flex h-11 flex-col items-center justify-center rounded-[5px] transition-transform hover:scale-[1.05] sm:h-14 xl:h-16",
-                    hasSales ? "text-stone-900" : "text-stone-500 dark:text-stone-300",
+                    hasSales ? "text-stone-900" : "text-stone-500 dark:text-slate-300",
                   )}
                   style={{ background: hasSales ? BI.gold : BI.goldSoft, ...(isToday ? { outline: `2px solid ${BI.crimson}`, outlineOffset: "1px" } : {}) }}
                 >
@@ -623,7 +623,7 @@ export function DashboardView({
           </div>
 
           {/* Légende */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-medium text-stone-500 dark:text-stone-400">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-medium text-stone-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: BI.gold }} aria-hidden /> Jour avec ventes
             </span>
@@ -648,7 +648,7 @@ export function DashboardView({
               const wide = pct >= 16;
               return (
                 <div key={t.label} className="flex items-center gap-2.5" title={`${t.count} facture(s) — ${formatMoney(t.total)}`}>
-                  <span className="w-[4.6rem] shrink-0 text-right text-[10px] font-bold text-stone-500 sm:w-20 sm:text-[11px] dark:text-stone-400">
+                  <span className="w-[4.6rem] shrink-0 text-right text-[10px] font-bold text-stone-500 sm:w-20 sm:text-[11px] dark:text-slate-400">
                     {t.label}
                   </span>
                   <div className="relative h-6 flex-1 sm:h-7">
@@ -660,7 +660,7 @@ export function DashboardView({
                     </div>
                     {!wide && (
                       <span
-                        className="absolute inset-y-0 flex items-center text-[11px] font-bold text-stone-700 dark:text-stone-200"
+                        className="absolute inset-y-0 flex items-center text-[11px] font-bold text-stone-700 dark:text-slate-200"
                         style={{ left: `calc(${barPct}% + 6px)` }}
                       >
                         {t.count}
@@ -795,18 +795,18 @@ export function DashboardView({
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-extrabold tabular-nums text-stone-800 dark:text-stone-100">{paidPct}%</span>
+                  <span className="text-3xl font-extrabold tabular-nums text-stone-800 dark:text-slate-100">{paidPct}%</span>
                   <span className="text-[11px] text-stone-400">payées</span>
                 </div>
               </div>
               <div className="mt-3 space-y-1.5">
                 {donutData.map((d) => (
                   <div key={d.name} className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-2 text-stone-600 dark:text-stone-300">
+                    <span className="flex items-center gap-2 text-stone-600 dark:text-slate-300">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} aria-hidden />
                       {d.name}
                     </span>
-                    <span className="font-semibold tabular-nums text-stone-800 dark:text-stone-100">{d.value}</span>
+                    <span className="font-semibold tabular-nums text-stone-800 dark:text-slate-100">{d.value}</span>
                   </div>
                 ))}
               </div>
@@ -874,11 +874,11 @@ export function DashboardView({
           {stats.lowStock.length === 0 ? (
             <p className="py-8 text-center text-sm text-stone-400">Tous les stocks sont au niveau. 👍</p>
           ) : (
-            <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-stone-600">
+            <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600">
               {stats.lowStock.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 p-2.5 dark:border-stone-700">
+                <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 p-2.5 dark:border-slate-700">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-stone-800 dark:text-stone-100" title={p.name}>
+                    <p className="truncate text-sm font-medium text-stone-800 dark:text-slate-100" title={p.name}>
                       {p.name}
                     </p>
                     <p className="text-xs text-stone-400">
@@ -929,7 +929,7 @@ export function DashboardView({
           <DialogHeader>
             <DialogTitle className="text-left">Top clients — {stats.year}</DialogTitle>
           </DialogHeader>
-          <div className="max-h-96 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-stone-600">
+          <div className="max-h-96 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600">
             {stats.topClients.length === 0 ? (
               <p className="py-8 text-center text-sm text-stone-400">Aucune vente enregistrée.</p>
             ) : (
@@ -978,7 +978,7 @@ export function DashboardView({
           <DialogHeader>
             <DialogTitle className="text-left">Total Revenue par mois — {stats.year}</DialogTitle>
           </DialogHeader>
-          <div className="max-h-96 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-stone-600">
+          <div className="max-h-96 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600">
             <Table>
               <TableHeader>
                 <TableRow className="bg-[#17AFA5] hover:bg-[#17AFA5]">
@@ -1004,7 +1004,7 @@ export function DashboardView({
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="bg-stone-50 font-bold dark:bg-stone-800/60">
+                <TableRow className="bg-stone-50 font-bold dark:bg-slate-800/60">
                   <TableCell className="text-xs">Total</TableCell>
                   <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">{formatMoney(monthsTotal)}</TableCell>
                   <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">{formatMoney(monthsPaidTotal)}</TableCell>

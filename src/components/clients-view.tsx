@@ -281,7 +281,7 @@ export function ClientsView() {
                         className={
                           c.type === "ENTREPRISE"
                             ? "border-green-300 text-green-700 dark:border-green-500/40 dark:text-green-300"
-                            : "border-stone-300 text-stone-600 dark:border-stone-500/50 dark:text-stone-300"
+                            : "border-slate-300 text-slate-600 dark:border-slate-500/50 dark:text-slate-300"
                         }
                       >
                         {c.type === "ENTREPRISE" ? "Entreprise" : "Particulier"}
