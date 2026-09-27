@@ -1385,3 +1385,23 @@ Work Log:
 
 Stage Summary:
 - Le tableau de bord BI est désormais une colonne unique : chaque section (calendrier, tranches, top clients, revenue mensuel, priorités, objectif, dernières factures, statut, catégories, alertes) occupe toute la largeur. Sidebar bleu marine #0B366B identique clair/sombre avec onglet actif vert #4AC87F. Fichiers modifiés : dashboard-view.tsx, globals.css.
+
+---
+Task ID: 53-b
+Agent: Z.ai Code (principal)
+Task: Passage du système vertical empilé au système horizontal de la maquette (rangées pleine largeur à 2 rubriques)
+
+Work Log:
+- Après comparaison demandée par l'utilisateur (maquette vs dashboard) : la version « tout empilé » du Task 53 donnait ~4 écrans de scroll (3 648 px) avec des graphiques démesurément étirés (donut flottant sur 1 300 px). La maquette montre en réalité des RANGÉES pleine largeur contenant 2 modules côte à côte — l'utilisateur valide : « faire un système horizontal pour occuper toute la largeur, classer les rubriques en version horizontal comme l'image ».
+- Réorganisation (dashboard-view.tsx, only-add sur les classes de grille, aucun module supprimé) :
+  · Rangée 1 (comme la maquette 60/40) : Période calendaire lg:col-span-2 + Nombre par tranche de facturation (grid lg:grid-cols-3).
+  · Rangée 2 (comme la maquette 50/50) : Top 5 - Revenue par client + Total Revenue par mois (grid lg:grid-cols-2).
+  · Rangée 3 : Mes 3 priorités du moment + Objectif du mois (grid lg:grid-cols-2 items-start — les deux widgets CRM existants posés côte à côte).
+  · Rangée 4 : Dernières factures lg:col-span-2 + Statut des factures (donut) en ⅓ (grid lg:grid-cols-3).
+  · Rangée 5 : Revenu par catégorie + Alertes de stock (grid lg:grid-cols-2).
+  · Bande Aujourd'hui et Accès rapides (3 colonnes) inchangés ; commentaires de sections mis à jour (Rangée 1→5).
+- Hauteur de page mesurée après : 2 338 px (~2,6 écrans) contre 3 648 px — les proportions des graphiques redeviennent lisibles (donut compact à droite du tableau, barres mensuelles espacées comme la maquette).
+- Vérifié agent-browser : light desktop 1440 px — les 5 rangées côte à côte conformes à la maquette ; dark (localStorage theme=dark) — toutes les rangées adaptées (cartes #1E2634, tuiles or assombries, donut, widgets) ; mobile iPhone 14 — repli propre en 1 colonne sans débordement ; retour desktop light identique. 0 erreur JS (agent-browser errors vide), APIs 200, lint 0/0, dev.log propre. Captures dans .zscreens/h-*.png.
+
+Stage Summary:
+- Le tableau de bord reprend la disposition horizontale de la maquette BI : 5 rangées pleine largeur (calendrier⅔+tranches⅓, top5½+mensuel½, priorités½+objectif½, factures⅔+statut⅓, catégories½+stock½) au lieu de l'empilement vertical ; scroll réduit de 4 à ~2,6 écrans ; dark mode et mobile conservés. Fichier modifié : dashboard-view.tsx (classes de grille uniquement).

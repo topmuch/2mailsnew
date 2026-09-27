@@ -545,10 +545,10 @@ export function DashboardView({
         />
       </div>
 
-      {/* ═══ Calendrier des ventes PLEINE LARGEUR + tranches ═══════════════ */}
-      <div className="grid gap-3.5 sm:gap-4">
-        {/* ─── Période calendaire (pleine largeur, comme la maquette) ─── */}
-        <BiCard title="Période calendaire">
+      {/* ═══ Rangée 1 (comme la maquette) : Période calendaire ⅔ + tranches ⅓ */}
+      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-3">
+        {/* ─── Période calendaire (2/3 de la rangée, comme la maquette) ─── */}
+        <BiCard title="Période calendaire" className="lg:col-span-2">
           {/* Bandeau des mois (navy) */}
           <div className="flex items-stretch overflow-hidden rounded" role="tablist" aria-label="Mois de l'année">
             <button
@@ -677,8 +677,8 @@ export function DashboardView({
         </BiCard>
       </div>
 
-      {/* ═══ Top 5 clients + Total Revenue par mois (pleine largeur) ════════ */}
-      <div className="grid gap-3.5 sm:gap-4">
+      {/* ═══ Rangée 2 (comme la maquette) : Top 5 clients ½ + Revenue/mois ½ ═ */}
+      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-2">
         {/* ─── Top 5 - Revenue par client (barres verticales orange) ─── */}
         <BiCard
           title="Top 5 - Revenue par client"
@@ -701,14 +701,17 @@ export function DashboardView({
         </BiCard>
       </div>
 
-      {/* ═══ Widgets CRM existants (prochaine action, objectif du mois) ═════ */}
-      <NextActionWidget onNavigate={onNavigate} />
-      <MonthlyGoalCard isAdmin={isAdmin} />
+      {/* ═══ Rangée 3 : Mes 3 priorités ½ + Objectif du mois ½ ══════════════ */}
+      <div className="grid items-start gap-3.5 sm:gap-4 lg:grid-cols-2">
+        <NextActionWidget onNavigate={onNavigate} />
+        <MonthlyGoalCard isAdmin={isAdmin} />
+      </div>
 
-      {/* ═══ Dernières factures + statut des factures (pleine largeur) ══════ */}
-      <div className="grid gap-3.5 sm:gap-4">
+      {/* ═══ Rangée 4 : Dernières factures ⅔ + Statut des factures ⅓ ════════ */}
+      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-3">
         <BiCard
           title="Dernières factures"
+          className="lg:col-span-2"
           right={
             <button
               type="button"
@@ -812,8 +815,8 @@ export function DashboardView({
         </BiCard>
       </div>
 
-      {/* ═══ Revenu par catégorie + alertes de stock (pleine largeur) ═══════ */}
-      <div className="grid gap-3.5 sm:gap-4">
+      {/* ═══ Rangée 5 : Revenu par catégorie ½ + Alertes de stock ½ ═════════ */}
+      <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-2">
         <BiCard
           title="Revenu par catégorie"
           right={
