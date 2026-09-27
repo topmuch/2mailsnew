@@ -1337,3 +1337,20 @@ Work Log:
 
 Stage Summary:
 - Local = GitHub = 2751db4 (avant le push du présent worklog). Aucune donnée perdue (backup /tmp/custom-backup-sync-49b.db conservé ; l'état restauré de la démo terroubi.sn était déjà celui commité). Si récidive de réécriture de hash : même procédure que Tasks 48/50 — fetch authentifié, diff contenu, backup db, reset --hard 2mailsnew/main, prisma generate + db push, restart, sondes health/hosting/page publique.
+
+---
+Task ID: 51
+Agent: Z.ai Code (principal)
+Task: Refonte COMPLÈTE du tableau de bord façon « tableau de bord des ventes » BI (maquette utilisateur : titre rouge centré, 5 cartes KPI à liseré coloré, calendrier doré, barres crimson/orange/teal, boutons Détails)
+
+Work Log:
+- Maquette analysée (upload/maxresdefault.jpg) : canevas gris-bleu clair, barre de titre blanche à texte rouge centré, 5 cartes KPI (liseré vertical coloré + icône + libellé grisé + valeur grasse), grille 2×2 (Période calendaire à tuiles dorées + bandeau de mois navy / barres horizontales crimson / 2 graphiques verticaux avec valeurs au-dessus des barres + pastilles « Détails » cerclées).
+- dashboard-view.tsx réécrit intégralement (~1015 lignes) : composants BiCard/BiKpi/MiniStat/VBars/DetailsPill/BiQuickLink + palette BI fixe (crimson #D6455F, orange #F09A3E, teal #17AFA5, navy #333F50, or #FFC918, titre #D93025, canevas #E8EAF1) volontairement claire et fixe (fidèle à la maquette, indépendante du thème).
+- Correspondances maquette → données réelles : Total Revenue=CA total, Nombre Factures=ventes (+proformas en hint), Nombre Clients, Nombre Produits, Reste à encaisser ; calendrier = CA par jour (api dailyRevenue, mois piloté par le bandeau JANV→DÉC + flèches ‹ › traversant les années, tuiles or = ventes avec montant compact, jour courant cerclé crimson, légende) ; tranches de facturation = comptes crimson ; Top 5 clients = barres orange (dialog Détails jusqu'à 10 clients) ; Total Revenue par mois = 12 barres teal (dialog Détails : facturé/encaissé/reste + ligne Total).
+- Fonctionnalités existantes CONSERVÉES et restylées : bande « Aujourd'hui » (ventes/encaissé/proformas/taux avec mini-barre), NextActionWidget, MonthlyGoalCard, Dernières factures (en-tête navy + PDF), donut statuts (couleurs BI), Revenu par catégorie (barres orange), Alertes de stock, 3 accès rapides (liserés). Rapport du jour = bouton icône crimson en haut à droite + Nouvelle facture.
+- API dashboard : topClients étendu 5→10 (le graphique en garde 5, le dialog Détails en affiche jusqu'à 10) ; fetch ?year=&month= réutilisé (chargement doux : opacité 0.6 au lieu de squelette plein écran).
+- Correctifs au fil des tests : chevauchement bouton rapport/titre (sm:pr-48), valeurs KPI tronquées (format axe sans devise 159 k + infobulle formatMoney complète), bandeau de mois resserré sur mobile (text-[8px]).
+- Vérifié agent-browser desktop 1280 px (3 captures plein écran : KPI, graphiques, bas de page), dialog Top clients + dialog mensuel (12 lignes + Total), navigation SEPT↔AOÛT, mobile iPhone 14 (3 captures), 0 erreur JS, lint 0/0, dev.log propre.
+
+Stage Summary:
+- Le tableau de bord reprend 1:1 la structure de la maquette BI avec les vraies données du CRM (FCFA) : titre rouge annuel, 5 KPI à liserés, calendrier de ventes doré navigable, tranches crimson, top clients orange, revenue mensuel teal, dialogs Détails. Toutes les anciennes fonctions (rapport du jour, priorités, objectif, factures récentes, stock, catégories) restent accessibles sous la grille BI.

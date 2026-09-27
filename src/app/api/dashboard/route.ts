@@ -142,7 +142,8 @@ export async function GET(request: NextRequest) {
       return { label: t.label, count: list.length, total: list.reduce((s, f) => s + f.totalTTC, 0) };
     });
 
-    // Top 5 clients par revenu
+    // Top clients par revenu (10 premiers — le graphique du tableau de bord
+    // en affiche 5, le dialog « Détails » en affiche jusqu'à 10)
     const clientTotals = new Map<string, { name: string; total: number }>();
     for (const f of ventes) {
       const key = f.clientId ?? "comptoir";
@@ -150,7 +151,7 @@ export async function GET(request: NextRequest) {
       entry.total += f.totalTTC;
       clientTotals.set(key, entry);
     }
-    const topClients = [...clientTotals.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+    const topClients = [...clientTotals.values()].sort((a, b) => b.total - a.total).slice(0, 10);
 
     // Top catégories (par montant facturé)
     const catTotals = new Map<string, number>();
