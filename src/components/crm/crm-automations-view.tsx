@@ -63,8 +63,10 @@ const DEFAULT_CONFIG: ConfigState = {
   reportEveningTime: "19:00",
   coachEnabled: true,
   coach11Enabled: true,
+  coach12Enabled: true,
   coach14Enabled: true,
   coach17Enabled: true,
+  coach18Enabled: true,
   remindersEnabled: true,
   reminderSlots: "H1",
   dailyGoal: "",
@@ -327,11 +329,17 @@ export default function CrmAutomationsView({ isAdmin }: { isAdmin: boolean }) {
             {/* Coach */}
             <div className="rounded-lg border p-3 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">🤖 Coach virtuel (3 messages/jour)</p>
+                <p className="text-sm font-medium">🤖 Coach virtuel (5 messages/jour)</p>
                 <Switch checked={config.coachEnabled} onCheckedChange={(v) => patch({ coachEnabled: v })} disabled={!isAdmin} aria-label="Activer le coach virtuel" />
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {([["11h", "coach11Enabled"], ["14h", "coach14Enabled"], ["17h", "coach17Enabled"]] as const).map(([slot, key]) => (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {([
+                  ["11h", "coach11Enabled"],
+                  ["12h", "coach12Enabled"],
+                  ["14h", "coach14Enabled"],
+                  ["17h", "coach17Enabled"],
+                  ["18h", "coach18Enabled"],
+                ] as const).map(([slot, key]) => (
                   <label key={slot} className="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium">
                     <Switch
                       checked={config[key]}
@@ -343,6 +351,9 @@ export default function CrmAutomationsView({ isAdmin }: { isAdmin: boolean }) {
                   </label>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                11h / 14h / 17h : coach business — <span className="font-medium text-foreground">12h &amp; 18h : rappel de poster des visuels sur TikTok, LinkedIn et Facebook</span>.
+              </p>
             </div>
             {/* Rappels */}
             <div className="rounded-lg border p-3 space-y-3">
@@ -398,8 +409,10 @@ export default function CrmAutomationsView({ isAdmin }: { isAdmin: boolean }) {
               ["MORNING", "Tester le briefing", Send],
               ["EVENING", "Tester le bilan", Send],
               ["COACH_11", "Coach 11h", Play],
+              ["COACH_12", "Visuels 12h", Play],
               ["COACH_14", "Coach 14h", Play],
               ["COACH_17", "Coach 17h", Play],
+              ["COACH_18", "Visuels 18h", Play],
               ["REMINDERS", "Vérifier rappels", Play],
             ].map(([kind, label, Icon]) => (
               <Button

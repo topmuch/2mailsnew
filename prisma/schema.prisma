@@ -459,8 +459,8 @@ model CrmTask {
 
 model CrmCoachMessage {
   id        String   @id @default(cuid())
-  timeSlot  String // "11h" | "14h" | "17h"
-  category  String @default("BUSINESS") // BUSINESS | MINDSET | CLOSING
+  timeSlot  String // "11h" | "12h" | "14h" | "17h" | "18h"
+  category  String @default("BUSINESS") // BUSINESS | MINDSET | CLOSING | SOCIAL (visuels réseaux sociaux)
   content   String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -494,8 +494,10 @@ model CrmAutomationConfig {
   reportEveningTime    String   @default("19:00") // HH:mm
   coachEnabled         Boolean  @default(true)
   coach11Enabled       Boolean  @default(true)
+  coach12Enabled       Boolean  @default(true) // notification « visuels réseaux sociaux » de midi (TikTok/LinkedIn/Facebook)
   coach14Enabled       Boolean  @default(true)
   coach17Enabled       Boolean  @default(true)
+  coach18Enabled       Boolean  @default(true) // notification « visuels réseaux sociaux » du soir (TikTok/LinkedIn/Facebook)
   remindersEnabled     Boolean  @default(true)
   reminderSlots        String   @default("H1") // créneaux de rappel RDV actifs : "J1" (J-1 18h), "H1" (1h avant), "H15" (15min avant) — CSV, vide = aucun
   dailyGoal            String   @default("") // objectif du jour (vide → objectif aléatoire)

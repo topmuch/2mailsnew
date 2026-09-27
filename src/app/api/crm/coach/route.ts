@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
       history,
       counts: {
         "11h": messages.filter((m) => m.timeSlot === "11h" && m.isActive).length,
+        "12h": messages.filter((m) => m.timeSlot === "12h" && m.isActive).length,
         "14h": messages.filter((m) => m.timeSlot === "14h" && m.isActive).length,
         "17h": messages.filter((m) => m.timeSlot === "17h" && m.isActive).length,
+        "18h": messages.filter((m) => m.timeSlot === "18h" && m.isActive).length,
       },
     });
   } catch (error) {
@@ -50,11 +52,18 @@ export async function POST(request: NextRequest) {
     const content = String(body.content ?? "").trim();
     const timeSlot = String(body.timeSlot ?? "");
     if (!content) return NextResponse.json({ error: "Le contenu du message est requis" }, { status: 400 });
-    if (!["11h", "14h", "17h"].includes(timeSlot)) {
-      return NextResponse.json({ error: "Créneau invalide (11h, 14h ou 17h)" }, { status: 400 });
+    if (!["11h", "12h", "14h", "17h", "18h"].includes(timeSlot)) {
+      return NextResponse.json({ error: "Créneau invalide (11h, 12h, 14h, 17h ou 18h)" }, { status: 400 });
     }
 
-    const category = timeSlot === "11h" ? "BUSINESS" : timeSlot === "14h" ? "MINDSET" : "CLOSING";
+    const category =
+      timeSlot === "11h"
+        ? "BUSINESS"
+        : timeSlot === "14h"
+          ? "MINDSET"
+          : timeSlot === "17h"
+            ? "CLOSING"
+            : "SOCIAL"; // 12h & 18h = visuels réseaux sociaux (Task 57)
     const message = await db.crmCoachMessage.create({
       data: { timeSlot, category, content: content.slice(0, 1000), isActive: true },
     });

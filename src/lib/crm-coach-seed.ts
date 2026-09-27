@@ -3,8 +3,15 @@ import { db } from "@/lib/db";
 // ─── Seed des 30 messages du Coach Virtuel (10 par créneau) ─────────────────
 // Auto-seed au premier accès (pattern ensurePlatformsSeeded) : fonctionne en
 // dev comme en production Coolify sans étape de seed manuelle.
+// Task 57 : créneaux additionnels « visuels réseaux sociaux » (12h & 18h,
+// catégorie SOCIAL) — seed incrémental, les 30 messages d'origine restent
+// strictement inchangés.
 
-type SeedMessage = { timeSlot: "11h" | "14h" | "17h"; category: "BUSINESS" | "MINDSET" | "CLOSING"; content: string };
+type SeedMessage = {
+  timeSlot: "11h" | "12h" | "14h" | "17h" | "18h";
+  category: "BUSINESS" | "MINDSET" | "CLOSING" | "SOCIAL";
+  content: string;
+};
 
 export const COACH_SEED_MESSAGES: SeedMessage[] = [
   // ── 11h — Focus Business & Action ──
@@ -42,10 +49,38 @@ export const COACH_SEED_MESSAGES: SeedMessage[] = [
   { timeSlot: "17h", category: "CLOSING", content: "Monsieur Diop, chaque journée bien terminée est une victoire. Finissez fort, reposez-vous bien, et demain on recommence plus fort ! 🌙" },
 ];
 
+// ─── Task 57 : créneaux « visuels réseaux sociaux » (12h & 18h, SOCIAL) ──────
+// Poster des visuels sur TikTok, LinkedIn et Facebook — notification
+// programmée tous les jours à 12h00 et 18h00 (seed incrémental dédié).
+export const SOCIAL_SEED_MESSAGES: SeedMessage[] = [
+  { timeSlot: "12h", category: "SOCIAL", content: "Bonjour Monsieur Diop ! ☀️ Il est midi : c'est l'heure de publier le visuel du jour sur TikTok, LinkedIn et Facebook. Une belle photo de vos produits ou réalisations, une légende courte avec des emojis et les hashtags #2MAILS #Dakar #Sénégal — la visibilité travaille pour vous pendant que vous déjeunez ! 📱" },
+  { timeSlot: "12h", category: "SOCIAL", content: "12h00 — Pause déjeuner = pause visibilité ! C'est le moment de poster le visuel du jour sur TikTok, LinkedIn et Facebook : les heures du midi sont celles où vos clients scrollent le plus. Un post aujourd'hui, un client demain ! 🚀" },
+  { timeSlot: "12h", category: "SOCIAL", content: "Monsieur Diop, rappel réseaux sociaux : TikTok, LinkedIn et Facebook attendent le visuel du jour. Alternez les formats : vidéo produit sur TikTok, réussite d'équipe sur LinkedIn, promotion du moment sur Facebook. La constance bat l'intensité ! 🔥" },
+  { timeSlot: "12h", category: "SOCIAL", content: "Bonjour ! Objectif midi : 1 visuel publié sur les 3 réseaux (TikTok, LinkedIn, Facebook). Prenez 10 minutes maintenant — photographiez un produit, ajoutez votre logo 2MAILS et publiez. Votre marque grandit à chaque post ! 📸" },
+  { timeSlot: "12h", category: "SOCIAL", content: "Monsieur Diop, à 12h l'audience est à son pic : publiez votre visuel sur TikTok, LinkedIn et Facebook avant de déjeuner. TikTok pour la vidéo courte, LinkedIn pour l'expertise, Facebook pour la proximité. L'ordre du jour : visibilité d'abord ! 🎯" },
+  { timeSlot: "12h", category: "SOCIAL", content: "Midi, heure sociale ! 💡 Prenez le visuel de la semaine (sanitaire, luminaire, plomberie ou QRTags) et publiez-le sur TikTok, LinkedIn et Facebook. Répondez ensuite aux commentaires : chaque interaction est un futur client ! 💬" },
+  { timeSlot: "18h", category: "SOCIAL", content: "Bonjour Monsieur Diop ! 🌆 18h : dernière fenêtre de visibilité avant le soir. Postez un visuel sur TikTok, LinkedIn et Facebook — une réalisation du jour, un avant/après chantier ou un produit phare. Terminez la journée en beauté en ligne ! 📱" },
+  { timeSlot: "18h", category: "SOCIAL", content: "18h00 — Les salariés rentrent et scrollent ! C'est le moment de poster le visuel du soir sur TikTok, LinkedIn et Facebook. Un post régulier = une marque qui reste gravée dans les esprits. 💪" },
+  { timeSlot: "18h", category: "SOCIAL", content: "Monsieur Diop, le soleil se couche mais vos réseaux restent éveillés ! Publiez maintenant votre visuel du soir sur TikTok, LinkedIn et Facebook. Demain matin, il aura déjà travaillé pour vous pendant la nuit. 🌙" },
+  { timeSlot: "18h", category: "SOCIAL", content: "Bonjour ! Petit bilan social du jour : avez-vous posté sur TikTok, LinkedIn et Facebook ? Si ce n'est pas fait, 18h est le moment idéal — l'audience du soir est la plus active. Une photo, une légende, publiez ! 📸" },
+  { timeSlot: "18h", category: "SOCIAL", content: "18h : heure sociale du soir ! 🎯 Vidéo courte TikTok, carte visuelle LinkedIn, photo produit Facebook — choisissez un format et publiez maintenant. La visibilité d'aujourd'hui prépare les ventes de demain ! 🚀" },
+  { timeSlot: "18h", category: "SOCIAL", content: "Monsieur Diop, dernière mission du jour : un visuel sur TikTok, LinkedIn et Facebook. Montrez une réussite de la journée (livraison, installation, nouveau produit) et remerciez vos clients. La gratitude engage ! 🙏" },
+];
+
 /** Crée les 30 messages si la table est vide (idempotent). */
 export async function ensureCoachMessagesSeeded(): Promise<number> {
   const count = await db.crmCoachMessage.count();
-  if (count > 0) return count;
-  await db.crmCoachMessage.createMany({ data: COACH_SEED_MESSAGES });
+  if (count === 0) {
+    await db.crmCoachMessage.createMany({ data: COACH_SEED_MESSAGES });
+  }
+  // Task 57 : seed incrémental des créneaux « visuels réseaux sociaux »
+  // (12h & 18h) — s'exécute aussi sur les bases qui ont déjà les 30 messages
+  // d'origine, sans jamais les modifier.
+  const socialCount = await db.crmCoachMessage.count({
+    where: { timeSlot: { in: ["12h", "18h"] } },
+  });
+  if (socialCount === 0) {
+    await db.crmCoachMessage.createMany({ data: SOCIAL_SEED_MESSAGES });
+  }
   return db.crmCoachMessage.count();
 }

@@ -4,8 +4,8 @@ import { getAuthUser } from "@/lib/auth";
 import { getAutomationConfig, getRandomCoachMessage, sendAutomationEmail } from "@/lib/crm-automation";
 
 // ─── POST : envoi immédiat d'un message du coach (admin) ─────────────────────
-// body : { timeSlot: "11h" | "14h" | "17h" } — pioche un message actif au hasard
-// et l'envoie tout de suite (indépendamment des horaires planifiés).
+// body : { timeSlot: "11h" | "12h" | "14h" | "17h" | "18h" } — pioche un message
+// actif au hasard et l'envoie tout de suite (indépendamment des horaires planifiés).
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const timeSlot = String(body.timeSlot ?? "");
-    if (!["11h", "14h", "17h"].includes(timeSlot)) {
-      return NextResponse.json({ error: "Créneau invalide (11h, 14h ou 17h)" }, { status: 400 });
+    if (!["11h", "12h", "14h", "17h", "18h"].includes(timeSlot)) {
+      return NextResponse.json({ error: "Créneau invalide (11h, 12h, 14h, 17h ou 18h)" }, { status: 400 });
     }
 
     const now = new Date();
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const setting = await db.setting.findFirst();
     const to = (config.recipientEmail || setting?.email || "").trim();
 
-    const msg = await getRandomCoachMessage(timeSlot as "11h" | "14h" | "17h", now);
+    const msg = await getRandomCoachMessage(timeSlot as "11h" | "12h" | "14h" | "17h" | "18h", now);
     if (!msg) {
       return NextResponse.json({ ok: false, error: `Aucun message actif pour le créneau ${timeSlot}` });
     }

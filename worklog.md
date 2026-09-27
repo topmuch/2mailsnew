@@ -1473,3 +1473,36 @@ Work Log:
 
 Stage Summary:
 - Le module Hosting vend maintenant des domaines (+ hébergement) en plus de suivre les renouvellements : création d'achat → page de paiement publique automatique (détail domaine/hébergement/total, Wave ou autre) → paiement signalé → confirmation admin « Paiement reçu » → échéance +1 an et rappels armés automatiquement. Tout l'existant (rappels, liens, historique, WhatsApp, page renouvellement) est intact. Fichiers : schema.prisma, hosting-notify.ts, api/hosting/route.ts, api/hosting/[id]/route.ts, renouvellement/[token]/page.tsx + renewal-client.tsx, hosting-view.tsx.
+
+---
+Task ID: 56-bis
+Agent: Z.ai Code (principal)
+Task: Génération automatique d'une facture de vente dès la validation d'un paiement dans le module Hosting-Domaine (achat domaine+hébergement ET renouvellement)
+
+Work Log:
+- Lecture worklog + exploration : schema.prisma (HostingDomain PENDING→ACTIVE via activatePurchase/markRenewed dans hosting-notify.ts), route /api/hosting/[id] (action confirm-paid), numérotation existante (generateDocumentNumber + withNumberRetry, préfixe FV VENTE), modèle Invoice/InvoiceItem/Payment.
+- Nouveau fichier src/lib/hosting-invoice.ts : createHostingInvoice() (facture VENTE PAYÉE : montant = renewal.amount source de vérité ; achat → 2 lignes « Nom de domaine X — 1 an »/« Hébergement web X — 1 an » si le détail correspond au montant encaissé, sinon 1 ligne unique ; renouvellement → ligne « Renouvellement nom de domaine X — <période> » ; taxRate 0, paymentStatus PAYE, amountPaid=totalTTC ; versement Payment lié avec mapping Manuel→ESPECES/Wave→WAVE/Autre→VIREMENT ; client lié best-effort par nom exact) + createHostingInvoiceSafe() (best-effort, jamais bloquant, logAudit CREATE Invoice).
+- Route /api/hosting/[id] PUT confirm-paid : après activatePurchase (achat) OU markRenewed (renouvellement), génère la facture et renvoie {invoice, invoiceError} sans invalider la confirmation en cas d'échec.
+- hosting-view.tsx : toast enrichi « Facture FV-…-… générée automatiquement (montant) — visible dans Factures. » (ou message d'erreur facture) + description du dialogue de confirmation mentionnant la facture automatique.
+- E2E agent-browser complet : achat facture-test.sn (15 000 + 25 000) → page publique « Achat de domaine et hébergement / Total 40 000 » → « J'ai effectué le paiement » → admin « Paiement reçu » → toast « Facture FV-2026-0004 générée automatiquement (40 000 FCFA) » → facture vérifiée (PAYE, 2 lignes 15 000/25 000, versement ESPECES, notes auto) + chemin renouvellement testé via API (client-test.sn, Wave, 20 000 → FV-2026-0005, ligne « Renouvellement nom de domaine client-test.sn — 2027-2028 », échéance 2028-09-27).
+- Incidents corrigés en chemin : serveur redémarré après db push (client Prisma périmé → PrismaClientValidationError sur coach12/18) ; onglet public qui pointait le token d'une session E2E précédente (artefact navigateur, base correcte).
+
+Stage Summary:
+- Chaque paiement validé dans Hosting (achat domaine+hébergement OU renouvellement annuel) produit automatiquement une facture de vente payée, numérotée, avec lignes détaillées, versement lié et audit — visible dans Factures. Aucun flux existant supprimé ; échec facture = avertissement sans blocage. Fichiers : src/lib/hosting-invoice.ts (nouveau), api/hosting/[id]/route.ts, hosting-view.tsx.
+
+---
+Task ID: 57
+Agent: Z.ai Code (principal)
+Task: Coach virtuel — nouvelle notification programmée tous les jours à 12h et 18h pour rappeler de poster des visuels sur TikTok, LinkedIn et Facebook
+
+Work Log:
+- Schema Prisma : CrmAutomationConfig + coach12Enabled/coach18Enabled (Boolean, défaut true) ; commentaires CrmCoachMessage étendus ("11h"|"12h"|"14h"|"17h"|"18h", catégorie SOCIAL) ; bun run db:push OK.
+- crm-coach-seed.ts : SOCIAL_SEED_MESSAGES (12 messages : 6 × 12h, 6 × 18h, catégorie SOCIAL, mention explicite TikTok/LinkedIn/Facebook et hashtags #2MAILS #Dakar) + seed INCRÉMENTAL dans ensureCoachMessagesSeeded (crée les créneaux 12h/18h même si les 30 messages d'origine existent déjà — 30 messages historiques strictement intacts).
+- crm-automation.ts : CoachSlot type (5 créneaux), COACH_TITLES 12h « 📱 Visuel réseaux sociaux (midi) » / 18h « 🌆 Visuel réseaux sociaux (soir) », runDueJobs planifie 12:00 et 18:00 (idempotence COACH-<slot>-<date> inchangée, heures ouvrées samedi 13h/dimanche respectées), runManualTest + COACH_12/COACH_18.
+- Routes : /api/crm/coach GET counts 5 créneaux + POST validation 5 créneaux (12h/18h → catégorie SOCIAL) ; /api/crm/coach/send idem ; /api/crm/automation/config GET/PUT coach12/18Enabled ; types.ts CrmAutomationConfig +2 champs.
+- UI crm-automations-view.tsx : bloc « Coach virtuel (5 messages/jour) » avec 5 interrupteurs + légende « 11h/14h/17h : coach business — 12h & 18h : rappel de poster des visuels sur TikTok, LinkedIn et Facebook » + tests manuels « Visuels 12h »/« Visuels 18h ». UI crm-coach-view.tsx : cartes « 12h — Visuels réseaux sociaux » et « 18h — Visuels du soir » (Post TikTok, LinkedIn, Facebook), grille md:2/lg:3, envoi immédiat par créneau.
+- E2E : API coach GET counts {11h:10, 12h:6, 14h:10, 17h:10, 18h:6} ; coach/send 12h renvoie un message SOCIAL correct (échec SMTP attendu en local, SMTP non configuré = action utilisateur connue) ; round-trip config coach12/18Enabled OK ; UI 5 cartes avec compteurs (12h→6, 18h→6) ; Automatisations 5 interrupteurs + légende + boutons test ; mode sombre luxe bleuté OK ; mobile 390px sans overflow ; lint 0/0 ; 0 erreur JS.
+- Bug corrigé pendant l'E2E : SOCIAL_SEED_MESSAGES référencé sans être défini (messages sociaux d'abord insérés dans COACH_SEED_MESSAGES → 500 GET /api/crm/coach) → tableau séparé exporté, 30 messages d'origine restaurés.
+
+Stage Summary:
+- Le coach virtuel envoie maintenant 5 messages/jour : les créneaux 12h00 et 18h00 (activables/désactivables dans Automatisations) rappellent de poster des visuels sur TikTok, LinkedIn et Facebook, avec 12 messages pré-écrits personnalisables dans le Coach Virtuel. Rien de supprimé : 11h/14h/17h et les 30 messages d'origine sont intacts. Fichiers : schema.prisma, crm-coach-seed.ts, crm-automation.ts, api/crm/coach/route.ts, api/crm/coach/send/route.ts, api/crm/automation/config/route.ts, types.ts, crm-automations-view.tsx, crm-coach-view.tsx.

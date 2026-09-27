@@ -11,6 +11,7 @@ import {
 } from "@/lib/hosting-notify";
 import { getAutomationConfig, sendAutomationEmail } from "@/lib/crm-automation";
 import { publicBaseUrl as requestPublicBaseUrl } from "@/lib/doc-share";
+import { createHostingInvoiceSafe } from "@/lib/hosting-invoice";
 
 // ─── Modification / suppression d'un domaine hébergé (Task 46-d, 49) ─────────
 // PUT    → mise à jour des champs ; SI renewalDate change → notifiedStages
@@ -30,7 +31,12 @@ import { publicBaseUrl as requestPublicBaseUrl } from "@/lib/doc-share";
 //                                      démarré), historique « Achat <a>-<a+1> ».
 //                                      Sinon : marque RENOUVELÉ (+1 an,
 //                                      historique HostingRenewal), méthode
-//                                      body.method optionnelle
+//                                      body.method optionnelle.
+//                                      Dans les deux cas (Task 56-bis) : une
+//                                      FACTURE DE VENTE PAYÉE est générée
+//                                      automatiquement (FV-…, versement lié) —
+//                                      en cas d'échec, invoiceError est renvoyé
+//                                      sans invalider la confirmation.
 //            {action:"dismiss-paid"} → efface le signalement « J'ai payé »
 // DELETE → suppression du domaine.
 
@@ -97,13 +103,23 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
       // Achat en attente (Task 56) → ACTIVER l'achat (compte à rebours
       // démarre : purchasedAt = maintenant, échéance = +1 an) ; sinon
       // comportement historique : renouveler (+1 an).
-      const { domain: updated, renewal } =
-        existing.status === "PENDING"
-          ? await activatePurchase(id, method, amount)
-          : await markRenewed(id, method, amount);
+      const isPurchase = existing.status === "PENDING";
+      const { domain: updated, renewal } = isPurchase
+        ? await activatePurchase(id, method, amount)
+        : await markRenewed(id, method, amount);
+      // Task 56-bis : facture de vente PAYÉE générée automatiquement à la
+      // validation du paiement (achat OU renouvellement) — best-effort.
+      const { invoice, error: invoiceError } = await createHostingInvoiceSafe(request, {
+        domain: updated,
+        renewal,
+        kind: isPurchase ? "ACHAT" : "RENOUVELLEMENT",
+        method,
+      });
       return NextResponse.json({
         domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
         renewal,
+        invoice,
+        invoiceError,
       });
     }
 

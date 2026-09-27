@@ -608,8 +608,10 @@ export interface CrmAutomationConfig {
   reportEveningTime: string;
   coachEnabled: boolean;
   coach11Enabled: boolean;
+  coach12Enabled: boolean;
   coach14Enabled: boolean;
   coach17Enabled: boolean;
+  coach18Enabled: boolean;
   remindersEnabled: boolean;
   reminderSlots: string;
   dailyGoal: string;

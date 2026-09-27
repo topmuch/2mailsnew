@@ -23,24 +23,30 @@ import { formatRelativeFr } from "@/components/crm/crm-shared";
 import CrmCoachChat from "@/components/crm/crm-coach-chat";
 import type { CrmCoachMessage, CrmSentMessage } from "@/lib/types";
 
-// ─── Coach Virtuel : 3 messages/jour (11h Business, 14h Mindset, 17h Closing) ─
+// ─── Coach Virtuel : 5 messages/jour ─────────────────────────────────────────
+// 11h Business, 14h Mindset, 17h Closing + 12h & 18h « visuels réseaux
+// sociaux » (TikTok, LinkedIn, Facebook — Task 57).
 
-const SLOTS = [
-  { slot: "11h" as const, title: "Focus Business", desc: "Relances, prospection, devis", emoji: "🎯" },
-  { slot: "14h" as const, title: "Motivation", desc: "Mindset et persévérance", emoji: "💪" },
-  { slot: "17h" as const, title: "Closing", desc: "Bilan et dernière ligne droite", emoji: "🏁" },
+type CoachSlotUi = "11h" | "12h" | "14h" | "17h" | "18h";
+
+const SLOTS: { slot: CoachSlotUi; title: string; desc: string; emoji: string }[] = [
+  { slot: "11h", title: "Focus Business", desc: "Relances, prospection, devis", emoji: "🎯" },
+  { slot: "12h", title: "Visuels réseaux sociaux", desc: "Post TikTok, LinkedIn, Facebook", emoji: "📱" },
+  { slot: "14h", title: "Motivation", desc: "Mindset et persévérance", emoji: "💪" },
+  { slot: "17h", title: "Closing", desc: "Bilan et dernière ligne droite", emoji: "🏁" },
+  { slot: "18h", title: "Visuels du soir", desc: "Post TikTok, LinkedIn, Facebook", emoji: "🌆" },
 ];
 
 export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<CrmCoachMessage[]>([]);
   const [history, setHistory] = useState<CrmSentMessage[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({ "11h": 0, "14h": 0, "17h": 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({ "11h": 0, "12h": 0, "14h": 0, "17h": 0, "18h": 0 });
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CrmCoachMessage | null>(null);
-  const [formSlot, setFormSlot] = useState<"11h" | "14h" | "17h">("11h");
+  const [formSlot, setFormSlot] = useState<CoachSlotUi>("11h");
   const [formContent, setFormContent] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +69,7 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
     load();
   }, [load]);
 
-  const openCreate = (slot: "11h" | "14h" | "17h") => {
+  const openCreate = (slot: CoachSlotUi) => {
     setEditing(null);
     setFormSlot(slot);
     setFormContent("");
@@ -126,7 +132,7 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  const sendNow = async (slot: "11h" | "14h" | "17h") => {
+  const sendNow = async (slot: CoachSlotUi) => {
     setSending(slot);
     try {
       const res = await authFetch("/api/crm/coach/send", {
@@ -156,8 +162,8 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
           <Bot className="h-6 w-6 text-gold" /> Coach Virtuel
         </h1>
         <p className="text-sm text-muted-foreground">
-          Discutez en direct avec votre coach IA (il connaît vos données du jour) et recevez 3 messages motivants par jour
-          (11h, 14h, 17h) — du lundi au samedi, arrêt le samedi à 13h, repos le dimanche.
+          Discutez en direct avec votre coach IA (il connaît vos données du jour) et recevez 5 messages par jour
+          (11h, 14h, 17h + 12h &amp; 18h « visuels réseaux sociaux ») — du lundi au samedi, arrêt le samedi à 13h, repos le dimanche.
         </p>
       </div>
 
@@ -165,7 +171,7 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
       <CrmCoachChat />
 
       {loading ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Card key={i}><CardContent className="space-y-3 p-6">
               <Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-2/3" />
@@ -173,7 +179,7 @@ export default function CrmCoachView({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {SLOTS.map((s) => {
             const slotMessages = messages.filter((m) => m.timeSlot === s.slot);
             return (

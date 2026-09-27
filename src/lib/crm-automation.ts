@@ -383,12 +383,18 @@ export async function generateEveningReport(now = new Date()) {
 
 const COACH_TITLES: Record<string, string> = {
   "11h": "🎯 Focus Business",
+  "12h": "📱 Visuel réseaux sociaux (midi)",
   "14h": "💪 Motivation",
   "17h": "🏁 Closing",
+  "18h": "🌆 Visuel réseaux sociaux (soir)",
 };
 
+// Créneaux du coach : 11h/14h/17h (business) + 12h/18h « visuels réseaux
+// sociaux » TikTok/LinkedIn/Facebook (Task 57).
+export type CoachSlot = "11h" | "12h" | "14h" | "17h" | "18h";
+
 /** Pioche un message actif du créneau et personnalise la salutation. */
-export async function getRandomCoachMessage(timeSlot: "11h" | "14h" | "17h", now = new Date()) {
+export async function getRandomCoachMessage(timeSlot: CoachSlot, now = new Date()) {
   await ensureCoachMessagesSeeded();
   const config = await getAutomationConfig();
   const pool = await db.crmCoachMessage.findMany({ where: { timeSlot, isActive: true } });
@@ -558,11 +564,13 @@ export async function runDueJobs(now = new Date(), opts?: { force?: boolean }): 
     }
   }
 
-  // Coach virtuel : 11h, 14h, 17h
-  const slots: { slot: "11h" | "14h" | "17h"; time: string; enabled: boolean }[] = [
+  // Coach virtuel : 11h, 12h (visuels réseaux sociaux), 14h, 17h, 18h (visuels)
+  const slots: { slot: CoachSlot; time: string; enabled: boolean }[] = [
     { slot: "11h", time: "11:00", enabled: config.coach11Enabled },
+    { slot: "12h", time: "12:00", enabled: config.coach12Enabled },
     { slot: "14h", time: "14:00", enabled: config.coach14Enabled },
     { slot: "17h", time: "17:00", enabled: config.coach17Enabled },
+    { slot: "18h", time: "18:00", enabled: config.coach18Enabled },
   ];
   for (const s of slots) {
     if (curHm !== s.time || !config.coachEnabled || !s.enabled) continue;
@@ -624,9 +632,18 @@ export async function runManualTest(
       return sendTest(`TEST-EVENING-${ts}`, c.subject, c.html, "Test manuel — bilan du jour");
     }
     case "COACH_11":
+    case "COACH_12":
     case "COACH_14":
-    case "COACH_17": {
-      const slot = kind === "COACH_11" ? "11h" : kind === "COACH_14" ? "14h" : "17h";
+    case "COACH_17":
+    case "COACH_18": {
+      const slotMap: Record<string, CoachSlot> = {
+        COACH_11: "11h",
+        COACH_12: "12h",
+        COACH_14: "14h",
+        COACH_17: "17h",
+        COACH_18: "18h",
+      };
+      const slot = slotMap[kind] ?? "11h";
       const msg = await getRandomCoachMessage(slot, now);
       if (!msg) return { ok: false, error: `Aucun message coach actif pour le créneau ${slot}` };
       return sendTest(`TEST-${kind}-${ts}`, msg.subject, msg.html, `Test manuel — coach ${slot}`);

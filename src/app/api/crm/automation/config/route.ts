@@ -41,8 +41,10 @@ export async function GET(request: NextRequest) {
         reportEveningTime: config.reportEveningTime,
         coachEnabled: config.coachEnabled,
         coach11Enabled: config.coach11Enabled,
+        coach12Enabled: config.coach12Enabled,
         coach14Enabled: config.coach14Enabled,
         coach17Enabled: config.coach17Enabled,
+        coach18Enabled: config.coach18Enabled,
         remindersEnabled: config.remindersEnabled,
         reminderSlots: config.reminderSlots ?? "H1",
         dailyGoal: config.dailyGoal,
@@ -87,8 +89,10 @@ export async function PUT(request: NextRequest) {
     if (typeof body.reportEveningTime === "string" && timeRe.test(body.reportEveningTime)) data.reportEveningTime = body.reportEveningTime;
     if (typeof body.coachEnabled === "boolean") data.coachEnabled = body.coachEnabled;
     if (typeof body.coach11Enabled === "boolean") data.coach11Enabled = body.coach11Enabled;
+    if (typeof body.coach12Enabled === "boolean") data.coach12Enabled = body.coach12Enabled;
     if (typeof body.coach14Enabled === "boolean") data.coach14Enabled = body.coach14Enabled;
     if (typeof body.coach17Enabled === "boolean") data.coach17Enabled = body.coach17Enabled;
+    if (typeof body.coach18Enabled === "boolean") data.coach18Enabled = body.coach18Enabled;
     if (typeof body.remindersEnabled === "boolean") data.remindersEnabled = body.remindersEnabled;
     if (typeof body.reminderSlots === "string") {
       const allowed = ["J1", "H1", "H15"];

@@ -657,13 +657,27 @@ export default function HostingView() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur");
+      // Task 56-bis : une facture de vente PAYÉE a été générée automatiquement
+      const invNumber: string | null = json.invoice?.number ?? null;
+      const invAmount: number | null = json.invoice?.totalTTC ?? null;
+      const invLine = invNumber
+        ? `Facture ${invNumber} générée automatiquement${invAmount ? ` (${formatPrice(invAmount)})` : ""} — visible dans Factures.`
+        : json.invoiceError
+          ? `Confirmation enregistrée, mais facture non générée : ${json.invoiceError}`
+          : null;
       toast({
         title: isPurchase
           ? "Achat confirmé — compte à rebours démarré"
           : "Domaine renouvelé, échéance repoussée d'un an",
-        description: isPurchase
-          ? `Échéance fixée au ${formatDate(json.domain?.renewalDate ?? "")} — les rappels de renouvellement sont armés.`
-          : undefined,
+        description:
+          isPurchase
+            ? [
+                `Échéance fixée au ${formatDate(json.domain?.renewalDate ?? "")} — les rappels de renouvellement sont armés.`,
+                invLine,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : invLine ?? undefined,
       });
       setRenewDialog(null);
       load();
@@ -1653,8 +1667,8 @@ export default function HostingView() {
             </DialogTitle>
             <DialogDescription>
               {renewDialog?.status === "PENDING"
-                ? "L'achat sera activé : l'échéance est fixée à aujourd'hui + 1 an, le compte à rebours de renouvellement démarre, les rappels e-mail sont armés et la ligne « Achat » est ajoutée à l'historique."
-                : "L'échéance sera repoussée d'un an (même jour/mois), les rappels e-mail admin et client seront réarmés et le signalement de paiement effacé."}
+                ? "L'achat sera activé : l'échéance est fixée à aujourd'hui + 1 an, le compte à rebours de renouvellement démarre, les rappels e-mail sont armés, la ligne « Achat » est ajoutée à l'historique et une facture de vente payée est générée automatiquement."
+                : "L'échéance sera repoussée d'un an (même jour/mois), les rappels e-mail admin et client seront réarmés, le signalement de paiement effacé et une facture de vente payée sera générée automatiquement."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3.5">
