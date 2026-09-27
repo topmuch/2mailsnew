@@ -465,6 +465,11 @@ export async function checkHostingRenewals(
 
     for (const d of domains) {
       try {
+        // Achats en attente de paiement (Task 56) : aucun rappel de
+        // renouvellement tant que l'achat n'est pas payé/activé (status
+        // repasse ACTIVE à la confirmation, avec cycles réarmés).
+        if (d.status === "PENDING") continue;
+
         const daysLeft = dakarDaysLeft(d.renewalDate, now);
         if (daysLeft > 30) continue; // trop loin : rien à faire
 
@@ -591,7 +596,7 @@ export async function checkHostingRenewals(
  *    méthode Manuel | Wave | Autre).
  * Retourne le domaine mis à jour + la ligne d'historique créée.
  */
-export async function markRenewed(domainId: string, method = "Manuel") {
+export async function markRenewed(domainId: string, method = "Manuel", amount?: number) {
   const domain = await db.hostingDomain.findUnique({ where: { id: domainId } });
   if (!domain) throw new Error("Domaine introuvable");
 
@@ -614,7 +619,56 @@ export async function markRenewed(domainId: string, method = "Manuel") {
     data: {
       domainId,
       renewedFor: `${parts.y}-${newY}`,
-      amount: domain.price,
+      amount: amount !== undefined && Number.isFinite(amount) && amount >= 0 ? amount : domain.price,
+      method,
+    },
+  });
+  return { domain: updated, renewal };
+}
+
+// ── Confirmation d'achat de domaine + hébergement (Task 56) ──────────────────
+
+/**
+ * Active un ACHAT payé (domaine + hébergement éventuel, status PENDING) :
+ *  - purchasedAt = maintenant (jour du paiement, calendrier Dakar) ;
+ *  - renewalDate fixée à MÊME jour/mois l'année suivante (clamp 29/02 → 28/02)
+ *    → le compte à rebours de renouvellement démarre ;
+ *  - status repasse ACTIVE (les rappels J-30/15/2/J s'arment naturellement) ;
+ *  - les deux cycles de rappels sont réarmés (notifiedStages admin ET
+ *    clientNotifiedStages remis à "") ;
+ *  - le signalement de paiement (paymentSignalAt) est effacé ;
+ *  - une ligne d'historique HostingRenewal est créée
+ *    (« Achat <année>-<année+1> », montant = prix total de l'achat,
+ *    méthode Manuel | Wave | Autre).
+ * Retourne le domaine mis à jour + la ligne d'historique créée.
+ */
+export async function activatePurchase(domainId: string, method = "Manuel", amount?: number) {
+  const domain = await db.hostingDomain.findUnique({ where: { id: domainId } });
+  if (!domain) throw new Error("Domaine introuvable");
+
+  const now = new Date();
+  const parts = calendarParts(now, DAKAR_TZ);
+  const newY = parts.y + 1;
+  // Dernier jour du même mois l'année suivante (clamp 29/02 → 28/02)
+  const maxDay = new Date(Date.UTC(newY, parts.m, 0)).getUTCDate();
+  const newDate = new Date(Date.UTC(newY, parts.m - 1, Math.min(parts.d, maxDay)));
+
+  const updated = await db.hostingDomain.update({
+    where: { id: domainId },
+    data: {
+      status: "ACTIVE",
+      purchasedAt: now,
+      renewalDate: newDate,
+      notifiedStages: "",
+      clientNotifiedStages: "",
+      paymentSignalAt: null,
+    },
+  });
+  const renewal = await db.hostingRenewal.create({
+    data: {
+      domainId,
+      renewedFor: `Achat ${parts.y}-${newY}`,
+      amount: amount !== undefined && Number.isFinite(amount) && amount >= 0 ? amount : domain.price,
       method,
     },
   });

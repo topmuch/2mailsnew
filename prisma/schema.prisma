@@ -611,12 +611,22 @@ model HostingDomain {
   customReminder String? // message de rappel personnalisé (surcharge le modèle global)
   paymentSignalAt DateTime? // « J'ai payé » signalé depuis la page publique (en attente de vérification admin)
   clientNotifiedStages String @default("") // étapes rappel CLIENT déjà envoyées ce cycle : CSV « 30,15,2,0 » (indépendant de notifiedStages=admin)
+  // ── Achat de domaine + hébergement (Task 56) ───────────────────────────────
+  // Flux : création de l'achat (status PENDING, sans échéance) → page de
+  // paiement publique → paiement confirmé → purchasedAt + renewalDate (+1 an)
+  // fixés et status repasse ACTIVE : le compte à rebours démarre.
+  status        String   @default("ACTIVE") // ACTIVE = suivi de renouvellement | PENDING = achat en attente de paiement
+  hasHosting    Boolean  @default(false) // l'achat inclut l'hébergement
+  domainPrice   Float    @default(0) // part du prix pour le nom de domaine (FCFA)
+  hostingPrice  Float    @default(0) // part du prix pour l'hébergement (FCFA)
+  purchasedAt   DateTime? // date de paiement de l'achat initial (démarre le cycle de renouvellement)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   renewals       HostingRenewal[]
 
   @@index([renewalDate])
+  @@index([status])
 }
 
 // Historique des renouvellements : 1 ligne par année renouvelée (Task 49)

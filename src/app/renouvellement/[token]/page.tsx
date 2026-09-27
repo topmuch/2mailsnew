@@ -8,6 +8,10 @@ import RenewalPublicClient from "./renewal-client";
 // le lien Wave configuré et signaler « J'ai effectué le paiement ».
 // Le jeton aléatoire (48 caractères hex) est la seule clé d'accès — révocable
 // depuis l'onglet Hosting (action revoke-link).
+// Task 56 : la même page sert à l'ACHAT d'un domaine (+ hébergement) tant que
+// le paiement n'est pas confirmé (status PENDING) — titre, détail du montant
+// et message d'activation adaptés ; le compte à rebours de renouvellement
+// démarre après confirmation (status repasse ACTIVE, page = renouvellement).
 // NOTE : page volontairement HORS de l'AppShell → elle reste accessible même
 // quand Setting.maintenanceMode est actif (l'écran de maintenance ne bloque
 // que l'application interne, comme pour les documents partagés).
@@ -101,6 +105,10 @@ export default async function RenewalPublicPage({
       companyName={companyName}
       telephone={telephone}
       logoUrl={logoUrl}
+      isPurchase={domain.status === "PENDING"}
+      hasHosting={domain.hasHosting}
+      domainPriceLabel={formatPrix(domain.domainPrice)}
+      hostingPriceLabel={formatPrix(domain.hostingPrice)}
     />
   );
 }

@@ -12,6 +12,10 @@ import { Loader2 } from "lucide-react";
 // sur « Payer avec Wave » déclenche le même signal (badge admin + notif)
 // sans aucune action supplémentaire du client ; le bouton « J'ai effectué
 // le paiement » reste en secours (paiement par un autre canal, clic raté).
+// Task 56 : variante ACHAT (status PENDING) — titre « Achat de domaine
+// (et hébergement) », détail du montant (domaine / hébergement / total) et
+// mention d'activation : le compte à rebours de renouvellement (1 an) ne
+// démarre qu'après confirmation du paiement.
 
 interface RenewalPublicClientProps {
   token: string;
@@ -26,6 +30,11 @@ interface RenewalPublicClientProps {
   companyName: string;
   telephone: string;
   logoUrl: string;
+  // ── Task 56 : variante achat (toutes optionnelles, défaut = renouvellement)
+  isPurchase?: boolean;
+  hasHosting?: boolean;
+  domainPriceLabel?: string | null;
+  hostingPriceLabel?: string | null;
 }
 
 export default function RenewalPublicClient({
@@ -41,6 +50,10 @@ export default function RenewalPublicClient({
   companyName,
   telephone,
   logoUrl,
+  isPurchase = false,
+  hasHosting = false,
+  domainPriceLabel = null,
+  hostingPriceLabel = null,
 }: RenewalPublicClientProps) {
   const [signaled, setSignaled] = useState(initialSignaled);
   const [signaledAtLabel, setSignaledAtLabel] = useState(initialSignaledLabel);
@@ -138,7 +151,11 @@ export default function RenewalPublicClient({
             </div>
 
             <h1 className="mt-5 text-center text-xl font-bold text-stone-900">
-              Renouvellement de domaine
+              {isPurchase
+                ? hasHosting
+                  ? "Achat de domaine et hébergement"
+                  : "Achat de domaine"
+                : "Renouvellement de domaine"}
             </h1>
             {clientName && <p className="mt-1 text-center text-sm text-stone-500">{clientName}</p>}
 
@@ -148,17 +165,40 @@ export default function RenewalPublicClient({
                 <dt className="shrink-0 text-stone-500">Domaine</dt>
                 <dd className="text-right font-bold text-stone-900">{domainName}</dd>
               </div>
+              {/* Task 56 — achat : détail du montant + activation après paiement */}
+              {isPurchase && domainPriceLabel && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="shrink-0 text-stone-500">Nom de domaine</dt>
+                  <dd className="text-right text-stone-900">{domainPriceLabel}</dd>
+                </div>
+              )}
+              {isPurchase && hostingPriceLabel && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="shrink-0 text-stone-500">Hébergement (1 an)</dt>
+                  <dd className="text-right text-stone-900">{hostingPriceLabel}</dd>
+                </div>
+              )}
+              {!isPurchase && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="shrink-0 text-stone-500">Échéance</dt>
+                  <dd className="text-right text-stone-900">{dueLabel}</dd>
+                </div>
+              )}
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="shrink-0 text-stone-500">Échéance</dt>
-                <dd className="text-right text-stone-900">{dueLabel}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="shrink-0 text-stone-500">Montant</dt>
+                <dt className="shrink-0 text-stone-500">{isPurchase ? "Total à payer" : "Montant"}</dt>
                 <dd className="text-right font-semibold text-stone-900">
                   {amountLabel || "À confirmer"}
                 </dd>
               </div>
             </dl>
+
+            {/* Task 56 — achat : le compte à rebours démarre après paiement */}
+            {isPurchase && (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs leading-relaxed text-sky-800">
+                Dès que votre paiement est confirmé, votre domaine est activé et le compte à
+                rebours de renouvellement (1 an) démarre automatiquement.
+              </p>
+            )}
 
             {/* Bandeau « paiement signalé » */}
             {signaled && (

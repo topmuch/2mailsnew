@@ -1454,3 +1454,22 @@ Work Log:
 
 Stage Summary:
 - Local et GitHub (topmuch/2mailsnew) parfaitement synchronisés au hash 341d6ae. Le commit synchronisé contenait uniquement les captures de vérification du mode sombre (Task 54). Token utilisé en credential helper jetable (rien stocké) — à révoquer si compromis.
+
+---
+Task ID: 56
+Agent: Z.ai Code (principal)
+Task: Achat de domaine + hébergement dans le module Hosting — page de paiement puis démarrage du compte à rebours de renouvellement
+
+Work Log:
+- Demande : dans l'onglet Hosting, ajouter la VENTE (achat) d'un domaine avec hébergement, dans le même module que les rappels de renouvellement : créer l'achat → afficher la page de paiement → une fois payé, le compte à rebours démarre. Approche strictement additive (Task 46/49 intactes).
+- Prisma (db:push OK) : HostingDomain +5 champs — status ("ACTIVE" défaut | "PENDING" achat en attente), hasHosting, domainPrice, hostingPrice, purchasedAt (+ index status). Domaines existants : comportement 100% identique.
+- hosting-notify.ts : nouvelle fonction activatePurchase(domainId, method, amount) — purchasedAt=maintenant, échéance=même jour/mois +1 an (calendrier Dakar, clamp 29/02→28/02), status→ACTIVE, cycles rappels admin+client réarmés, paymentSignalAt effacé, historique « Achat <a>-<a+1> » ; scheduler : skip des domaines PENDING (aucun rappel avant paiement) ; markRenewed/activatePurchase acceptent un montant optionnel (défaut = prix du domaine).
+- API POST /api/hosting : {purchase:true} → status PENDING, renewalDate facultatif (placeholder +1 an), prix total = domainPrice+hostingPrice imposé serveur (fix : le price:0 du client n'écrase plus le total), hasHosting déduit ; GET : PENDING d'abord ([{status:"desc"},{renewalDate:"asc"}]).
+- API PUT [id] : champs éditables hasHosting/domainPrice/hostingPrice ; action confirm-paid intelligente — PENDING → activatePurchase (compte à rebours démarre), sinon markRenewed (historique) ; montant optionnel désormais réellement pris en compte (quirk préexistant corrigé au passage, additif).
+- Page publique /renouvellement/[token] : variante ACHAT quand status PENDING — titre « Achat de domaine (et hébergement) », détail Nom de domaine / Hébergement (1 an) / Total à payer, note « le compte à rebours démarre après confirmation » ; page ACTIVE strictement inchangée (échéance + montant).
+- hosting-view.tsx : bouton « Nouvel achat » (dialogue avec switch « Nouvel achat à faire payer », prix domaine/hébergement + total live, SANS date ; à la création le lien public s'ouvre automatiquement) ; 4e carte stats « Achats à encaisser » (grid 4 col) ; badge violet « Achat à payer », cellule « — / Après paiement », bouton « Paiement reçu », dialogue « Confirmer le paiement de l'achat » ; mention « Achat payé le … » une fois activé ; WhatsApp adapté aux achats ; tri PENDING en tête.
+- Bug corrigé pendant l'E2E : total affiché « À confirmer » (price:0 envoyé par le form) → serveur = source de vérité du total + payload client sans price en mode achat.
+- E2E agent-browser complet : création achat client-test.sn (15 000 + 25 000) → lien public ouvert auto → page « Achat de domaine et hébergement / Total 40 000 FCFA » → « J'ai payé » (bandeau vert) → admin badge « Paiement signalé » + bouton « Paiement reçu » → confirmation → badge « À jour », échéance 27 sept. 2027, « Achat payé le 27 sept. 2026 », historique « Achat 2026-2027 · 40 000 FCFA », page publique redevenue « Renouvellement de domaine » (échéance 27/09/2027). Mobile 390px sans overflow, dark OK, 0 erreur JS, 0 500 serveur, lint 0/0. (Méthode « Wave » non persistée en E2E : artefact harnais/Radix Select, chemin de code inchangé.)
+
+Stage Summary:
+- Le module Hosting vend maintenant des domaines (+ hébergement) en plus de suivre les renouvellements : création d'achat → page de paiement publique automatique (détail domaine/hébergement/total, Wave ou autre) → paiement signalé → confirmation admin « Paiement reçu » → échéance +1 an et rappels armés automatiquement. Tout l'existant (rappels, liens, historique, WhatsApp, page renouvellement) est intact. Fichiers : schema.prisma, hosting-notify.ts, api/hosting/route.ts, api/hosting/[id]/route.ts, renouvellement/[token]/page.tsx + renewal-client.tsx, hosting-view.tsx.

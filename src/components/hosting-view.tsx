@@ -95,6 +95,12 @@ interface HostingDomainDto {
   customReminder: string | null;
   paymentSignalAt: string | null; // ISO — « J'ai payé » (page publique)
   clientNotifiedStages: string; // CSV « 30,15,2,0 » (rappels CLIENT)
+  // ── Task 56 : achat de domaine + hébergement ─────────────
+  status: string; // ACTIVE (suivi) | PENDING (achat en attente de paiement)
+  hasHosting: boolean;
+  domainPrice: number;
+  hostingPrice: number;
+  purchasedAt: string | null; // ISO — fixé quand l'achat est payé (compte à rebours démarré)
 }
 
 interface HostingRenewalDto {
@@ -117,6 +123,10 @@ interface DomainForm {
   paymentUrl: string;
   paymentLabel: string;
   customReminder: string;
+  // ── Task 56 : achat de domaine + hébergement (création uniquement)
+  isPurchase: boolean; // « Nouvel achat » : le client paie avant l'activation
+  domainPrice: string; // part domaine (FCFA)
+  hostingPrice: string; // part hébergement (FCFA)
 }
 
 const EMPTY_FORM: DomainForm = {
@@ -131,6 +141,9 @@ const EMPTY_FORM: DomainForm = {
   paymentUrl: "",
   paymentLabel: "",
   customReminder: "",
+  isPurchase: false,
+  domainPrice: "",
+  hostingPrice: "",
 };
 
 /** Variables du modèle de rappel client (boutons d'insertion). */
@@ -218,8 +231,19 @@ function cleanPhone(phone: string): string {
 }
 
 function whatsappMessage(d: HostingDomainDto, companyName: string): string {
-  const date = fmtDateLong.format(new Date(d.renewalDate));
   const name = d.clientName ? d.clientName : "";
+  // Task 56 — achat en attente de paiement : message adapté (pas encore
+  // d'échéance de renouvellement) + lien de paiement s'il est actif.
+  if (d.status === "PENDING") {
+    const total = d.price > 0 ? `${fmtPrice.format(d.price)} FCFA` : "";
+    const contenu = d.hasHosting ? " (hébergement inclus)" : "";
+    const lien = d.renewalUrl ? ` Payez directement ici : ${d.renewalUrl}` : "";
+    return (
+      `Bonjour${name ? ` ${name}` : ""}, votre achat du domaine ${d.domain}${contenu} est enregistré.` +
+      `${total ? ` Montant : ${total}.` : ""}${lien} Merci de nous confirmer après paiement. — ${companyName}`
+    );
+  }
+  const date = fmtDateLong.format(new Date(d.renewalDate));
   let when: string;
   if (d.daysLeft > 0) {
     when = `dans ${d.daysLeft} jour${d.daysLeft > 1 ? "s" : ""}`;
@@ -373,15 +397,16 @@ export default function HostingView() {
   const stats = useMemo(
     () => ({
       total: domains.length,
-      soon: domains.filter((d) => d.daysLeft >= 0 && d.daysLeft <= 30).length,
-      expired: domains.filter((d) => d.daysLeft < 0).length,
+      soon: domains.filter((d) => d.status !== "PENDING" && d.daysLeft >= 0 && d.daysLeft <= 30).length,
+      expired: domains.filter((d) => d.status !== "PENDING" && d.daysLeft < 0).length,
+      pending: domains.filter((d) => d.status === "PENDING").length, // achats à encaisser (Task 56)
     }),
     [domains],
   );
 
-  const openCreate = () => {
+  const openCreate = (purchase = false) => {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, isPurchase: purchase });
     setDialogOpen(true);
   };
 
@@ -399,6 +424,9 @@ export default function HostingView() {
       paymentUrl: d.paymentUrl ?? "",
       paymentLabel: d.paymentLabel ?? "",
       customReminder: d.customReminder ?? "",
+      isPurchase: false, // le statut d'un achat se gère via « Paiement reçu », pas ici
+      domainPrice: d.domainPrice > 0 ? String(d.domainPrice) : "",
+      hostingPrice: d.hostingPrice > 0 ? String(d.hostingPrice) : "",
     });
     setDialogOpen(true);
   };
@@ -408,7 +436,14 @@ export default function HostingView() {
       toast({ title: "Le nom de domaine est requis", variant: "destructive" });
       return;
     }
-    if (!form.renewalDate) {
+    // Achat (Task 56) : pas d'échéance à saisir, mais au moins un prix.
+    if (form.isPurchase) {
+      const total = (Number(form.domainPrice) || 0) + (Number(form.hostingPrice) || 0);
+      if (total <= 0) {
+        toast({ title: "Indiquez le prix du domaine et/ou de l'hébergement", variant: "destructive" });
+        return;
+      }
+    } else if (!form.renewalDate) {
       toast({ title: "La date de renouvellement est requise", variant: "destructive" });
       return;
     }
@@ -419,13 +454,20 @@ export default function HostingView() {
         registrar: form.registrar.trim(),
         clientName: form.clientName.trim(),
         clientPhone: form.clientPhone.trim(),
-        renewalDate: form.renewalDate,
-        price: form.price.trim() === "" ? 0 : Number(form.price),
+        // Achat : la date sera fixée automatiquement (+1 an) au paiement
+        ...(form.isPurchase ? {} : { renewalDate: form.renewalDate }),
+        // Achat : le serveur calcule le total (domaine + hébergement)
+        ...(form.isPurchase ? {} : { price: form.price.trim() === "" ? 0 : Number(form.price) }),
         notes: form.notes.trim(),
         clientEmail: form.clientEmail.trim(),
         paymentUrl: form.paymentUrl.trim(),
         paymentLabel: form.paymentLabel.trim(),
         customReminder: form.customReminder.trim(),
+        // ── Task 56 : achat de domaine + hébergement ──
+        purchase: !editing && form.isPurchase,
+        domainPrice: form.domainPrice.trim() === "" ? 0 : Number(form.domainPrice),
+        hostingPrice: form.hostingPrice.trim() === "" ? 0 : Number(form.hostingPrice),
+        hasHosting: (Number(form.hostingPrice) || 0) > 0,
       };
       const res = await authFetch(editing ? `/api/hosting/${editing.id}` : "/api/hosting", {
         method: editing ? "PUT" : "POST",
@@ -435,13 +477,18 @@ export default function HostingView() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur");
       toast({
-        title: editing ? "Domaine modifié" : "Domaine ajouté",
+        title: editing ? "Domaine modifié" : form.isPurchase ? "Achat créé — page de paiement prête" : "Domaine ajouté",
         description:
           editing && form.renewalDate !== toDateInputValue(editing.renewalDate)
             ? "Nouvelle date — les rappels e-mail du cycle ont été réarmés."
             : undefined,
       });
       setDialogOpen(false);
+      // Task 56 : un achat vient d'être créé → générer et afficher immédiatement
+      // la page de paiement publique (le compte à rebours démarrera au paiement).
+      if (!editing && form.isPurchase && json.domain?.id) {
+        await openOrCreateLink(json.domain as HostingDomainDto);
+      }
       load();
     } catch (err) {
       toast({
@@ -592,19 +639,32 @@ export default function HostingView() {
     setRenewDialog(d);
   };
 
-  /** Confirme le renouvellement : échéance +1 an, rappels réarmés, historique. */
+  /** Confirme le renouvellement OU l'achat (Task 56) : échéance +1 an, rappels réarmés, historique. */
   const confirmRenew = async () => {
     if (!renewDialog) return;
+    const isPurchase = renewDialog.status === "PENDING";
     setRenewBusy(true);
     try {
       const res = await authFetch(`/api/hosting/${renewDialog.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "confirm-paid", method: renewMethod }),
+        body: JSON.stringify({
+          action: "confirm-paid",
+          method: renewMethod,
+          // Montant saisi dans le dialogue (défaut serveur = prix du domaine)
+          amount: renewAmount.trim() === "" ? undefined : Number(renewAmount),
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur");
-      toast({ title: "Domaine renouvelé, échéance repoussée d'un an" });
+      toast({
+        title: isPurchase
+          ? "Achat confirmé — compte à rebours démarré"
+          : "Domaine renouvelé, échéance repoussée d'un an",
+        description: isPurchase
+          ? `Échéance fixée au ${formatDate(json.domain?.renewalDate ?? "")} — les rappels de renouvellement sont armés.`
+          : undefined,
+      });
       setRenewDialog(null);
       load();
     } catch (err) {
@@ -731,6 +791,10 @@ export default function HostingView() {
       .map((s) => `J-${s}`)
       .join(" · ");
 
+  // Achat en cours d'édition (Task 56) : la date reste masquée jusqu'au paiement.
+  const editingPending = editing?.status === "PENDING";
+  const purchaseTotal = (Number(form.domainPrice) || 0) + (Number(form.hostingPrice) || 0);
+
   return (
     <div className="space-y-5">
       {/* En-tête */}
@@ -743,21 +807,29 @@ export default function HostingView() {
             Hosting — Domaines &amp; renouvellements
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Noms de domaine achetés pour vos clients : échéances, rappels e-mail (admin + client), lien de paiement en ligne, relance WhatsApp en un clic.
+            Noms de domaine achetés pour vos clients : échéances, rappels e-mail (admin + client), lien de paiement en ligne, relance WhatsApp en un clic. Vendez aussi de nouveaux domaines avec hébergement : créez l&apos;achat, envoyez la page de paiement, le compte à rebours de renouvellement démarre dès que c&apos;est payé.
           </p>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={openTemplate} className="shrink-0">
             <FileText className="h-4 w-4" aria-hidden /> Modèle de rappel client
           </Button>
-          <Button onClick={openCreate} className="bg-emerald-600 text-white hover:bg-emerald-700 shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => openCreate(true)}
+            className="shrink-0"
+            title="Créer un achat de domaine (+ hébergement) et faire payer le client avant l'activation"
+          >
+            <CreditCard className="h-4 w-4" aria-hidden /> Nouvel achat
+          </Button>
+          <Button onClick={() => openCreate(false)} className="bg-emerald-600 text-white hover:bg-emerald-700 shrink-0">
             <Plus className="h-4 w-4" aria-hidden /> Ajouter un domaine
           </Button>
         </div>
       </div>
 
       {/* Stats rapides */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" aria-hidden>
@@ -791,6 +863,17 @@ export default function HostingView() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-600 dark:text-violet-400" aria-hidden>
+              <CreditCard className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-2xl font-bold leading-none">{loading ? "…" : stats.pending}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Achats à encaisser</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Liste */}
@@ -815,7 +898,7 @@ export default function HostingView() {
           <p className="max-w-md text-sm text-muted-foreground">
             Suivez ici les échéances des domaines achetés pour vos clients : rappels e-mail automatiques à J-30, J-15, J-2 et le jour J, relance WhatsApp d&apos;un clic.
           </p>
-          <Button onClick={openCreate} className="bg-emerald-600 text-white hover:bg-emerald-700">
+          <Button onClick={() => openCreate(false)} className="bg-emerald-600 text-white hover:bg-emerald-700">
             <Plus className="h-4 w-4" aria-hidden /> Ajouter un domaine
           </Button>
         </div>
@@ -842,6 +925,7 @@ export default function HostingView() {
                       const urgency = urgencyOf(d.daysLeft);
                       const sent = stagesSent(d);
                       const clientSent = clientStagesSent(d);
+                      const isPending = d.status === "PENDING"; // achat en attente de paiement (Task 56)
                       return (
                         <TableRow key={d.id}>
                           <TableCell className="font-semibold">{d.domain}</TableCell>
@@ -858,16 +942,36 @@ export default function HostingView() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <p>{formatDate(d.renewalDate)}</p>
+                            {isPending ? (
+                              <>
+                                <p className="text-muted-foreground">—</p>
+                                <p className="text-[11px] text-muted-foreground">Après paiement</p>
+                              </>
+                            ) : (
+                              <>
+                                <p>{formatDate(d.renewalDate)}</p>
+                                {d.purchasedAt && (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Achat payé le {formatDate(d.purchasedAt)}
+                                  </p>
+                                )}
+                              </>
+                            )}
                             {sent && <p className="text-[11px] text-muted-foreground">Rappels envoyés : {sent}</p>}
                             {clientSent && <p className="text-[11px] text-muted-foreground">Rappels client : {clientSent}</p>}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatPrice(d.price)}</TableCell>
                           <TableCell>
                             <div className="flex flex-col items-start gap-1">
-                              <Badge variant="outline" className={urgency.className}>
-                                {urgency.label}
-                              </Badge>
+                              {isPending ? (
+                                <Badge variant="outline" className="border-violet-500/30 bg-violet-500/15 font-semibold text-violet-600 dark:text-violet-400">
+                                  <CreditCard className="mr-1 h-3 w-3" aria-hidden /> Achat à payer
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className={urgency.className}>
+                                  {urgency.label}
+                                </Badge>
+                              )}
                               {d.paymentSignalAt && (
                                 <Badge variant="outline" className="border-amber-500/40 bg-amber-500/15 font-semibold text-amber-700 dark:text-amber-400" title={`Signalé le ${fmtDateTime.format(new Date(d.paymentSignalAt))} (Dakar)`}>
                                   <CreditCard className="mr-1 h-3 w-3" aria-hidden /> 💳 Paiement signalé
@@ -883,9 +987,13 @@ export default function HostingView() {
                                     size="sm"
                                     className="h-8 bg-emerald-600 px-2.5 text-white hover:bg-emerald-700"
                                     onClick={() => openRenewDialog(d)}
-                                    title="Confirmer le renouvellement (échéance +1 an)"
+                                    title={
+                                      isPending
+                                        ? "Confirmer le paiement de l'achat — le compte à rebours de renouvellement (1 an) démarre"
+                                        : "Confirmer le renouvellement (échéance +1 an)"
+                                    }
                                   >
-                                    <CheckCircle2 className="h-4 w-4" aria-hidden /> Renouvelé
+                                    <CheckCircle2 className="h-4 w-4" aria-hidden /> {isPending ? "Paiement reçu" : "Renouvelé"}
                                   </Button>
                                   <Button
                                     variant="outline"
@@ -995,6 +1103,7 @@ export default function HostingView() {
               const sent = stagesSent(d);
               const clientSent = clientStagesSent(d);
               const wa = whatsappUrl(d, companyName);
+              const isPending = d.status === "PENDING"; // achat en attente (Task 56)
               return (
                 <Card key={d.id} className="transition-shadow hover:shadow-md">
                   <CardContent className="p-4">
@@ -1002,9 +1111,15 @@ export default function HostingView() {
                       <p className="min-w-0 truncate font-semibold" title={d.domain}>
                         {d.domain}
                       </p>
-                      <Badge variant="outline" className={`${urgency.className} shrink-0`}>
-                        {urgency.label}
-                      </Badge>
+                      {isPending ? (
+                        <Badge variant="outline" className="shrink-0 border-violet-500/30 bg-violet-500/15 font-semibold text-violet-600 dark:text-violet-400">
+                          <CreditCard className="mr-1 h-3 w-3" aria-hidden /> Achat à payer
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className={`${urgency.className} shrink-0`}>
+                          {urgency.label}
+                        </Badge>
+                      )}
                     </div>
                     {d.paymentSignalAt && (
                       <Badge variant="outline" className="mt-2 border-amber-500/40 bg-amber-500/15 font-semibold text-amber-700 dark:text-amber-400">
@@ -1026,7 +1141,20 @@ export default function HostingView() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Renouvellement</dt>
-                        <dd className="text-right">{formatDate(d.renewalDate)}</dd>
+                        <dd className="text-right">
+                          {isPending ? (
+                            <span className="text-muted-foreground">Après paiement</span>
+                          ) : (
+                            <>
+                              {formatDate(d.renewalDate)}
+                              {d.purchasedAt && (
+                                <span className="block text-[11px] text-muted-foreground">
+                                  Achat payé le {formatDate(d.purchasedAt)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Prix annuel</dt>
@@ -1043,7 +1171,8 @@ export default function HostingView() {
                           className="h-9 flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
                           onClick={() => openRenewDialog(d)}
                         >
-                          <CheckCircle2 className="h-4 w-4" aria-hidden /> Marquer renouvelé
+                          <CheckCircle2 className="h-4 w-4" aria-hidden />{" "}
+                          {isPending ? "Paiement reçu" : "Marquer renouvelé"}
                         </Button>
                         <Button
                           variant="outline"
@@ -1142,12 +1271,41 @@ export default function HostingView() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Modifier le domaine" : "Nouveau domaine"}</DialogTitle>
+            <DialogTitle>
+              {editing
+                ? editingPending
+                  ? "Achat en attente de paiement"
+                  : "Modifier le domaine"
+                : form.isPurchase
+                  ? "Nouvel achat — domaine et hébergement"
+                  : "Nouveau domaine"}
+            </DialogTitle>
             <DialogDescription>
-              Renseignez le domaine acheté, son échéance et le client à relancer.
+              {form.isPurchase && !editing
+                ? "Le client paie d'abord : la page de paiement s'affichera juste après la création, et le compte à rebours de renouvellement (1 an) démarrera à la confirmation du paiement."
+                : editingPending
+                ? "Cet achat attend le paiement du client. Une fois payé, cliquez sur « Paiement reçu » : l'échéance (+1 an) et les rappels seront activés automatiquement."
+                : "Renseignez le domaine acheté, son échéance et le client à relancer."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3.5">
+            {!editing && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="host-purchase" className="font-medium">
+                    Nouvel achat à faire payer
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Activé : achat d&apos;un domaine (avec hébergement si renseigné) — le client paie via la page publique avant l&apos;activation.
+                  </p>
+                </div>
+                <Switch
+                  id="host-purchase"
+                  checked={form.isPurchase}
+                  onCheckedChange={(v) => setForm({ ...form, isPurchase: v })}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="host-domain">Nom de domaine *</Label>
               <Input
@@ -1170,19 +1328,53 @@ export default function HostingView() {
                   maxLength={120}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="host-price">Prix annuel (FCFA)</Label>
-                <Input
-                  id="host-price"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={500}
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="Ex. 15000"
-                />
-              </div>
+              {form.isPurchase && !editing ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="host-domain-price">Prix du domaine (FCFA)</Label>
+                    <Input
+                      id="host-domain-price"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={500}
+                      value={form.domainPrice}
+                      onChange={(e) => setForm({ ...form, domainPrice: e.target.value })}
+                      placeholder="Ex. 15000"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="host-hosting-price">Prix de l&apos;hébergement (FCFA)</Label>
+                    <Input
+                      id="host-hosting-price"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={500}
+                      value={form.hostingPrice}
+                      onChange={(e) => setForm({ ...form, hostingPrice: e.target.value })}
+                      placeholder="0 si sans hébergement — ex. 25000"
+                    />
+                    <p className="text-[11px] font-medium text-foreground">
+                      Total à faire payer : {purchaseTotal.toLocaleString("fr-SN")} FCFA
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="host-price">Prix annuel (FCFA)</Label>
+                  <Input
+                    id="host-price"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={500}
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    placeholder="Ex. 15000"
+                  />
+                </div>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -1255,21 +1447,35 @@ export default function HostingView() {
                 </p>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="host-date">Date de renouvellement *</Label>
-              <Input
-                id="host-date"
-                type="date"
-                required
-                value={form.renewalDate}
-                onChange={(e) => setForm({ ...form, renewalDate: e.target.value })}
-              />
-              {editing && (
-                <p className="text-[11px] text-muted-foreground">
-                  Changer la date réinitialise les rappels e-mail du cycle (J-30, J-15, J-2, jour J repartent de zéro).
-                </p>
-              )}
-            </div>
+            {(!form.isPurchase || !!editing) && !editingPending && (
+              <div className="space-y-1.5">
+                <Label htmlFor="host-date">Date de renouvellement *</Label>
+                <Input
+                  id="host-date"
+                  type="date"
+                  required
+                  value={form.renewalDate}
+                  onChange={(e) => setForm({ ...form, renewalDate: e.target.value })}
+                />
+                {editing && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Changer la date réinitialise les rappels e-mail du cycle (J-30, J-15, J-2, jour J repartent de zéro).
+                  </p>
+                )}
+              </div>
+            )}
+            {form.isPurchase && !editing && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs leading-relaxed text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+                Achat : pas d&apos;échéance à saisir. À la confirmation du paiement, la date de renouvellement sera fixée
+                automatiquement à aujourd&apos;hui + 1 an et le compte à rebours démarrera.
+              </div>
+            )}
+            {editingPending && (
+              <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs leading-relaxed text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
+                Achat en attente de paiement — la date de renouvellement sera fixée automatiquement (+1 an) quand vous
+                confirmerez « Paiement reçu ».
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="host-notes">Notes (facultatif)</Label>
               <Textarea
@@ -1302,11 +1508,17 @@ export default function HostingView() {
             </Button>
             <Button
               onClick={save}
-              disabled={saving || !form.domain.trim() || !form.renewalDate}
+              disabled={
+                saving ||
+                !form.domain.trim() ||
+                (!editing && form.isPurchase
+                  ? purchaseTotal <= 0
+                  : !editingPending && !form.renewalDate)
+              }
               className="bg-emerald-600 text-white hover:bg-emerald-700"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Globe className="h-4 w-4" aria-hidden />}
-              {editing ? "Enregistrer" : "Ajouter le domaine"}
+              {editing ? "Enregistrer" : form.isPurchase ? "Créer l'achat et afficher la page de paiement" : "Ajouter le domaine"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1432,18 +1644,24 @@ export default function HostingView() {
         </DialogContent>
       </Dialog>
 
-      {/* Marquer renouvelé (confirmation manuelle, Task 49) */}
+      {/* Marquer renouvelé / Confirmer le paiement d'un achat (Task 49, 56) */}
       <Dialog open={!!renewDialog} onOpenChange={(o) => !o && setRenewDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Marquer renouvelé — {renewDialog?.domain}</DialogTitle>
+            <DialogTitle>
+              {renewDialog?.status === "PENDING" ? "Confirmer le paiement de l'achat" : "Marquer renouvelé"} — {renewDialog?.domain}
+            </DialogTitle>
             <DialogDescription>
-              L&apos;échéance sera repoussée d&apos;un an (même jour/mois), les rappels e-mail admin et client seront réarmés et le signalement de paiement effacé.
+              {renewDialog?.status === "PENDING"
+                ? "L'achat sera activé : l'échéance est fixée à aujourd'hui + 1 an, le compte à rebours de renouvellement démarre, les rappels e-mail sont armés et la ligne « Achat » est ajoutée à l'historique."
+                : "L'échéance sera repoussée d'un an (même jour/mois), les rappels e-mail admin et client seront réarmés et le signalement de paiement effacé."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3.5">
             <div className="space-y-1.5">
-              <Label htmlFor="renew-amount">Montant du renouvellement (FCFA)</Label>
+              <Label htmlFor="renew-amount">
+                {renewDialog?.status === "PENDING" ? "Montant payé (FCFA)" : "Montant du renouvellement (FCFA)"}
+              </Label>
               <Input
                 id="renew-amount"
                 type="number"
@@ -1477,7 +1695,7 @@ export default function HostingView() {
             </Button>
             <Button onClick={confirmRenew} disabled={renewBusy} className="bg-emerald-600 text-white hover:bg-emerald-700">
               {renewBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}
-              Confirmer le renouvellement
+              {renewDialog?.status === "PENDING" ? "Confirmer le paiement" : "Confirmer le renouvellement"}
             </Button>
           </DialogFooter>
         </DialogContent>

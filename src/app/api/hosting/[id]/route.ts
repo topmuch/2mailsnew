@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import {
+  activatePurchase,
   buildHostingClientReminder,
   buildHostingReminder,
   dakarDaysLeft,
@@ -16,14 +17,20 @@ import { publicBaseUrl as requestPublicBaseUrl } from "@/lib/doc-share";
 //          reset à "" (nouveau cycle de rappels J-30/15/2/J).
 //          Champs additionnels (Task 49) : clientEmail (doit contenir @),
 //          paymentUrl (http/https), paymentLabel, customReminder.
+//          Champs achat (Task 56) : hasHosting, domainPrice, hostingPrice.
 //          Actions optionnelles :
 //            {action:"notify"}       → rappel e-mail immédiat manuel (admin +
 //                                      client si clientEmail renseigné)
 //            {action:"create-link"}  → génère le jeton de la page publique de
 //                                      renouvellement, renvoie {domain, url}
 //            {action:"revoke-link"}  → révoque le jeton public
-//            {action:"confirm-paid"} → marque RENOUVELÉ (+1 an, historique
-//                                      HostingRenewal), body.method optionnel
+//            {action:"confirm-paid"} → domain PENDING (achat, Task 56) :
+//                                      ACTIVE l'achat — purchasedAt = maintenant,
+//                                      renewalDate = +1 an (compte à rebours
+//                                      démarré), historique « Achat <a>-<a+1> ».
+//                                      Sinon : marque RENOUVELÉ (+1 an,
+//                                      historique HostingRenewal), méthode
+//                                      body.method optionnelle
 //            {action:"dismiss-paid"} → efface le signalement « J'ai payé »
 // DELETE → suppression du domaine.
 
@@ -84,7 +91,16 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
       const method = (PAYMENT_METHODS as readonly string[]).includes(methodRaw)
         ? methodRaw
         : "Manuel";
-      const { domain: updated, renewal } = await markRenewed(id, method);
+      // Montant facultatif saisi dans le dialogue (défaut = prix du domaine)
+      const amountRaw = Number(body.amount);
+      const amount = body.amount !== undefined && Number.isFinite(amountRaw) && amountRaw >= 0 ? amountRaw : undefined;
+      // Achat en attente (Task 56) → ACTIVER l'achat (compte à rebours
+      // démarre : purchasedAt = maintenant, échéance = +1 an) ; sinon
+      // comportement historique : renouveler (+1 an).
+      const { domain: updated, renewal } =
+        existing.status === "PENDING"
+          ? await activatePurchase(id, method, amount)
+          : await markRenewed(id, method, amount);
       return NextResponse.json({
         domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },
         renewal,
@@ -154,6 +170,24 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
     }
     if (body.customReminder !== undefined) {
       data.customReminder = body.customReminder.toString().trim().slice(0, 5000) || null;
+    }
+    // ── Achat de domaine + hébergement (Task 56) ─────────────────────────
+    if (body.hasHosting !== undefined) {
+      data.hasHosting = body.hasHosting === true || body.hasHosting === "true";
+    }
+    if (body.domainPrice !== undefined) {
+      const p = Number(body.domainPrice);
+      if (!Number.isFinite(p) || p < 0) {
+        return NextResponse.json({ error: "Le prix du domaine doit être un nombre positif" }, { status: 400 });
+      }
+      data.domainPrice = p;
+    }
+    if (body.hostingPrice !== undefined) {
+      const p = Number(body.hostingPrice);
+      if (!Number.isFinite(p) || p < 0) {
+        return NextResponse.json({ error: "Le prix de l'hébergement doit être un nombre positif" }, { status: 400 });
+      }
+      data.hostingPrice = p;
     }
     if (dateChanged) data.notifiedStages = ""; // nouveau cycle → rappels réarmés
 
