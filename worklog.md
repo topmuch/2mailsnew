@@ -1322,3 +1322,18 @@ Work Log:
 
 Stage Summary:
 - Le client clique une seule fois sur « Payer avec Wave » : le paiement est signalé en silence à l'admin (badge + e-mail dès que SMTP/destinataire seront ressaisis) et la page affiche le bandeau vert sans action supplémentaire. La confirmation finale reste manuelle (« Marquer renouvelé ») — un clic prouve l'intention de payer, pas la réception des fonds ; l'admin peut « Ignorer » un faux signal. Nuance : {lienPaiement} des rappels pointe vers la page publique, donc les clics partant de l'e-mail sont aussi capturés.
+
+---
+Task ID: 50
+Agent: Z.ai Code (principal)
+Task: Resynchronisation locale ↔ GitHub — le sandbox a réécrit les hash de commits (c55ec2b au lieu de 2751db4, contenu identique)
+
+Work Log:
+- Diagnostiqué : HEAD local c55ec2b avec le MÊME message que le commit GitHub 2751db4 (Task 49-b) → réécriture de hash par le sandbox, pas de divergence de contenu ; diff arbre local vs 2mailsnew/main (fetch authentifié) = uniquement db/custom.db (bruit binaire SQLite, même taille 2 187 264 o, contenu logique identique) ; code Task 49-b intact (handlePayClick, source "wave").
+- Aucun travail local unique (status = .zscripts/dev.pid seulement) → backup db /tmp/custom-backup-sync-49b.db puis git reset --hard 2mailsnew/main → HEAD = 2751db4 = GitHub, arbre propre.
+- bunx prisma generate + db push → « The database is already in sync » (aucune migration).
+- Redémarrage complet du serveur dev (pkill + setsid nohup) : health 200 ; /api/hosting 401 (protégée) ; page publique /renouvellement/<token> 200.
+- Vérification agent-browser : page publique rendue (bouton « Payer avec Wave — le paiement sera signalé automatiquement », bouton « J'ai effectué le paiement » à l'état propre), 0 erreur JS ; dev.log sans erreur (simple polling scheduler).
+
+Stage Summary:
+- Local = GitHub = 2751db4 (avant le push du présent worklog). Aucune donnée perdue (backup /tmp/custom-backup-sync-49b.db conservé ; l'état restauré de la démo terroubi.sn était déjà celui commité). Si récidive de réécriture de hash : même procédure que Tasks 48/50 — fetch authentifié, diff contenu, backup db, reset --hard 2mailsnew/main, prisma generate + db push, restart, sondes health/hosting/page publique.
