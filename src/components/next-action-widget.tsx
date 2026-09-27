@@ -92,7 +92,7 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
           ))}
         </div>
       ) : !actions || actions.length === 0 ? (
-        <div className="rounded-xl bg-white/90 p-6 text-center">
+        <div className="rounded-xl bg-white/90 p-6 text-center dark:bg-white/10">
           <p className="text-sm font-semibold text-foreground">🎉 Tout est à jour !</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Aucune action urgente détectée : aucune facture en retard, aucun RDV imminent, aucune tâche dépassée.
@@ -103,9 +103,9 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
           {actions.slice(0, 3).map((action, index) => (
             <div
               key={action.id}
-              className="flex min-w-0 items-start gap-3 overflow-hidden rounded-xl bg-white/90 p-3.5 sm:p-4"
+              className="flex min-w-0 items-start gap-3 overflow-hidden rounded-xl bg-white/90 p-3.5 sm:p-4 dark:bg-white/10"
             >
-              <div className="w-7 shrink-0 text-center text-2xl font-black text-[#1f3fbf]" aria-hidden>
+              <div className="w-7 shrink-0 text-center text-2xl font-black text-[#1f3fbf] dark:text-[#A9BCF5]" aria-hidden>
                 {index + 1}
               </div>
               <div className="min-w-0 flex-1">
@@ -124,7 +124,7 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
                 </div>
                 <h3 className="truncate text-sm font-bold text-foreground sm:text-base">{action.title}</h3>
                 <p className="truncate text-xs text-muted-foreground sm:text-sm">{action.description}</p>
-                <p className="mt-1 text-xs font-bold text-[#1f3fbf]">
+                <p className="mt-1 text-xs font-bold text-[#1f3fbf] dark:text-[#A9BCF5]">
                   → {action.action} : {action.context}
                 </p>
               </div>
@@ -132,7 +132,7 @@ export function NextActionWidget({ onNavigate }: { onNavigate?: (view: string) =
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="mt-1 h-8 w-8 shrink-0 text-muted-foreground hover:text-[#1f3fbf]"
+                  className="mt-1 h-8 w-8 shrink-0 text-muted-foreground hover:text-[#1f3fbf] dark:hover:text-[#A9BCF5]"
                   onClick={() => onNavigate(action.targetView)}
                   aria-label={`Ouvrir ${action.title}`}
                   title="Ouvrir la section concernée"

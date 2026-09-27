@@ -1354,3 +1354,20 @@ Work Log:
 
 Stage Summary:
 - Le tableau de bord reprend 1:1 la structure de la maquette BI avec les vraies données du CRM (FCFA) : titre rouge annuel, 5 KPI à liserés, calendrier de ventes doré navigable, tranches crimson, top clients orange, revenue mensuel teal, dialogs Détails. Toutes les anciennes fonctions (rapport du jour, priorités, objectif, factures récentes, stock, catégories) restent accessibles sous la grille BI.
+
+---
+Task ID: 52
+Agent: Z.ai Code (principal)
+Task: Retouches du tableau de bord BI — calendrier des ventes élargi (2/3 de la largeur) + mode sombre pleinement appliqué au nouveau design
+
+Work Log:
+- Demandes utilisateur : « le tableau de vente au milieu du dashboard doit être large comme l'image fournie » + « le mode sombre ne s'applique pas sur le nouveau design ».
+- Élargissement (dashboard-view.tsx) : l'ancienne grille 2×2 est scindée en deux grilles — « Période calendaire » (calendrier des ventes doré) passe à 2/3 de la largeur (lg:grid-cols-3 + lg:col-span-2) avec « Nombre par tranche de facturation » en colonne droite ; « Top 5 clients » + « Total Revenue par mois » restent en paire 2 colonnes. Tuiles calendrier agrandies (sm:h-14 xl:h-16, jours sm:text-[13px], montants sm:text-[10.5px], gouttières sm:gap-2), squelette de chargement aligné sur la nouvelle géométrie.
+- Mode sombre (dashboard-view.tsx + next-action-widget.tsx) : la palette BI n'est plus « fixe claire » — canevas #E8EAF1→#131822, cartes/header/bande Aujourd'hui/KPI/accès rapides bg-white→#1E2634, textes stone-800/900/700→stone-100/50/200 en dark, dividers/bordures/scrollbars/piste de progression adaptés, boutons blancs (rapport, pastilles Détails) → dark:bg-transparent.
+- Couleurs inline thème-aware : useTheme() (next-themes) → biNavy éclairci #9DAFCC en dark (liseré/icône « Reste à encaisser », pastilles « Voir tout »/« Produits » — le navy #333F50 était invisible sur fond sombre) + titre rouge lumineux #FF6B5E. Les couleurs vives (crimson/orange/teal/or, bandeau mois navy, en-têtes de tableaux pleins) restent identiques dans les deux thèmes — texte foncé sur or volontairement conservé.
+- Correctif de lisibilité hérité : widget « Mes 3 priorités » — puces bg-white/90 → dark:bg-white/10, numéros et liens d'action #1f3fbf → #A9BCF5 en dark (le texte à tokens devenait blanc sur blanc).
+- Aucune suppression de fonctionnalité (only-add) ; dialogs Détails déjà à tokens shadcn (sombres nativement), ligne Total des mois dark:bg-stone-800/60.
+- Vérifié agent-browser : light (3 captures : KPI+calendrier large, graphiques, bas de page), dark via theme=dark (3 captures + dialog Top clients + widget priorités corrigé), mobile iPhone 14 en dark (KPI empilés, calendrier), retour light identique à la maquette ; 0 erreur JS (seul l'avertissement préexistant aria-describedby du Dialog) ; lint 0/0 ; dev.log propre.
+
+Stage Summary:
+- Le calendrier des ventes occupe désormais 2/3 de la largeur centrale (grandes tuiles dorées) et le mode sombre s'applique à tout le nouveau design BI (canevas, cartes, textes, liserés navy éclaircis, widget priorités) sans altérer le mode clair. Deux fichiers modifiés : dashboard-view.tsx, next-action-widget.tsx.
