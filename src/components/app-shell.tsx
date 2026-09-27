@@ -667,7 +667,8 @@ export function AppShell() {
               /* Boîte mail : occupe toute la page (design premium 3 volets) */
               <MailView />
             ) : (
-            <div className="w-full min-w-0 mx-auto max-w-6xl px-3 sm:px-6 py-5 sm:py-7 pb-10">
+            // Pleine largeur : de la limite du sidebar jusqu'au bord de la page (comme la maquette BI)
+            <div className="w-full min-w-0 px-1.5 sm:px-2 py-3 sm:py-4 pb-10">
               {view === "dashboard" && (
                 <DashboardView onNavigate={(v) => select(v as ViewId)} onNewInvoice={newInvoice} isAdmin={isAdmin} />
               )}
@@ -717,7 +718,7 @@ export function AppShell() {
 
       {/* Footer collant */}
       <footer className="mt-auto border-t border-sidebar-border bg-sidebar text-sidebar-foreground/75">
-        <div className="mx-auto max-w-6xl px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
+        <div className="w-full px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
           <p className="font-semibold text-sidebar-foreground">
             © {new Date().getFullYear()} {companyName}
             {companyTagline ? ` — ${companyTagline}` : ""}

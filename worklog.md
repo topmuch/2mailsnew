@@ -1405,3 +1405,20 @@ Work Log:
 
 Stage Summary:
 - Le tableau de bord reprend la disposition horizontale de la maquette BI : 5 rangées pleine largeur (calendrier⅔+tranches⅓, top5½+mensuel½, priorités½+objectif½, factures⅔+statut⅓, catégories½+stock½) au lieu de l'empilement vertical ; scroll réduit de 4 à ~2,6 écrans ; dark mode et mobile conservés. Fichier modifié : dashboard-view.tsx (classes de grille uniquement).
+
+---
+Task ID: 53-c
+Agent: Z.ai Code (principal)
+Task: Suppression de la bride de largeur max-w-6xl — le contenu va de la limite du sidebar jusqu'au bord de la page (comme la maquette)
+
+Work Log:
+- Signalement utilisateur : « la largeur comme l'image n'est pas respecté — la largeur commence à la limite du sidebar et se termine à la fin de la page ». Diagnostic : app-shell.tsx enfermait TOUT le contenu principal dans `mx-auto max-w-6xl px-3 sm:px-6` (plafond 1152px centré) — le contenu ne touchait ni la sidebar ni le bord droit, quelle que soit la disposition interne du dashboard.
+- Correctif (app-shell.tsx, uniquement des classes) :
+  · Conteneur principal des vues (ligne ~670) : `w-full min-w-0 mx-auto max-w-6xl px-3 sm:px-6 py-5 sm:py-7 pb-10` → `w-full min-w-0 px-1.5 sm:px-2 py-3 sm:py-4 pb-10` — suppression du plafond 1152px et du centrage, marges fines (6-8px + p-3 du canevas ≈ 18-20px au total) fidèles à la maquette. S'applique à toutes les vues (menus) : « tous les menus doivent être en large ».
+  · Footer : `mx-auto max-w-6xl px-4` → `w-full px-4` (cohérence pleine largeur).
+  · Commentaire // dans la branche ternaire mails (JSX {/*…*/} en position expression = erreur de syntaxe, corrigé immédiatement).
+- Mesures agent-browser (getBoundingClientRect) : 1440px — marge gauche sidebar→contenu = 0.0px, marge droite contenu→bord = 0.0px ; 1920px — identique 0.0/0.0 ; le canevas #E8EAF1 s'étend donc de la limite exacte du sidebar (#0B366B) au bord de la page.
+- Vérifié agent-browser : light 1440 + 1920 (KPI, bande Aujourd'hui, rangées horizontales et cartes s'étirent bord à bord), dark (thème sombre intact), mobile iPhone 14 (overflowX=false, marges 0.0). 0 erreur JS, lint 0/0.
+
+Stage Summary:
+- Cause racine éliminée : le plafond max-w-6xl (1152px) du conteneur principal. Toutes les vues s'étendent désormais de la limite du sidebar au bord de la page (marges mesurées 0.0px), canevas BI inclus, avec marges internes fines comme la maquette. Fichier modifié : app-shell.tsx.
