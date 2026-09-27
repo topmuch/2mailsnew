@@ -1506,3 +1506,18 @@ Work Log:
 
 Stage Summary:
 - Le coach virtuel envoie maintenant 5 messages/jour : les créneaux 12h00 et 18h00 (activables/désactivables dans Automatisations) rappellent de poster des visuels sur TikTok, LinkedIn et Facebook, avec 12 messages pré-écrits personnalisables dans le Coach Virtuel. Rien de supprimé : 11h/14h/17h et les 30 messages d'origine sont intacts. Fichiers : schema.prisma, crm-coach-seed.ts, crm-automation.ts, api/crm/coach/route.ts, api/crm/coach/send/route.ts, api/crm/automation/config/route.ts, types.ts, crm-automations-view.tsx, crm-coach-view.tsx.
+
+---
+Task ID: 58
+Agent: Z.ai Code (principal)
+Task: Harmoniser les couleurs des titres du dashboard en vert à la place du rouge
+
+Work Log:
+- Repérage : le grand titre h1 « Tableau de bord des ventes - Année AAAA » utilisait BI.title #D93025 (rouge) en clair et #FF6B5E en sombre ; les deux actions de la barre de titre (« Rapport du jour », « Nouvelle facture ») utilisaient BI.crimson #D6455F (rouge).
+- dashboard-view.tsx : BI.title #D93025 → #059669 (vert, cohérent avec les boutons emerald de l'app) ; nouvelle constante biGreen = dark ? #4AC87F (vert marque sidebar) : #059669, appliquée au h1, au bouton « Rapport du jour » (bordure + icône + hover) et au bouton « Nouvelle facture » (fond).
+- Rouges SÉMANTIQUES conservés volontairement : bandes/icônes KPI (crimson), statut « Impayées », montants restants, badges expiré, calendrier (aujourd'hui/barres de ventes) — ce sont des indicateurs de données, pas des titres.
+- Vérification E2E agent-browser : light (titre + 2 boutons verts), dark luxe bleuté (#4AC87F sur fond bleu nuit), mobile 390 px (clair + sombre) sans overflow ; lint 0/0 ; aucune erreur runtime dans dev.log.
+- Captures : .zscreens/task58-before-light.png, task58-dash-light.png (avant), task58-after-light.png, task58-after-dark.png, task58-after-mobile.png, task58-after-mobile-light.png (après).
+
+Stage Summary:
+- La barre de titre du dashboard est désormais entièrement verte (titre H1 + « Rapport du jour » + « Nouvelle facture ») : #059669 en mode clair, #4AC87F en mode sombre, en harmonie avec le vert de marque de la sidebar. Aucun élément supprimé ; les rouges sémantiques (impayés, statuts, alertes) sont intacts. Fichier modifié : src/components/dashboard-view.tsx uniquement.

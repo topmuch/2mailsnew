@@ -68,7 +68,8 @@ const BI = {
   stripNavyActive: "#2D5CA8",
   gold: "#FFC918",
   goldSoft: "rgba(255, 201, 24, 0.38)",
-  title: "#D93025",
+  // Titre du dashboard en vert marque (demande utilisateur — remplace le rouge #D93025)
+  title: "#059669",
 } as const;
 
 const CARD_SHADOW = "shadow-[0_2px_6px_rgba(16,24,40,0.10)]";
@@ -293,7 +294,8 @@ export function DashboardView({
   const dark = resolvedTheme === "dark";
   // Navy « texte / bordure » trop sombre sur fond sombre → version éclaircie en dark
   const biNavy = dark ? "#A5BFDF" : BI.navy;
-  const biTitle = dark ? "#FF6B5E" : BI.title;
+  // Vert marque pour le titre + actions de la barre de titre (clair #059669 / sombre #4AC87F)
+  const biGreen = dark ? "#4AC87F" : BI.title;
   const [year, setYear] = useState(now.getFullYear());
   // Mois affiché dans le calendrier AAAA-MM (piloté par le bandeau de mois)
   const [calMonth, setCalMonth] = useState(`${now.getFullYear()}-${pad2(now.getMonth() + 1)}`);
@@ -422,7 +424,7 @@ export function DashboardView({
       className="space-y-4 rounded-xl bg-[#E8EAF1] p-3 dark:bg-[#0B1730] sm:space-y-5 sm:p-4"
       style={{ opacity: loading ? 0.6 : 1, transition: "opacity 150ms" }}
     >
-      {/* ═══ Barre de titre : titre rouge centré + actions à droite ═════════ */}
+      {/* ═══ Barre de titre : titre vert centré + actions à droite ═════════ */}
       <header className="relative flex flex-col items-center gap-2.5 rounded-lg bg-white px-3 py-3 dark:bg-[#152648] sm:px-4 sm:pr-48" style={{ boxShadow: "0 2px 6px rgba(16,24,40,0.10)" }}>
         <div className="flex items-center gap-1">
           <button
@@ -433,7 +435,7 @@ export function DashboardView({
           >
             <ChevronLeft className="h-5 w-5" aria-hidden />
           </button>
-          <h1 className="text-center text-lg font-extrabold tracking-tight sm:text-2xl" style={{ color: biTitle }}>
+          <h1 className="text-center text-lg font-extrabold tracking-tight sm:text-2xl" style={{ color: biGreen }}>
             Tableau de bord des ventes - Année <span className="tabular-nums">{stats.year}</span>
           </h1>
           <button
@@ -453,8 +455,8 @@ export function DashboardView({
                 size="icon"
                 aria-label="Rapport du jour"
                 disabled={reportBusy !== null}
-                className="h-9 w-9 border-2 bg-white hover:bg-[#D6455F]/10 dark:bg-transparent dark:hover:bg-[#D6455F]/25"
-                style={{ borderColor: BI.crimson, color: BI.crimson }}
+                className="h-9 w-9 border-2 bg-white hover:bg-[#059669]/10 dark:bg-transparent dark:hover:bg-[#4AC87F]/25"
+                style={{ borderColor: biGreen, color: biGreen }}
               >
                 {reportBusy !== null ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Printer className="h-4 w-4" aria-hidden />}
               </Button>
@@ -468,7 +470,7 @@ export function DashboardView({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={onNewInvoice} className="h-9 border-0 text-white" style={{ background: BI.crimson }}>
+          <Button size="sm" onClick={onNewInvoice} className="h-9 border-0 text-white" style={{ background: biGreen }}>
             <Plus className="h-4 w-4" aria-hidden />
             Nouvelle facture
           </Button>
