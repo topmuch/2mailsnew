@@ -74,7 +74,7 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: str
             // apprentissage best-effort — ne bloque pas la création du lien
           });
       }
-      const renewalToken = randomBytes(24).toString("hex"); // 48 caractères hex
+      const renewalToken = randomBytes(12).toString("base64url"); // 16 caractères URL-safe (96 bits) — lien court
       const updated = await db.hostingDomain.update({ where: { id }, data: { renewalToken } });
       return NextResponse.json({
         domain: { ...updated, daysLeft: dakarDaysLeft(updated.renewalDate, new Date()) },

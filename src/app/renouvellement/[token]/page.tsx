@@ -6,8 +6,9 @@ import RenewalPublicClient from "./renewal-client";
 // Le client ouvre le lien /renouvellement/<token> (envoyé par WhatsApp ou
 // e-mail) : il voit l'échéance et le montant de son domaine, peut payer via
 // le lien Wave configuré et signaler « J'ai effectué le paiement ».
-// Le jeton aléatoire (48 caractères hex) est la seule clé d'accès — révocable
-// depuis l'onglet Hosting (action revoke-link).
+// Le jeton aléatoire (16 caractères base64url — 96 bits —, liens Task 49
+// historiques à 48 caractères hexadécimaux toujours acceptés) est la seule clé
+// d'accès — révocable depuis l'onglet Hosting (action revoke-link).
 // Task 56 : la même page sert à l'ACHAT d'un domaine (+ hébergement) tant que
 // le paiement n'est pas confirmé (status PENDING) — titre, détail du montant
 // et message d'activation adaptés ; le compte à rebours de renouvellement

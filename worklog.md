@@ -1536,3 +1536,19 @@ Work Log:
 
 Stage Summary:
 - Local = GitHub = d928495 (Task 58), divergence 0/0, base Prisma en phase. L'app fonctionne (E2E login + dashboard vérifiés). Leçon infrastructure : le serveur dev est géré par le boot du conteneur ; les process d'arrière-plan des appels shell sont tués entre les appels → vérifications en un seul appel, ne jamais pkill le serveur boot sans nécessité.
+
+---
+Task ID: 60
+Agent: Z.ai Code (principal)
+Task: Raccourcir le lien public de renouvellement (option 1 choisie par l'utilisateur) — token 48 hex → 16 caractères base64url
+
+Work Log:
+- Contexte : l'utilisateur trouvait le lien de paiement hosting trop long/bizarre (https://2mails.pro/renouvellement/<48 hex>). Explication donnée : le token est la seule clé d'accès (page publique sans auth) mais 192 bits étaient surdimensionnés ; 3 options présentées (token court dans le code / shortener externe / QR) — l'utilisateur a retenu l'option 1.
+- src/app/api/hosting/[id]/route.ts : randomBytes(24).toString("hex") → randomBytes(12).toString("base64url") = 16 caractères URL-safe (A-Z a-z 0-9 - _), 96 bits d'entropie ; commentaire à jour.
+- src/app/renouvellement/[token]/page.tsx : commentaire mis à jour ; le garde-fou existant token.length < 16 accepte exactement les nouveaux tokens (16) ET les anciens (48) — aucune migration nécessaire, liens déjà envoyés toujours valables.
+- E2E one-shot (login API + PUT create-link) : URL générée /renouvellement/pWfLLqdWBkSeUAWH = 16 caractères exactement ; page publique 200 avec données réelles du domaine (terroubi.sn, 18 000 FCFA, bouton Wave) ; ancien format 48 hex inconnu → page rendue proprement (InvalidLink) ; capture .zscreens/task60-lien-court-public.png.
+- Note test : la route [id] exporte PUT (pas POST) pour create-link — un POST renvoie 405 (cause d'un premier test infructueux, corrigé).
+- Lint 0/0 ; repo non rembobiné au démarrage de session (local = GitHub = 67b6eba avant travail).
+
+Stage Summary:
+- Les NOUVEAUX liens de paiement hosting sont 3× plus courts : https://2mails.pro/renouvellement/<16 caractères> (ex. pWfLLqdWBkSeUAWH). Les liens existants (48 hex) restent valables ; « Générer le lien » dans Hosting régénère un token court et remplace l'ancien ; révocation inchangée. En production, nécessite un redeploy Coolify pour s'appliquer aux prochains liens. Fichiers : api/hosting/[id]/route.ts, app/renouvellement/[token]/page.tsx (commentaire).
