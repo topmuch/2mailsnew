@@ -1552,3 +1552,17 @@ Work Log:
 
 Stage Summary:
 - Les NOUVEAUX liens de paiement hosting sont 3× plus courts : https://2mails.pro/renouvellement/<16 caractères> (ex. pWfLLqdWBkSeUAWH). Les liens existants (48 hex) restent valables ; « Générer le lien » dans Hosting régénère un token court et remplace l'ancien ; révocation inchangée. En production, nécessite un redeploy Coolify pour s'appliquer aux prochains liens. Fichiers : api/hosting/[id]/route.ts, app/renouvellement/[token]/page.tsx (commentaire).
+
+---
+Task ID: 61
+Agent: Z.ai Code (principal)
+Task: Création facture/proforma — bouton + pour ajouter des lignes d'articles (actuellement une seule ligne)
+
+Work Log:
+- Diagnostic : le composant partagé src/components/items-editor.tsx (utilisé par invoice-editor facture/proforma, invoice-dialog, orders-view, purchases-view) n'offrait AUCUN moyen d'ajouter une ligne libre — seule la recherche catalogue ajoutait des lignes ; les formulaires démarrent avec [emptyItem()] (1 ligne).
+- items-editor.tsx : ajout d'un bouton « + Ajouter une ligne d'article » (variant outline, bordure pointillée, pleine largeur, aria-label dédié) qui appends emptyItem() ; message d'état vide mis à jour pour mentionner le bouton +. Bénéfice partagé par les 4 formulaires, rien retiré.
+- E2E one-shot agent-browser (login → Nouvelle facture → 2 clics sur + → remplissage 3 lignes via eval React setter natif : Impression banderole 2×15 000, Conception logo 1×50 000, Livraison Dakar 1×5 000) : 3 lignes affichées, totaux temps réel 85 000 HT / TVA 18 % 15 300 / TTC 100 300, clic « Créer » → POST /api/invoices 201 → toast « Document enregistré — N° FV-2026-0006 — 100 300 FCFA », facture en tête de la liste Factures de vente avec le bon montant. Captures : .zscreens/task61-totaux.png, task61-final.png.
+- Leçons E2E : l'état du navigateur agent-browser ne persiste PAS de façon fiable entre les appels (page rechargée → refaire le flow complet en un seul appel) ; l'éditeur facture a 2 boutons « Créer » (sauvegarde header + création client) → cliquer via eval sur le 1er bouton dont textContent.trim() === "Créer" ; scripts JS d'interaction dans des fichiers /tmp (éviter l'échappement d'apostrophes bash).
+
+Stage Summary:
+- Facture et proforma (ainsi que commandes/achats) permettent maintenant d'ajouter autant de lignes d'articles que voulu via le bouton « + Ajouter une ligne d'article » sous le tableau ; suppression ligne inchangée (poubelle), totaux temps réel vérifiés, sauvegarde multi-lignes validée en base (201). Fichier modifié : src/components/items-editor.tsx uniquement.

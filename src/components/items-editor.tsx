@@ -183,7 +183,7 @@ export function ItemsEditor({
 
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground border border-dashed rounded-md p-4 text-center">
-          Aucun article. Recherchez un produit du catalogue ou saisissez un article libre.
+          Aucun article. Recherchez un produit du catalogue, appuyez sur le bouton + ci-dessous ou saisissez un article libre.
         </p>
       ) : (
         <div className="rounded-md border overflow-x-auto">
@@ -266,6 +266,19 @@ export function ItemsEditor({
           </table>
         </div>
       )}
+
+      {/* ─── Bouton + : ajouter une ligne d'article libre (Task 61) ─── */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => onChange([...items, emptyItem()])}
+        disabled={disabled}
+        className="w-full justify-center gap-2 border-dashed text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+        aria-label="Ajouter une ligne d'article"
+      >
+        <Plus className="h-4 w-4" aria-hidden />
+        Ajouter une ligne d&apos;article
+      </Button>
 
       {/* Rappel discret : création rapide */}
       {onCreateProduct && (
