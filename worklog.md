@@ -1521,3 +1521,18 @@ Work Log:
 
 Stage Summary:
 - La barre de titre du dashboard est désormais entièrement verte (titre H1 + « Rapport du jour » + « Nouvelle facture ») : #059669 en mode clair, #4AC87F en mode sombre, en harmonie avec le vert de marque de la sidebar. Aucun élément supprimé ; les rouges sémantiques (impayés, statuts, alertes) sont intacts. Fichier modifié : src/components/dashboard-view.tsx uniquement.
+
+---
+Task ID: 59
+Agent: Z.ai Code (principal)
+Task: Synchroniser la version locale avec la version GitHub (2mailsnew)
+
+Work Log:
+- Diagnostic : le sandbox avait rembobiné le repo local à l'état Task 49-b (0ff614c, hash réécrit) alors que GitHub (2mailsnew/main) = d928495 avec 16 commits d'avance (Tasks 50→58) ; le commit local Task 49-b était un doublon (même message que 2751db4 déjà dans GitHub).
+- Sync : git reset --hard 2mailsnew/main → HEAD local = d928495, rev-list --left-right --count = 0 0.
+- Prisma : bunx prisma generate OK (client v6.19.2) ; bun run db:push → "database already in sync".
+- Découverte infra importante : le sandbox moissonne TOUS les processus lancés par les appels shell entre deux appels (même setsid nohup + disown — testé avec sleep 300 et 2× bun run dev). Le serveur dev qui survit est celui démarré par l'arbre de boot (start.sh → .zscripts/dev.sh) au démarrage du conteneur. Conséquence : ne PAS tuer le serveur boot (pas de pkill "next dev" inutile) et faire les vérifications E2E serveur en UN SEUL appel shell ; agent-browser relaie son démon à chaque appel avec profil persistant sur disque (login conservé).
+- Vérification one-shot (démarrage serveur + curl + login E2E dans le même appel) : GET / 200, /api/dashboard 200, login admin OK, dashboard rendu avec titre vert Task 58 (« Tableau de bord des ventes - Année 2026 » + boutons Rapport du jour / Nouvelle facture en vert), KPI et calendrier opérationnels. Capture : .zscreens/task59-sync-verify.png, task59-sync-dashboard.png.
+
+Stage Summary:
+- Local = GitHub = d928495 (Task 58), divergence 0/0, base Prisma en phase. L'app fonctionne (E2E login + dashboard vérifiés). Leçon infrastructure : le serveur dev est géré par le boot du conteneur ; les process d'arrière-plan des appels shell sont tués entre les appels → vérifications en un seul appel, ne jamais pkill le serveur boot sans nécessité.
