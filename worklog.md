@@ -1583,3 +1583,18 @@ Work Log:
 Stage Summary:
 - Local resynchronisé sur GitHub (baa6896) — MAIS le reset --hard sur db/custom.db tracké casse les écritures SQLite du serveur en cours (inode remplacé) : à éviter → soit ne pas tracker la db, soit redémarrer le serveur après reset (impossible en session → reboot conteneur = remède automatique au retour de l'utilisateur).
 - Page Leads entièrement refaite, plus engageante et pro : héro marque navy/or, 4 KPIs (dont taux de conversion), entonnoir filtrant cliquable, bascule Kanban ⇄ Liste, cartes enrichies (avatars, temps relatif, indicateurs), dialog en sections, animations subtiles ; toutes les fonctions d'origine conservées et vérifiées E2E (création UI 201, filtre, dark, mobile). Fichier : src/components/crm/crm-leads-view.tsx.
+
+---
+Task ID: 63
+Agent: Z.ai Code (principal)
+Task: Retour utilisateur sur la refonte Leads (Task 62) : « pas top » → refaire plus simple, plus compréhensible, plus design
+
+Work Log:
+- Analyse du retour : la version Task 62 était surchargée (bandeau héro dégradé géant, 4 KPI décorés, entonnoir cliquable, avatars, badges multiples, bordures arc-en-ciel par colonne) → bruit visuel, hiérarchie confuse.
+- Réécriture complète de src/components/crm/crm-leads-view.tsx dans un esprit épuré (type Notion/Linear) : en-tête simple (icône or + titre + sous-titre, recherche et bouton à droite) ; UNE carte de chiffres clés à 4 colonnes séparées par hairlines (astuce gap-px + bg-border, grille 2×2 en mobile) avec points colorés discrets : En pipeline / Gagné / Devis envoyés / Taux de conversion ; kanban apaisé (point coloré par étape au lieu de border-t-4, total de colonne conservé) ; cartes lisibles : nom en gras, « société · source » en une ligne, contact, valeur en or à droite, temps relatif, statut — avatars et badges supprimés ; vue Liste simplifiée à 6 colonnes (source fusionnée sous la société) ; dialog en grille 2 colonnes sans sections (tous champs conservés) ; AnimatePresence Kanban ⇄ Liste conservé.
+- Supprimés (ajouts Task 62 devenus bruit) : bandeau héro gradient, entonnoir + filtre par étape, avatars initiales, icônes de stage, indicateur notes, framer-motion sur les cartes (gardé seulement pour la bascule de vue). Fonctions d'origine INTACTES : création/édition, changement de statut, recherche, suppression admin, temps relatif, formats compacts.
+- Lint 0/0. E2E one-shot x4 (serveur relancé à chaque appel) : light desktop (hiérarchie claire) ; vue Liste ; dark luxe bleuté (hairlines et or s'adaptent parfaitement) ; mobile 390 px (stats 2×2, actions toujours visibles) ; parcours d'or : création « Test UI 63 » via dialog → visible en tête de colonne Nouveau, chips 9 leads/7 actifs, toast « Lead ajouté au pipeline », temps relatif « aujourd'hui » → cleanup DELETE 200. Captures .zscreens/63-01…63-05.
+- Leçon agent-browser : le viewport persiste dans le profil entre les sessions → toujours repasser `set viewport 1280 800` avant un test desktop (un viewport mobile laissé par une session antérieure masque la sidebar et casse la navigation par refs).
+
+Stage Summary:
+- Page Leads refaite en version épurée : une ligne de chiffres clés à séparateurs fins, kanban minimaliste à points colorés, cartes aérées (nom / société · source / valeur or / temps / statut), liste 6 colonnes, dialog 2 colonnes — plus simple, plus lisible, plus design. Toutes les fonctions vérifiées E2E (création UI 201 + cleanup, bascule liste, dark, mobile). Fichier : src/components/crm/crm-leads-view.tsx.
