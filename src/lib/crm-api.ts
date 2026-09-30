@@ -221,8 +221,145 @@ export async function reconcileCrmClients(platform: PlatformName) {
   return linked;
 }
 
+// ─── Fallback « infos du site » (sans clé API) ──────────────────────────────
+// Certaines plateformes (ex. verifscan.com) n'exposent pas d'API admin.
+// Quand seule l'URL du site est connue, on récupère les métadonnées publiques
+// de la page d'accueil (title, description, Open Graph) pour alimenter le CRM.
+
+export interface SiteInfo {
+  url: string;
+  title: string;
+  description: string;
+  siteName: string;
+  image: string;
+  fetchedAt: string;
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&apos;|&rsquo;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/** Lit l'attribut content d'une balise <meta> (property/name dans les deux ordres). */
+function pickMeta(metaTags: string[], keys: string[]): string {
+  for (const tag of metaTags) {
+    const keyMatch = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i);
+    const contentMatch = tag.match(/content\s*=\s*["']([^"']*)["']/i);
+    const contentFirst = tag.match(/content\s*=\s*["']([^"']*)["'][^>]*(?:property|name)\s*=\s*["']([^"']+)["']/i);
+    const key = (keyMatch?.[1] ?? contentFirst?.[2] ?? "").toLowerCase();
+    if (keys.includes(key)) {
+      const value = contentMatch?.[1] ?? "";
+      if (value) return decodeHtmlEntities(value);
+    }
+  }
+  return "";
+}
+
+/** Extrait les infos publiques d'une page HTML (title + meta description + Open Graph). */
+export function extractSiteInfo(html: string, url: string): SiteInfo {
+  const metaTags = html.match(/<meta\s+[^>]*>/gi) ?? [];
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return {
+    url,
+    title:
+      pickMeta(metaTags, ["og:title", "twitter:title"]) ||
+      decodeHtmlEntities(titleMatch?.[1] ?? ""),
+    description:
+      pickMeta(metaTags, ["og:description", "twitter:description", "description"]),
+    siteName: pickMeta(metaTags, ["og:site_name", "application-name"]),
+    image: pickMeta(metaTags, ["og:image", "twitter:image"]),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+/** Récupère la page d'accueil d'un site et en extrait les infos publiques. */
+export async function fetchSiteInfo(apiUrl: string): Promise<SiteInfo> {
+  const base = apiUrl.replace(/\/+$/, "");
+  const response = await fetch(base, {
+    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "2mails-CRM/1.0 (+sync site info)" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Site ${base} injoignable (HTTP ${response.status})`);
+  }
+  const html = await response.text();
+  return extractSiteInfo(html, base);
+}
+
+/** Synchronise une plateforme sans API admin : enregistre les infos publiques du site comme item « SITE ». */
+async function syncSiteInfo(platform: PlatformName, config: PlatformConfig): Promise<{
+  platform: string;
+  total: number;
+  created: number;
+  updated: number;
+  siteInfo: true;
+}> {
+  const info = await fetchSiteInfo(config.apiUrl);
+  const platformRow = await db.crmPlatform.findUnique({ where: { name: platform } });
+  if (!platformRow) throw new Error(`Plateforme ${platform} inconnue en base`);
+
+  const raw = JSON.stringify(info);
+  const existing = await db.crmItem.findUnique({
+    where: { platformId_externalId: { platformId: platformRow.id, externalId: "site-info" } },
+  });
+
+  const data = {
+    code: config.label || config.apiUrl.replace(/^https?:\/\//, ""),
+    type: "SITE",
+    status: "ACTIVE",
+    ownerName: info.title || info.siteName || config.label || platform,
+    ownerPhone: null as string | null,
+    ownerEmail: null as string | null,
+    lastScanAt: null as Date | null,
+    lastScanPlace: null as string | null,
+    scanCount: 0,
+    raw,
+  };
+
+  if (existing) {
+    await db.crmItem.update({ where: { id: existing.id }, data });
+  } else {
+    await db.crmItem.create({
+      data: { platformId: platformRow.id, externalId: "site-info", ...data },
+    });
+  }
+
+  await reconcileCrmClients(platform);
+  await db.crmPlatform.update({ where: { name: platform }, data: { lastSyncAt: new Date() } });
+  await db.crmActivity.create({
+    data: {
+      platform,
+      action: "SYNC",
+      details: existing
+        ? `Infos du site mises à jour : ${info.title || config.label}`
+        : `Infos du site récupérées : ${info.title || config.label}`,
+    },
+  });
+
+  return { platform, total: 1, created: existing ? 0 : 1, updated: existing ? 1 : 0, siteInfo: true };
+}
+
 /** Synchronise une plateforme : récupère ses items et met à jour le cache local. */
 export async function syncPlatform(platform: PlatformName) {
+  const config = await getPlatformConfig(platform);
+  if (!config?.apiUrl) {
+    throw new Error(`Plateforme ${platform} non configurée (URL du site ou de l'API requise)`);
+  }
+
+  // Sans clé API : la plateforme n'expose pas d'API admin → fallback « infos du site ».
+  if (!config.apiKey) {
+    return syncSiteInfo(platform, config);
+  }
+
   const items = await fetchItemsFromPlatform(platform);
   let created = 0;
   let updated = 0;
@@ -258,7 +395,9 @@ export async function syncAllPlatforms() {
 
   for (const name of PLATFORM_NAMES) {
     const config = await getPlatformConfig(name);
-    if (!config?.isActive || !config.apiUrl || !config.apiKey) continue;
+    // Une plateforme avec une URL mais sans clé API est synchronisée en mode
+    // « infos du site » (syncPlatform gère le fallback) ; sans URL du tout → ignorée.
+    if (!config?.isActive || !config.apiUrl) continue;
     try {
       results.push(await syncPlatform(name));
     } catch (err) {

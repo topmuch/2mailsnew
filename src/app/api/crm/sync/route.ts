@@ -15,8 +15,16 @@ export async function POST(request: NextRequest) {
     const platformParam = request.nextUrl.searchParams.get("platform")?.toUpperCase();
 
     if (platformParam && (PLATFORM_NAMES as string[]).includes(platformParam)) {
-      const result = await syncPlatform(platformParam as PlatformName);
-      return NextResponse.json({ ok: true, results: [result], errors: [] });
+      try {
+        const result = await syncPlatform(platformParam as PlatformName);
+        return NextResponse.json({ ok: true, results: [result], errors: [] });
+      } catch (err) {
+        // Échec ciblé (plateforme non configurée, site injoignable…) : message
+        // clair en français plutôt qu'une erreur serveur générique.
+        const message = err instanceof Error ? err.message : "Erreur inconnue";
+        console.error(`POST /api/crm/sync?platform=${platformParam}`, err);
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
     }
 
     const result = await syncAllPlatforms();

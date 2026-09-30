@@ -476,6 +476,7 @@ export interface CrmItem {
   lastScanAt: string | null;
   lastScanPlace: string | null;
   scanCount: number;
+  raw?: string | null; // JSON brut renvoyé par la plateforme (infos du site pour type SITE)
   createdAt: string;
   updatedAt: string;
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Luggage, QrCode, RefreshCw, Search, ShieldCheck, TriangleAlert, MapPin } from "lucide-react";
+import { ExternalLink, Globe, Loader2, Luggage, QrCode, RefreshCw, Search, ShieldCheck, TriangleAlert, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -121,6 +121,34 @@ export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAG
     };
   }, [items]);
 
+  // Infos publiques du site (item type SITE créé par la synchronisation sans clé API,
+  // ex. verifscan.com) : titre, description, image Open Graph, URL.
+  const siteInfo = useMemo<null | {
+    code: string;
+    title: string;
+    description: string;
+    image: string;
+    url: string;
+    updatedAt: string;
+  }>(() => {
+    const site = items.find((i) => i.type === "SITE");
+    if (!site) return null;
+    let raw: { title?: string; description?: string; image?: string; url?: string } = {};
+    try {
+      raw = site.raw ? (JSON.parse(site.raw) as typeof raw) : {};
+    } catch {
+      raw = {};
+    }
+    return {
+      code: site.code,
+      title: site.ownerName || raw.title || site.code,
+      description: raw.description ?? "",
+      image: raw.image ?? "",
+      url: raw.url || `https://${site.code}`,
+      updatedAt: site.updatedAt,
+    };
+  }, [items]);
+
   return (
     <div className="space-y-5">
       {/* En-tête */}
@@ -137,6 +165,50 @@ export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAG
           Synchroniser {platform}
         </Button>
       </div>
+
+      {/* Infos du site (synchronisées depuis le domaine public, ex. verifscan.com) */}
+      {siteInfo && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+          <Card className="border-gold/40 bg-gradient-to-br from-gold/5 to-transparent p-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {siteInfo.image ? (
+                <img
+                  src={siteInfo.image}
+                  alt={`Aperçu de ${siteInfo.code}`}
+                  className="h-20 w-20 rounded-lg border bg-background object-cover shrink-0"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-lg border bg-background shrink-0">
+                  <Globe className="h-8 w-8 text-gold" aria-hidden />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-semibold truncate">{siteInfo.title}</h2>
+                  <Badge variant="outline" className="text-[10px] border-gold/50 text-gold">Infos du site</Badge>
+                </div>
+                {siteInfo.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{siteInfo.description}</p>
+                )}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  <a
+                    href={siteInfo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" aria-hidden />
+                    {siteInfo.code}
+                  </a>
+                  <span className="text-[11px] text-muted-foreground">
+                    Synchronisé {formatRelativeFr(siteInfo.updatedAt).toLowerCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Compteurs rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -188,6 +260,7 @@ export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAG
             <SelectItem value="TOUS">Tous les types</SelectItem>
             <SelectItem value="TAG">Tags</SelectItem>
             <SelectItem value="BAGAGE">Bagages</SelectItem>
+            <SelectItem value="SITE">Sites</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -230,7 +303,9 @@ export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAG
                         {item.code && <p className="text-[10px] text-muted-foreground font-mono">{item.externalId}</p>}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        <Badge variant="outline" className="text-[10px]">{item.type === "BAGAGE" ? "Bagage" : "Tag"}</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {item.type === "BAGAGE" ? "Bagage" : item.type === "SITE" ? "Site" : "Tag"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <ItemStatusBadge status={item.status} />
