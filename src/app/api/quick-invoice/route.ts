@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           create: [
             {
               productName: pack.name,
-              category: pack.type === "QRTAGS" || pack.type === "QRBAGS" ? pack.type : null,
+              category: ["QRTAGS", "QRBAGS", "VERIFSCAN"].includes(pack.type) ? pack.type : null,
               unit: "pack",
               quantity: 1,
               unitPrice: totalHT,

@@ -1,20 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QrCode, Luggage, MapPin } from "lucide-react";
+import { QrCode, Luggage, ShieldCheck, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { actionLabel, formatRelativeFr } from "@/components/crm/crm-shared";
 import type { CrmActivity } from "@/lib/types";
 
 // ─── ActivityFeed : flux des derniers webhooks reçus ────────────────────────
-// - Icône selon la plateforme : 🏷️ QrCode → QRTags, 🧳 Luggage → QRBags
+// - Icône selon la plateforme : QrCode → QRTags, Luggage → QRBags, ShieldCheck → VerifScan
 // - Indicateur « Live » (point vert clignotant) si un webhook a été reçu
 //   dans la dernière minute
 // - État vide explicite quand aucune activité
 
 function platformIcon(platform: string) {
-  return platform === "QRBAGS" ? Luggage : QrCode;
+  if (platform === "QRBAGS") return Luggage;
+  if (platform === "VERIFSCAN") return ShieldCheck;
+  return QrCode;
+}
+
+function platformChipClass(platform: string) {
+  if (platform === "QRBAGS") {
+    return "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400";
+  }
+  if (platform === "VERIFSCAN") {
+    return "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-500/15 text-teal-600 dark:text-teal-400";
+  }
+  return "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold";
 }
 
 function LiveDot({ live }: { live: boolean }) {
@@ -83,14 +95,7 @@ export default function ActivityFeed({
             const Icon = platformIcon(a.platform);
             return (
               <div key={a.id} className="flex items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-                <div
-                  className={
-                    a.platform === "QRBAGS"
-                      ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                      : "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold"
-                  }
-                  aria-hidden
-                >
+                <div className={platformChipClass(a.platform)} aria-hidden>
                   <Icon className="h-3.5 w-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">

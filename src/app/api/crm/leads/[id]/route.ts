@@ -4,7 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 
 // ─── PUT : mise à jour d'un lead (statut pipeline, champs) ───────────────────
 
-const SOURCES = ["QRTAGS", "QRBAGS", "RECOMMANDATION", "SITE_WEB", "AUTRE"] as const;
+const SOURCES = ["QRTAGS", "QRBAGS", "VERIFSCAN", "RECOMMANDATION", "SITE_WEB", "AUTRE"] as const;
 const STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "WON", "LOST"] as const;
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

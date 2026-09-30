@@ -23,6 +23,7 @@ interface ProductPack {
 const TYPE_LABELS: Record<string, string> = {
   QRTAGS: "QRTags",
   QRBAGS: "QRBags",
+  VERIFSCAN: "VerifScan",
   SUBSCRIPTION: "Abonnement",
   AUTRE: "Divers",
 };

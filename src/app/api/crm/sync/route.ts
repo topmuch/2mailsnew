@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
-import { ensurePlatformsSeeded, syncAllPlatforms, syncPlatform, type PlatformName } from "@/lib/crm-api";
+import { ensurePlatformsSeeded, syncAllPlatforms, syncPlatform, PLATFORM_NAMES, type PlatformName } from "@/lib/crm-api";
 
 // ─── Synchronisation manuelle CRM (admin) ───────────────────────────────────
 // POST /api/crm/sync            → synchronise toutes les plateformes actives
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     await ensurePlatformsSeeded();
     const platformParam = request.nextUrl.searchParams.get("platform")?.toUpperCase();
 
-    if (platformParam && ["QRTAGS", "QRBAGS"].includes(platformParam)) {
+    if (platformParam && (PLATFORM_NAMES as string[]).includes(platformParam)) {
       const result = await syncPlatform(platformParam as PlatformName);
       return NextResponse.json({ ok: true, results: [result], errors: [] });
     }

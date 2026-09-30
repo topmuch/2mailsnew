@@ -178,11 +178,14 @@ export async function getDailyKpis(day: Date) {
   const packsBy = (name: string) => newItems.filter((i) => i.platform.name === name).length;
   const priceOf = (name: string) => platforms.find((p) => p.name === name)?.estimatedPackPrice ?? 0;
   const revenue =
-    packsBy("QRTAGS") * priceOf("QRTAGS") + packsBy("QRBAGS") * priceOf("QRBAGS");
+    packsBy("QRTAGS") * priceOf("QRTAGS") +
+    packsBy("QRBAGS") * priceOf("QRBAGS") +
+    packsBy("VERIFSCAN") * priceOf("VERIFSCAN");
 
   return {
     activationsQrtags: activationsBy("QRTAGS"),
     activationsQrbags: activationsBy("QRBAGS"),
+    activationsVerifscan: activationsBy("VERIFSCAN"),
     activationsTotal: activations.reduce((s, a) => s + a._count, 0),
     scans,
     found,
@@ -198,7 +201,7 @@ function fcfa(n: number): string {
 // ── Objectifs du jour (aléatoires) ───────────────────────────────────────────
 
 const DAILY_GOALS = [
-  "Contacter au moins 5 prospects QRTags/QRBags avant 17h.",
+  "Contacter au moins 5 prospects QRTags/QRBags/VerifScan avant 17h.",
   "Relancer tous les clients avec facture impayée aujourd'hui.",
   "Obtenir 2 nouveaux RDV confirmés avec des hôtels partenaires.",
   "Envoyer 3 devis (bracelets, bagages ou tags) avant midi.",
@@ -330,6 +333,7 @@ export async function generateEveningReport(now = new Date()) {
   const kpiTable = `<table style="border-collapse:collapse;width:100%;"><tbody><tr>
     ${kpiRow("Activations QRTags", String(kpis.activationsQrtags), "#a16207")}
     ${kpiRow("Activations QRBags", String(kpis.activationsQrbags), "#1d4ed8")}
+    ${kpiRow("Activations VerifScan", String(kpis.activationsVerifscan), "#0d9488")}
     ${kpiRow("Total scans", String(kpis.scans))}
     ${kpiRow("Objets retrouvés", String(kpis.found), "#15803d")}
   </tr><tr>

@@ -41,6 +41,7 @@ const STAGES: { value: CrmLead["status"]; label: string; dot: string }[] = [
 const SOURCE_LABEL: Record<string, string> = {
   QRTAGS: "QRTags",
   QRBAGS: "QRBags",
+  VERIFSCAN: "VerifScan",
   RECOMMANDATION: "Recommandation",
   SITE_WEB: "Site web",
   AUTRE: "Autre",
@@ -485,6 +486,7 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
                 <SelectContent>
                   <SelectItem value="QRTAGS">QRTags</SelectItem>
                   <SelectItem value="QRBAGS">QRBags</SelectItem>
+                  <SelectItem value="VERIFSCAN">VerifScan</SelectItem>
                   <SelectItem value="RECOMMANDATION">Recommandation</SelectItem>
                   <SelectItem value="SITE_WEB">Site web</SelectItem>
                   <SelectItem value="AUTRE">Autre</SelectItem>

@@ -108,6 +108,7 @@ type ViewId =
   | "crm"
   | "crm-qrbags"
   | "crm-qrtags"
+  | "crm-verifscan"
   | "crm-clients"
   | "crm-leads"
   | "crm-tasks"
@@ -142,6 +143,7 @@ const NAV: {
   { id: "crm-projects", label: "Projets (dossiers clients)", short: "Projets", icon: FolderKanban, section: "CRM Unifié" },
   { id: "crm-qrbags", label: "Suivi QR Bags (qrbags.com)", short: "QR Bags", icon: Luggage, section: "CRM Unifié" },
   { id: "crm-qrtags", label: "Suivi QR Tags (qrtags.pro)", short: "QR Tags", icon: ScanLine, section: "CRM Unifié" },
+  { id: "crm-verifscan", label: "Suivi VerifScan (verifscan.com)", short: "VerifScan", icon: ShieldCheck, section: "CRM Unifié" },
   { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
   { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
@@ -693,6 +695,7 @@ export function AppShell() {
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
               {view === "crm-qrbags" && <CrmItemsView platform="QRBAGS" />}
               {view === "crm-qrtags" && <CrmItemsView platform="QRTAGS" />}
+              {view === "crm-verifscan" && <CrmItemsView platform="VERIFSCAN" />}
               {view === "crm-clients" && <CrmClientsView />}
               {view === "crm-tasks" && <CrmTasksView isAdmin={isAdmin} />}
               {view === "crm-automations" && <CrmAutomationsView isAdmin={isAdmin} />}

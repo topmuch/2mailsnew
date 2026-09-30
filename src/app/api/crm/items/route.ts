@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 
-// ─── Liste des items CRM (cache local qrtags.pro / qrbags.com) ──────────────
+// ─── Liste des items CRM (cache local qrtags.pro / qrbags.com / verifscan.com) ──
 // GET /api/crm/items?platform=QRBAGS&status=LOST&type=BAGAGE&q=hajj
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const q = sp.get("q")?.trim();
 
     const where: Record<string, unknown> = {};
-    if (platform && ["QRTAGS", "QRBAGS"].includes(platform)) {
+    if (platform && ["QRTAGS", "QRBAGS", "VERIFSCAN"].includes(platform)) {
       where.platform = { name: platform };
     }
     if (status && status !== "TOUS") {

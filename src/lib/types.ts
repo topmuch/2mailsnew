@@ -458,7 +458,7 @@ export interface QrBagsResult {
   message: string;
 }
 
-// ─── CRM Unifié (sync qrtags.pro / qrbags.com) ──────────────────────────────
+// ─── CRM Unifié (sync qrtags.pro / qrbags.com / verifscan.com) ──────────────────
 
 export interface CrmItem {
   id: string;
@@ -482,7 +482,7 @@ export interface CrmItem {
 
 export interface CrmActivity {
   id: string;
-  platform: string; // QRTAGS | QRBAGS
+  platform: string; // QRTAGS | QRBAGS | VERIFSCAN
   itemId: string | null;
   action: string; // SCAN | ACTIVATION | LOST | FOUND | SUSPENDED | SYNC | WEBHOOK_ERROR | UPDATED
   details: string;
@@ -504,7 +504,7 @@ export interface CrmClientDto {
 
 export interface CrmPlatformDto {
   id: string;
-  name: string; // QRTAGS | QRBAGS
+  name: string; // QRTAGS | QRBAGS | VERIFSCAN
   label: string;
   apiUrl?: string;
   apiKey?: string;
@@ -519,7 +519,7 @@ export interface CrmPlatformDto {
 
 export interface CrmPlatformStat {
   id: string;
-  name: string; // QRTAGS | QRBAGS
+  name: string; // QRTAGS | QRBAGS | VERIFSCAN
   label: string;
   isActive: boolean;
   lastSyncAt: string | null;
@@ -536,7 +536,7 @@ export interface CrmPlatformStat {
 }
 
 export interface CrmPieSlice {
-  name: string; // QRTAGS | QRBAGS
+  name: string; // QRTAGS | QRBAGS | VERIFSCAN
   label: string;
   value: number; // événements aujourd'hui
 }
@@ -637,7 +637,7 @@ export interface CrmLead {
   company: string | null;
   email: string | null;
   phone: string | null;
-  source: "QRTAGS" | "QRBAGS" | "RECOMMANDATION" | "SITE_WEB" | "AUTRE";
+  source: "QRTAGS" | "QRBAGS" | "VERIFSCAN" | "RECOMMANDATION" | "SITE_WEB" | "AUTRE";
   status: "NEW" | "CONTACTED" | "QUALIFIED" | "PROPOSAL" | "WON" | "LOST";
   value: number;
   notes: string | null;

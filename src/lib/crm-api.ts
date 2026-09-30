@@ -1,13 +1,25 @@
 import { db } from "@/lib/db";
 
-// ─── CRM Unifié — couche d'intégration qrtags.pro / qrbags.com ──────────────
+// ─── CRM Unifié — couche d'intégration qrtags.pro / qrbags.com / verifscan.com ─
 // Ce module communique avec les plateformes externes UNIQUEMENT via fetch.
 // Il ne modifie jamais le code des plateformes : il récupère leurs items
 // (GET {apiUrl}/api/admin/items) et reçoit leurs webhooks (/api/crm/webhooks).
 
-export type PlatformName = "QRTAGS" | "QRBAGS";
+export type PlatformName = "QRTAGS" | "QRBAGS" | "VERIFSCAN";
 
-export const PLATFORM_NAMES: PlatformName[] = ["QRTAGS", "QRBAGS"];
+export const PLATFORM_NAMES: PlatformName[] = ["QRTAGS", "QRBAGS", "VERIFSCAN"];
+
+/** Libellés de domaine par défaut (si la plateforme n'a pas de label en base). */
+const DEFAULT_LABELS: Record<PlatformName, string> = {
+  QRTAGS: "qrtags.pro",
+  QRBAGS: "qrbags.com",
+  VERIFSCAN: "verifscan.com",
+};
+
+/** URL d'API prés configurée à la création de la plateforme (modifiable en UI). */
+const DEFAULT_API_URLS: Partial<Record<PlatformName, string>> = {
+  VERIFSCAN: "https://verifscan.com",
+};
 
 export interface CrmItemInput {
   externalId: string;
@@ -35,8 +47,18 @@ export interface PlatformConfig {
 
 /** Lit les credentials d'une plateforme : variables d'environnement en priorité, sinon base (CrmPlatform). */
 export async function getPlatformConfig(platform: PlatformName): Promise<PlatformConfig | null> {
-  const envUrl = platform === "QRTAGS" ? process.env.QRTAGS_API_URL : process.env.QRBAGS_API_URL;
-  const envKey = platform === "QRTAGS" ? process.env.QRTAGS_API_KEY : process.env.QRBAGS_API_KEY;
+  const envUrl =
+    platform === "QRTAGS"
+      ? process.env.QRTAGS_API_URL
+      : platform === "QRBAGS"
+        ? process.env.QRBAGS_API_URL
+        : process.env.VERIFSCAN_API_URL;
+  const envKey =
+    platform === "QRTAGS"
+      ? process.env.QRTAGS_API_KEY
+      : platform === "QRBAGS"
+        ? process.env.QRBAGS_API_KEY
+        : process.env.VERIFSCAN_API_KEY;
 
   const row = await db.crmPlatform.findUnique({ where: { name: platform } });
   if (!row && !envUrl && !envKey) return null;
@@ -44,7 +66,7 @@ export async function getPlatformConfig(platform: PlatformName): Promise<Platfor
   return {
     id: row?.id ?? "",
     name: platform,
-    label: row?.label ?? (platform === "QRTAGS" ? "qrtags.pro" : "qrbags.com"),
+    label: row?.label ?? DEFAULT_LABELS[platform],
     apiUrl: envUrl ?? row?.apiUrl ?? "",
     apiKey: envKey ?? row?.apiKey ?? "",
     webhookSecret: process.env.CRM_WEBHOOK_SECRET ?? row?.webhookSecret ?? "",
@@ -251,17 +273,18 @@ export async function syncAllPlatforms() {
   return { results, errors };
 }
 
-/** Assure que les deux plateformes existent en base (idempotent, appelé au premier usage). */
+/** Assure que les trois plateformes existent en base (idempotent, appelé au premier usage). */
 export async function ensurePlatformsSeeded() {
-  const defaults: Array<{ name: PlatformName; label: string }> = [
+  const defaults: Array<{ name: PlatformName; label: string; apiUrl?: string }> = [
     { name: "QRTAGS", label: "qrtags.pro" },
     { name: "QRBAGS", label: "qrbags.com" },
+    { name: "VERIFSCAN", label: "verifscan.com", apiUrl: DEFAULT_API_URLS.VERIFSCAN },
   ];
   for (const d of defaults) {
     await db.crmPlatform.upsert({
       where: { name: d.name },
       update: {},
-      create: { name: d.name, label: d.label },
+      create: { name: d.name, label: d.label, apiUrl: d.apiUrl ?? "" },
     });
   }
 }

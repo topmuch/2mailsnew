@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 
 // ─── SyncButton : « 🔄 Synchroniser maintenant » ─────────────────────────────
 // Appelle POST /api/crm/sync pour rattraper un webhook manqué.
-// Variante compacte utilisée dans les onglets QR Bags / QR Tags
-// (?platform=QRBAGS|QRTAGS pour ne synchroniser qu'une plateforme).
+// Variante compacte utilisée dans les onglets QR Bags / QR Tags / VerifScan
+// (?platform=QRBAGS|QRTAGS|VERIFSCAN pour ne synchroniser qu'une plateforme).
 
 export default function SyncButton({
   onSync,
@@ -17,7 +17,7 @@ export default function SyncButton({
   onSync: () => void | Promise<void>;
   syncing?: boolean;
   /** si renseigné : synchronise uniquement cette plateforme */
-  platform?: "QRTAGS" | "QRBAGS";
+  platform?: "QRTAGS" | "QRBAGS" | "VERIFSCAN";
   label?: string;
 }) {
   return (

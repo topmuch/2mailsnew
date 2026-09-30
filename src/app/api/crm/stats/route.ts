@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       s.scansToday = scanMap.get(s.name) ?? 0;
     }
 
-    // ─── Répartition QRTAGS vs QRBAGS (camembert) ───────────────────────────
+    // ─── Répartition QRTAGS / QRBAGS / VERIFSCAN (camembert) ────────────────
     const pieData = platformStats.map((s) => ({ name: s.name, label: s.label || s.name, value: s.activitiesToday }));
 
     const totalFound = itemsByStatus.find((r) => r.status === "FOUND")?._count._all ?? 0;

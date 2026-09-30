@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Luggage, QrCode, RefreshCw, Search, TriangleAlert, MapPin } from "lucide-react";
+import { Loader2, Luggage, QrCode, RefreshCw, Search, ShieldCheck, TriangleAlert, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ import { authFetch } from "@/lib/auth-client";
 import { ItemStatusBadge, formatRelativeFr } from "@/components/crm/crm-shared";
 import type { CrmItem } from "@/lib/types";
 
-// ─── Suivi des items d'une plateforme (QRBAGS ou QRTAGS) ────────────────────
+// ─── Suivi des items d'une plateforme (QRBAGS, QRTAGS ou VERIFSCAN) ────────────────────
 
 const PLATFORM_META = {
   QRBAGS: {
@@ -40,9 +40,14 @@ const PLATFORM_META = {
     subtitle: "Étiquettes enregistrées sur qrtags.pro — activées, perdues, retrouvées.",
     icon: QrCode,
   },
+  VERIFSCAN: {
+    title: "Suivi VerifScan",
+    subtitle: "Vérifications enregistrées sur verifscan.com — activées, scans, statuts.",
+    icon: ShieldCheck,
+  },
 } as const;
 
-export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAGS" }) {
+export default function CrmItemsView({ platform }: { platform: "QRBAGS" | "QRTAGS" | "VERIFSCAN" }) {
   const { toast } = useToast();
   const meta = PLATFORM_META[platform];
   const Icon = meta.icon;

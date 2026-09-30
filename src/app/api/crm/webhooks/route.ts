@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { ensurePlatformsSeeded, PLATFORM_NAMES, type PlatformName } from "@/lib/crm-api";
 
-// ─── Webhooks CRM : réception des événements qrtags.pro / qrbags.com ────────
+// ─── Webhooks CRM : réception des événements qrtags.pro / qrbags.com / verifscan.com ──
 // Les plateformes externes appellent :
 //   POST /api/crm/webhooks
 //   En-tête  : X-Webhook-Secret: <secret>   (ou ?secret=… en repli)
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const platformName = String(body.platform ?? body.source ?? url.searchParams.get("platform") ?? "").toUpperCase();
     if (!isPlatformName(platformName)) {
-      return NextResponse.json({ error: "Plateforme inconnue (attendu : QRTAGS ou QRBAGS)" }, { status: 400 });
+      return NextResponse.json({ error: "Plateforme inconnue (attendu : QRTAGS, QRBAGS ou VERIFSCAN)" }, { status: 400 });
     }
     const platform = platformName as PlatformName;
 
@@ -163,7 +163,7 @@ export async function GET() {
     endpoint: "POST /api/crm/webhooks",
     headers: { "X-Webhook-Secret": "<secret partagé>" },
     body: {
-      platform: "QRTAGS | QRBAGS",
+      platform: "QRTAGS | QRBAGS | VERIFSCAN",
       event: "item_activated | item_scanned | item_lost | item_found | item_suspended",
       item: { id: "<id plateforme>", code: "HAJJ25-ABC123", ownerName: "…", ownerPhone: "…", place: "HLM Grand Yoff" },
     },

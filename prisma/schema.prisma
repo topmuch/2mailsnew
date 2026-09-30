@@ -380,7 +380,7 @@ model CrmLead {
   company   String?
   email     String?
   phone     String?
-  source    String   @default("AUTRE") // QRTAGS | QRBAGS | RECOMMANDATION | SITE_WEB | AUTRE
+  source    String   @default("AUTRE") // QRTAGS | QRBAGS | VERIFSCAN | RECOMMANDATION | SITE_WEB | AUTRE
   status    String   @default("NEW") // NEW | CONTACTED | QUALIFIED | PROPOSAL | WON | LOST
   value     Float    @default(0) // valeur estimée du deal (FCFA)
   notes     String?

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const action = sp.get("action")?.toUpperCase();
 
     const where: Record<string, unknown> = {};
-    if (platform && ["QRTAGS", "QRBAGS"].includes(platform)) where.platform = platform;
+    if (platform && ["QRTAGS", "QRBAGS", "VERIFSCAN"].includes(platform)) where.platform = platform;
     if (action) where.action = action;
 
     const activities = await db.crmActivity.findMany({

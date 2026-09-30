@@ -4,7 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 
 // ─── GET : liste des leads (pipeline commercial) ─────────────────────────────
 
-const SOURCES = ["QRTAGS", "QRBAGS", "RECOMMANDATION", "SITE_WEB", "AUTRE"] as const;
+const SOURCES = ["QRTAGS", "QRBAGS", "VERIFSCAN", "RECOMMANDATION", "SITE_WEB", "AUTRE"] as const;
 const STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "WON", "LOST"] as const;
 
 export async function GET(request: NextRequest) {

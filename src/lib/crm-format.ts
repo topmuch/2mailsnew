@@ -1,6 +1,7 @@
 import type { CrmPieSlice, CrmPlatformStat } from "@/lib/types";
 
 // ─── CRM Unifié — formateurs pour le dashboard (adapté de lib/api.ts du prompt) ──
+// 3 plateformes : QRTAGS (or), QRBAGS (bleu), VERIFSCAN (sarcelle/teal).
 
 /** Formate un montant en FCFA avec séparateurs (ex. 12 500 FCFA). */
 export function formatFcfa(amount: number | null | undefined): string {
@@ -25,20 +26,26 @@ export function formatTodayLong(): string {
 }
 
 /**
- * Tonalité d'une carte selon la plateforme dominante :
+ * Tonalité d'une carte selon la plateforme dominante (valeurs dans l'ordre :
+ * QRTAGS, QRBAGS, VERIFSCAN — compatibilité : 2 arguments = ancien comportement) :
  * - « qrts » → or/jaune (QRTags dominant)
  * - « qrbg » → bleu (QRBags dominant)
- * - « global » → vert (équilibre ou global)
+ * - « global » → vert (équilibre, VerifScan dominant ou global)
  */
 export type StatTone = "qrts" | "qrbg" | "global";
 
-export function dominantTone(a: number, b: number): StatTone {
-  if (a > b) return "qrts";
-  if (b > a) return "qrbg";
+export function dominantTone(...values: number[]): StatTone {
+  const a = values[0] ?? 0;
+  const b = values[1] ?? 0;
+  const c = values[2] ?? 0;
+  const max = Math.max(a, b, c);
+  if (max <= 0) return "global";
+  if (max === a && a > b) return "qrts";
+  if (max === b && b > a) return "qrbg";
   return "global";
 }
 
-/** Sous-valeur lisible « QRTags : 12 | QRBags : 8 » à partir des stats par plateforme. */
+/** Sous-valeur lisible « QRTags : 12 | QRBags : 8 | VerifScan : 3 » à partir des stats par plateforme. */
 export function platformSubValue(
   platformStats: CrmPlatformStat[] | undefined,
   pick: (s: CrmPlatformStat) => number
@@ -48,7 +55,7 @@ export function platformSubValue(
     const s = list.find((x) => x.name === name);
     return s ? pick(s) : 0;
   };
-  return `QRTags : ${formatNumber(part("QRTAGS"))} | QRBags : ${formatNumber(part("QRBAGS"))}`;
+  return `QRTags : ${formatNumber(part("QRTAGS"))} | QRBags : ${formatNumber(part("QRBAGS"))} | VerifScan : ${formatNumber(part("VERIFSCAN"))}`;
 }
 
 /** Somme d'un indicateur sur les deux plateformes. */
@@ -56,10 +63,11 @@ export function sumPlatforms(platformStats: CrmPlatformStat[] | undefined, pick:
   return (platformStats ?? []).reduce((acc, s) => acc + (pick(s) || 0), 0);
 }
 
-/** Transforme les données camembert en couleurs cohérentes (ambre = QRTAGS, bleu = QRBAGS). */
+/** Transforme les données camembert en couleurs cohérentes (ambre = QRTAGS, bleu = QRBAGS, sarcelle = VERIFSCAN). */
 export const PIE_COLORS: Record<string, string> = {
   QRTAGS: "var(--color-gold, #f59e0b)",
   QRBAGS: "#3b82f6", // bleu — distinctif QRBags (demandé par l'utilisateur)
+  VERIFSCAN: "#0d9488", // sarcelle — distinctif VerifScan (verifscan.com)
 };
 
 export function pieColor(name: string): string {

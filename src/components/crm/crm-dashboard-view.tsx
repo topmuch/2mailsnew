@@ -53,7 +53,7 @@ import {
 } from "@/lib/crm-format";
 import type { CrmPlatformDto, CrmStats } from "@/lib/types";
 
-// ─── CRM Unifié — Tableau de Bord Unifié (qrtags.pro + qrbags.com) ──────────
+// ─── CRM Unifié — Tableau de Bord Unifié (qrtags.pro + qrbags.com + verifscan.com) ──
 // Adaptation du « Prompt 2 » : le dashboard consomme la couche API locale
 // (/api/crm/stats) qui agrège les données reçues des deux plateformes
 // (webhooks + synchronisation). Aucun appel direct vers les plateformes
@@ -62,6 +62,7 @@ import type { CrmPlatformDto, CrmStats } from "@/lib/types";
 const PIE_CHART_CONFIG = {
   QRTAGS: { label: "QRTags", color: "var(--color-gold, #d4a017)" },
   QRBAGS: { label: "QRBags", color: "#3b82f6" },
+  VERIFSCAN: { label: "VerifScan", color: "#0d9488" },
 } satisfies ChartConfig;
 
 interface PlatformConfigDraft {
@@ -221,7 +222,7 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
             CRM Unifié — Tableau de Bord
           </h1>
           <p className="text-sm text-muted-foreground mt-1 first-letter:uppercase">
-            {formatTodayLong()} · suivi des QR codes <strong>qrtags.pro</strong> et <strong>qrbags.com</strong> en temps réel.
+            {formatTodayLong()} · suivi des QR codes <strong>qrtags.pro</strong>, <strong>qrbags.com</strong> et <strong>verifscan.com</strong> en temps réel.
           </p>
         </div>
         <SyncButton onSync={doSyncAll} syncing={syncing} />
@@ -234,14 +235,22 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
           value={formatNumber(activations)}
           subValue={platformSubValue(ps, (s) => s.activationsToday)}
           icon={Sparkles}
-          tone={dominantTone(ps?.find((x) => x.name === "QRTAGS")?.activationsToday ?? 0, ps?.find((x) => x.name === "QRBAGS")?.activationsToday ?? 0)}
+          tone={dominantTone(
+            ps?.find((x) => x.name === "QRTAGS")?.activationsToday ?? 0,
+            ps?.find((x) => x.name === "QRBAGS")?.activationsToday ?? 0,
+            ps?.find((x) => x.name === "VERIFSCAN")?.activationsToday ?? 0,
+          )}
         />
         <StatsCard
           title="Total scans (jour)"
           value={formatNumber(scans)}
           subValue={platformSubValue(ps, (s) => s.scansToday)}
           icon={ScanLine}
-          tone={dominantTone(ps?.find((x) => x.name === "QRTAGS")?.scansToday ?? 0, ps?.find((x) => x.name === "QRBAGS")?.scansToday ?? 0)}
+          tone={dominantTone(
+            ps?.find((x) => x.name === "QRTAGS")?.scansToday ?? 0,
+            ps?.find((x) => x.name === "QRBAGS")?.scansToday ?? 0,
+            ps?.find((x) => x.name === "VERIFSCAN")?.scansToday ?? 0,
+          )}
         />
         <StatsCard
           title="Objets retrouvés"
@@ -257,12 +266,16 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
           subValue={`${formatNumber(newItemsToday)} pack(s) vendu(s) aujourd'hui`}
           hint={platformSubValue(ps, (s) => s.estimatedRevenue)}
           icon={Wallet}
-          tone={dominantTone(ps?.find((x) => x.name === "QRTAGS")?.estimatedRevenue ?? 0, ps?.find((x) => x.name === "QRBAGS")?.estimatedRevenue ?? 0)}
+          tone={dominantTone(
+            ps?.find((x) => x.name === "QRTAGS")?.estimatedRevenue ?? 0,
+            ps?.find((x) => x.name === "QRBAGS")?.estimatedRevenue ?? 0,
+            ps?.find((x) => x.name === "VERIFSCAN")?.estimatedRevenue ?? 0,
+          )}
         />
       </div>
 
       {/* Cartes plateformes (configuration admin conservée) */}
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
         {(stats?.platforms ?? []).map((p) => {
           const stat = ps?.find((x) => x.name === p.name);
           return (
@@ -270,7 +283,7 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-sky-700 text-white">
-                    {p.name === "QRBAGS" ? <QrCode className="h-5 w-5" aria-hidden /> : <ScanLine className="h-5 w-5" aria-hidden />}
+                    {p.name === "QRBAGS" ? <QrCode className="h-5 w-5" aria-hidden /> : p.name === "VERIFSCAN" ? <ShieldCheck className="h-5 w-5" aria-hidden /> : <ScanLine className="h-5 w-5" aria-hidden />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm flex items-center gap-2">
@@ -353,7 +366,7 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
                     nameKey="name"
                     innerRadius={46}
                     strokeWidth={4}
-                    label={({ name, value }) => `${name === "QRTAGS" ? "QRTags" : "QRBags"} : ${value}`}
+                    label={({ name, value }) => `${name === "QRTAGS" ? "QRTags" : name === "QRBAGS" ? "QRBags" : "VerifScan"} : ${value}`}
                   >
                     {pieSlices.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
@@ -368,6 +381,9 @@ export default function CrmDashboardView({ isAdmin }: { isAdmin: boolean }) {
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-blue-500" aria-hidden /> QRBags
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-teal-600" aria-hidden /> VerifScan
               </span>
               <span className="text-muted-foreground">{formatNumber(pieSum)} événement(s) aujourd&apos;hui</span>
             </div>

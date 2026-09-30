@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         description: (body.description ?? "").toString().trim() || null,
         price,
         quantity: Math.max(1, Math.round(Number(body.quantity) || 1)),
-        type: ["QRTAGS", "QRBAGS", "SUBSCRIPTION", "AUTRE"].includes(body.type) ? body.type : "AUTRE",
+        type: ["QRTAGS", "QRBAGS", "VERIFSCAN", "SUBSCRIPTION", "AUTRE"].includes(body.type) ? body.type : "AUTRE",
       },
     });
     return NextResponse.json({ pack });
