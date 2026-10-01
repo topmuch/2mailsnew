@@ -464,6 +464,22 @@ async function fetchNewsSearch(topicKey: string): Promise<NewsCacheEntry> {
 
 // ─── Route ───────────────────────────────────────────────────────────────────
 
+/**
+ * Les photos sont servies via notre proxy même origine (/api/news/image) :
+ * les médias bloquent l'affichage direct depuis un autre domaine (anti-hotlink
+ * via Referer) et le contenu mixte http:// est rejeté quand l'app est en
+ * https. La base garde l'URL canonique ; seul l'affichage passe par le proxy.
+ */
+const proxifyImage = (u: string | null) => (u ? `/api/news/image?u=${encodeURIComponent(u)}` : null);
+
+function serve(entry: NewsCacheEntry, extra: Record<string, unknown>) {
+  return NextResponse.json({
+    ...entry,
+    items: entry.items.map((i) => ({ ...i, image: proxifyImage(i.image) })),
+    ...extra,
+  });
+}
+
 function ensureFetch(key: string, run: () => Promise<NewsCacheEntry>): Promise<NewsCacheEntry> {
   if (!inflight.has(key)) {
     const p = run()
@@ -488,21 +504,21 @@ export async function GET(request: NextRequest) {
 
   const cached = cache.get(topicKey);
   if (!refresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return NextResponse.json({ ...cached, topic: topicKey, label: topic.label, cached: true });
+    return serve(cached, { topic: topicKey, label: topic.label, cached: true });
   }
 
   try {
     // Source primaire : Google Actualités
     const entry = await ensureFetch(topicKey, () => fetchNewsGoogle(topicKey));
-    return NextResponse.json({ ...entry, topic: topicKey, label: topic.label, cached: false });
+    return serve(entry, { topic: topicKey, label: topic.label, cached: false });
   } catch (googleErr) {
     // Repli : pipeline recherche web, puis cache périmé, sinon erreur.
     try {
       const entry = await ensureFetch(`${topicKey}::search`, () => fetchNewsSearch(topicKey));
-      return NextResponse.json({ ...entry, topic: topicKey, label: topic.label, cached: false, fallback: true });
+      return serve(entry, { topic: topicKey, label: topic.label, cached: false, fallback: true });
     } catch (searchErr) {
       if (cached) {
-        return NextResponse.json({ ...cached, topic: topicKey, label: topic.label, cached: true, stale: true });
+        return serve(cached, { topic: topicKey, label: topic.label, cached: true, stale: true });
       }
       console.error("GET /api/news", googleErr, searchErr);
       return NextResponse.json({ error: "Impossible de récupérer les actualités pour le moment" }, { status: 502 });

@@ -185,6 +185,7 @@ export default function NewsView() {
                     src={item.image}
                     alt=""
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";

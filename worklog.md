@@ -1698,3 +1698,18 @@ Work Log:
 
 Stage Summary:
 - L'onglet Actus puise maintenant dans Google Actualités (flux RSS public, fil Sénégal + 3 fils de recherche) : titres classés par Google, nom du média d'origine affiché, dates en français, et la vraie photo de chaque article (og:image ou image du corps) récupérée via résolution économe en quota (cache DB NewsArticle + budget + pacing + cooldown 429). Les articles non encore résolus restent cliquables (lien Google) et se complètent automatiquement aux cycles suivants. Fichiers : api/news/route.ts (réécrit), news-view.tsx (adapté), prisma/schema.prisma (+NewsArticle). Rappels inchangés : redeploy Coolify, IMAP/SMTP, token GitHub révocable.
+
+---
+Task ID: 70
+Agent: Z.ai Code (principal)
+Task: « les articles sont là mais les photos ne s'affichent pas » — proxy d'images même origine pour l'onglet Actus
+
+Work Log:
+- Diagnostic : les og:image pointent vers les CDN des journaux (senenews.com/wp-content, lesoleil.sn, aps.sn, images.theconversation.com…). Les presses WordPress bloquent typiquement l'affichage direct depuis un autre domaine (anti-hotlink via Referer) et certaines photos sont en http:// (contenu mixte rejeté quand l'app est servie en https via la preview) — d'où photos invisibles chez l'utilisateur alors que le test localhost headless les voyait charger.
+- Fix définitif : servir chaque photo depuis NOTRE backend. Nouvelle route src/app/api/news/image/route.ts : GET ?u=<url encodée> → fetch serveur (UA navigateur, SANS Referer → contourne l'anti-hotlink), validation type image/*, plafond 10 Mo, timeout 8 s, échec → 404 (placeholder doré côté UI) ; Cache-Control public 7 jours (vues répétées gratuites). Route volontairement publique (une balise <img> ne peut pas envoyer le Bearer) mais durcie SSRF : protocole http(s) seul + regex PRIVATE_HOST (localhost/127/10/192.168/169.254/172.16-31/0.0.0.0/IPv6 ::1, fc/fd/fe80) — sonde curl http://127.0.0.1 → 400.
+- api/news/route.ts : helper serve() + proxifyImage — les URL images de la RÉPONSE sont réécrites en /api/news/image?u=… (la base NewsArticle garde l'URL canonique) ; appliqué aux 4 chemins de retour (cache frais, google, repli search, cache périmé). news-view.tsx : referrerPolicy="no-referrer" ajouté sur <img> (ceinture+bretelles), onError/placeholder inchangés.
+- E2E : lint 0/0 ; API → 9 items dont 7 images proxifiées ; curl proxy → HTTP 200 image/webp 42 890 octets ; navigateur : 9 cartes, 7 balises <img> toutes chargées (naturalWidth>0), src toutes en /api/news/image?u= ; captures task70-actus-photos-proxy-{,dark,mobile}.png validées (FMI, Macky Sall ONU, Revue de presse APS, Crédits spéciaux — cette dernière a RÉCUPÉRÉ sa photo entre-temps grâce au cycle de complétion DB Task 69) ; dev.log sans erreur ni 429.
+- Seule exception : olympics.com (Akamai) bloque même le fetch serveur avec UA navigateur → placeholder pour cette carte, acceptable.
+
+Stage Summary:
+- Les photos de l'onglet Actus s'affichent maintenant dans tous les cas : elles transitent par notre proxy même origine /api/news/image (anti-hotlink neutralisé, plus de contenu mixte, cache navigateur 7 j, route publique durcie contre le SSRF). 7/7 images chargées en desktop clair et sombre ; les articles sans photo du moment gardent leur placeholder doré et se complètent aux cycles suivants. Fichiers : api/news/image/route.ts (nouveau), api/news/route.ts (serve()), news-view.tsx (1 attribut). Rappels inchangés : redeploy Coolify, IMAP/SMTP, token GitHub révocable.
