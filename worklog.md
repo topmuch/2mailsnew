@@ -1629,3 +1629,20 @@ Work Log:
 
 Stage Summary:
 - La synchronisation VERIFSCAN fonctionne SANS clé API : elle récupère les infos publiques du site verifscan.com (titre « VerifScan — Passeport numérique produit », description complète, logo og:image) et les affiche dans une carte « Infos du site » + une ligne Site dans le tableau de suivi ; les erreurs de sync restantes sont maintenant explicites en français (400) au lieu d'un 500 générique. Le sync GitHub est à jour (4690bc4 poussé). La réception de mails reste bloquée tant que l'utilisateur n'a pas re-saisi IMAP/SMTP dans Boîte mail → Configuration. Fichiers : crm-api.ts, api/crm/sync/route.ts, crm-items-view.tsx, types.ts.
+
+---
+Task ID: 66
+Agent: Z.ai Code (principal)
+Task: Synchroniser la version GitHub et la version locale (demande utilisateur)
+
+Work Log:
+- Diagnostic : sandbox rembobiné à Task 61 locale (daba93d, hash réécrit) alors que GitHub (2mailsnew/main) = 9dbfa70 avec 6 commits d'avance (Tasks 61→65) ; vérifié par patch-id ET diff d'arbre que le commit local unique était strictement identique en contenu au commit distant baa6896 (Tasks 62-65 perdues du disque local, conservées sur GitHub + worklog restauré par le reset).
+- Procédure anti-incident inode DB appliquée dans l'ordre : backup db → /tmp/custom-backup-sync-task66.db ; kill propre du serveur boot (PID 1162 + arbre next) AVANT le reset pour libérer le fd de db/custom.db ; git reset --hard 2mailsnew/main → HEAD = 9dbfa70, divergence 0 0 ; bunx prisma generate ; serveur relancé via .zscripts/dev.sh (recette boot exacte : install + db:push + dev + health) → 200 en ~10 s, aucun SQLITE_READONLY_DBMOVED.
+- Note infra : le serveur lancé via setsid nohup dans un appel a SURVÉCU entre deux appels cette fois (contrairement à la leçon Task 59) — arbre orphan PPID 1 identique au boot ; à reconfirmer les prochaines fois avant de s'y fier.
+- Sondes API : login admin 200 ; GET /api/crm/leads → 8 leads + counts (données Tasks 62-65 intactes) ; POST lead test → créé (écriture DB OK) puis DELETE 200 (suppression admin OK) ; GET /api/crm/platforms → QRTAGS/QRBAGS/VERIFSCAN présentes ; POST /api/crm/sync?platform=VERIFSCAN → 200 {siteInfo:true, updated:1} idempotent (fallback infos du site Task 65 fonctionnel).
+- E2E agent-browser : login → CRM UNIFIÉ déplié → nav « VerifScan » (Task 64) présente → page Leads version épurée Task 63 (bouton « Nouveau lead », chiffres clés « Taux de conversion », onglets Kanban/Liste, table « Liste des leads du pipeline commercial ») → vue VerifScan avec carte « Infos du site » (aperçu verifscan.com + lien) et bouton « Synchroniser VERIFSCAN » ; thème sombre luxe bleuté OK ; mobile 390 px (set viewport, hamburger → CRM UNIFIÉ → Leads rendu) ; lint 0/0 ; dev.log sans erreur (seules traces prisma:query normales des automatisations mails).
+- CLI agent-browser : la commande viewport se fait via `agent-browser set viewport <w> <h>` (ni `resize` ni `viewport` nus) ; screenshot ignore l'argument path et écrit dans /home/z/.agent-browser/tmp/screenshots/ → copier le dernier PNG vers .zscreens/.
+- Commit + push vers 2mailsnew (worklog Task 66, .zscreens/task66-*.png, db/custom.db force-addée).
+
+Stage Summary:
+- Local = GitHub = 9dbfa70 (Task 65) : Tasks 62-65 restaurées (page Leads épurée, plateforme VERIFSCAN avec infos du site verifscan.com, réparation sync) — aucune perte de données (8 leads, plateformes, items site-info intacts), écriture DB vérifiée, UI desktop/dark/mobile validée. Le serveur dev tourne sur le code Task 65. Rappels utilisateur inchangés : redeploy Coolify pour Tasks 56-65 en production ; re-saisie IMAP/SMTP (Boîte mail → Configuration) ; token GitHub révocable.
