@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { extractSiteInfo } from "@/lib/crm-api";
 import { db } from "@/lib/db";
+import { warmNewsImages } from "@/lib/news-image-cache";
 
 // ─── GET /api/news?topic=… : actualités Google Actualités, avec photos ───────
 // Source primaire (Task 69, demande utilisateur) : flux RSS public de Google
@@ -473,6 +474,11 @@ async function fetchNewsSearch(topicKey: string): Promise<NewsCacheEntry> {
 const proxifyImage = (u: string | null) => (u ? `/api/news/image?u=${encodeURIComponent(u)}` : null);
 
 function serve(entry: NewsCacheEntry, extra: Record<string, unknown>) {
+  // Préchauffage du cache disque des photos : dès qu'un lot d'articles est
+  // servi, ses images sont récupérées en arrière-plan et conservées sur le
+  // disque — l'affichage utilisateur devient instantané et ne dépend plus
+  // de la disponibilité des sites des médias au moment du clic.
+  warmNewsImages(entry.items.map((i) => i.image));
   return NextResponse.json({
     ...entry,
     items: entry.items.map((i) => ({ ...i, image: proxifyImage(i.image) })),
