@@ -1646,3 +1646,18 @@ Work Log:
 
 Stage Summary:
 - Local = GitHub = 9dbfa70 (Task 65) : Tasks 62-65 restaurées (page Leads épurée, plateforme VERIFSCAN avec infos du site verifscan.com, réparation sync) — aucune perte de données (8 leads, plateformes, items site-info intacts), écriture DB vérifiée, UI desktop/dark/mobile validée. Le serveur dev tourne sur le code Task 65. Rappels utilisateur inchangés : redeploy Coolify pour Tasks 56-65 en production ; re-saisie IMAP/SMTP (Boîte mail → Configuration) ; token GitHub révocable.
+
+---
+Task ID: 67
+Agent: Z.ai Code (principal)
+Task: « refaitmoi le design de l'onglet leads plus simple en liste » — refonte liste unique de la page Leads
+
+Work Log:
+- Retour utilisateur : la version Task 63 (stats 4 colonnes + bascule Kanban ⇄ Liste) restait trop complexe → demande explicite d'un design plus simple, en liste.
+- src/components/crm/crm-leads-view.tsx réécrit (un seul fichier, rien d'autre touché) : UNE seule vue liste — supprimés : carte de 4 chiffres clés, bascule Kanban/Liste, colonnes kanban (code Task 63 récupérable au commit de la Task 63) ; remplacés par : résumé sur une ligne sous le titre (« 8 leads · 1 490 000 F en pipeline · 1 gagné »), filtres pilules arrondis par étape avec compteurs (Tous + 6 statuts, défilement horizontal mobile, aria-pressed), liste en ul/divide-y lisible : point coloré étape + Nom · Société + sous-ligne (source · contact · temps relatif) + valeur dorée + select statut inline + actions (modifier, supprimer admin) toujours visibles ; dialog création/édition passé en une colonne (max-h-90vh scroll) avec Source/Statut côte à côte ; skeleton 3 lignes ; états vides conservés (invitation si pipeline vide, message si filtre sans résultat) ; fmtCompact/Badge/AnimatePresence/LayoutGrid/List/Inbox import inutiles retirés (lint propre) ; framer-motion gardé pour un fade-in discret.
+- Fonctions intégralement conservées : recherche (nom/société/email/téléphone + filtre pilule combinés), création/édition, changement de statut inline, suppression admin, valeur estimée, temps relatif, props isAdmin inchangées.
+- E2E agent-browser (re-login requis, profil navigateur reparti vierge) : résumé + pilules « Tous 8/Nouveau 3/… » rendus, zéro trace de Kanban ; filtre « Gagné 1 » → 1 ligne (Cheikh Mbaye) puis retour Tous ; création via dialog « Aminata Sow Test · Pharmacie Ngor » → toast « Lead ajouté au pipeline » + ligne visible avec actions admin ; cleanup du lead test par API (DELETE 200) ; captures desktop clair / desktop sombre / mobile 390 px sombre (task67-leads-liste-{desktop,dark,mobile}.png) ; lint 0/0 ; dev.log sans erreur.
+- Leçon CLI : `agent-browser screenshot <path>` accepte désormais un chemin explicite (sauvegarde réellement à l'endroit demandé) — ne plus passer par le copier-coller du tmp ; vérifier la tailles distinctes des captures avant commit (3 png identiques détectés et corrigés).
+
+Stage Summary:
+- L'onglet Leads est maintenant une simple liste : titre + résumé d'une ligne, pilules de filtrage par étape (avec compteurs), fiches claires (valeur, statut modifiable, actions), dialog une colonne — fini le kanban et la carte de stats jugés trop denses. Toutes les fonctions conservées ; E2E complet (filtre, création, admin, dark, mobile) validé. Fichier modifié : src/components/crm/crm-leads-view.tsx uniquement.

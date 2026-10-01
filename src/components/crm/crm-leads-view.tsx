@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Briefcase, Inbox, LayoutGrid, List, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Briefcase, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +23,13 @@ import { cn } from "@/lib/utils";
 import type { CrmLead } from "@/lib/types";
 
 // ─── Leads : pipeline commercial (nouveau → gagné/perdu) ─────────────────────
-// Version épurée (Task 63) : en-tête simple, une ligne de chiffres clés,
-// kanban lisible (point coloré par étape), bascule Kanban ⇄ Liste.
+// Version liste simple (Task 67, retour utilisateur) : UNE seule vue liste,
+// filtres pilules par étape, résumé sur une ligne sous le titre, fiches
+// lisibles (nom · société · valeur · statut modifiable · actions).
 // Fonctions conservées : création/édition, changement de statut, recherche,
 // suppression admin, valeur estimée, temps relatif.
+// (La vue kanban de la Task 63 est retirée à la demande de l'utilisateur —
+// reste disponible dans l'historique git au commit Task 63.)
 
 const STAGES: { value: CrmLead["status"]; label: string; dot: string }[] = [
   { value: "NEW", label: "Nouveau", dot: "bg-emerald-500" },
@@ -48,13 +50,6 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const fmtFcfa = (n: number) => `${new Intl.NumberFormat("fr-FR").format(Math.round(n))} F`;
-
-/** Format compact pour les cartes et entêtes de colonnes (1 200 000 F → 1,2 M F). */
-const fmtCompact = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M F`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)} k F`;
-  return fmtFcfa(n);
-};
 
 /** Temps relatif depuis la dernière mise à jour (« aujourd'hui », « il y a 3 j »…). */
 const relTime = (iso: string) => {
@@ -80,21 +75,18 @@ interface LeadForm {
 
 const EMPTY_FORM: LeadForm = { name: "", company: "", email: "", phone: "", source: "AUTRE", status: "NEW", value: "", notes: "" };
 
-type ViewMode = "kanban" | "list";
-
 export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
   const { toast } = useToast();
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [pipelineValue, setPipelineValue] = useState(0);
-  const [wonValue, setWonValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CrmLead | null>(null);
   const [form, setForm] = useState<LeadForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [view, setView] = useState<ViewMode>("kanban");
 
   const load = useCallback(async () => {
     try {
@@ -104,7 +96,6 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
       setLeads(data.leads ?? []);
       setCounts(data.counts ?? {});
       setPipelineValue(data.pipelineValue ?? 0);
-      setWonValue(data.wonValue ?? 0);
     } catch {
       toast({ title: "Erreur", description: "Impossible de charger les leads", variant: "destructive" });
     } finally {
@@ -116,19 +107,16 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
     load();
   }, [load]);
 
-  // ─── Indicateurs dérivés ───
   const wonCount = counts.WON ?? 0;
-  const lostCount = counts.LOST ?? 0;
-  const activeCount = leads.length - wonCount - lostCount;
-  const winRate = wonCount + lostCount > 0 ? Math.round((wonCount / (wonCount + lostCount)) * 100) : null;
-  const proposalCount = counts.PROPOSAL ?? 0;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter((l) =>
-      !q ? true : [l.name, l.company, l.email, l.phone].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)),
-    );
-  }, [leads, query]);
+    return leads.filter((l) => {
+      if (statusFilter !== "ALL" && l.status !== statusFilter) return false;
+      if (!q) return true;
+      return [l.name, l.company, l.email, l.phone].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [leads, query, statusFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -200,23 +188,25 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  // ─── Chiffres clés (une seule ligne, 4 colonnes) ───
-  const STATS = [
-    { label: "En pipeline", value: fmtFcfa(pipelineValue), sub: `${activeCount} lead${activeCount > 1 ? "s" : ""} actif${activeCount > 1 ? "s" : ""}`, dot: "bg-gold" },
-    { label: "Gagné", value: fmtFcfa(wonValue), sub: `${wonCount} deal${wonCount > 1 ? "s" : ""} signé${wonCount > 1 ? "s" : ""}`, dot: "bg-emerald-500" },
-    { label: "Devis envoyés", value: String(proposalCount), sub: "en attente de réponse", dot: "bg-purple-500" },
-    { label: "Taux de conversion", value: winRate == null ? "—" : `${winRate} %`, sub: `${wonCount} gagnés · ${lostCount} perdus`, dot: "bg-teal-500" },
+  // ─── Filtres pilules : Tous + une par étape, avec compteurs ───
+  const FILTERS = [
+    { value: "ALL", label: "Tous", dot: "", count: leads.length },
+    ...STAGES.map((s) => ({ ...s, count: counts[s.value] ?? 0 })),
   ];
 
   return (
-    <div className="space-y-6">
-      {/* ─── En-tête simple ─── */}
+    <div className="space-y-5">
+      {/* ─── En-tête : titre, résumé sur une ligne, recherche + action ─── */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <Briefcase className="h-6 w-6 text-gold" aria-hidden /> Leads
           </h1>
-          <p className="text-sm text-muted-foreground">Pipeline commercial — suivez vos prospects jusqu&apos;à la signature.</p>
+          <p className="mt-0.5 text-sm text-muted-foreground" aria-live="polite">
+            {loading
+              ? "Chargement…"
+              : `${leads.length} lead${leads.length > 1 ? "s" : ""} · ${fmtFcfa(pipelineValue)} en pipeline · ${wonCount} gagné${wonCount > 1 ? "s" : ""}`}
+          </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative sm:w-60">
@@ -229,39 +219,43 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
 
-      {/* ─── Chiffres clés : une carte, 4 colonnes, séparateurs fins ─── */}
-      <Card className="overflow-hidden p-0 shadow-sm">
-        <div className="grid grid-cols-2 gap-px bg-border/60 md:grid-cols-4">
-          {STATS.map((s) => (
-            <div key={s.label} className="bg-card p-4 md:p-5">
-              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", s.dot)} aria-hidden />
-                {s.label}
-              </p>
-              <p className="mt-1.5 truncate text-xl font-bold tabular-nums md:text-2xl">{loading ? "—" : s.value}</p>
-              <p className="mt-0.5 truncate text-[11px] text-muted-foreground/80">{loading ? "" : s.sub}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* ─── Barre d'outils : comptage + bascule de vue ─── */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground" aria-live="polite">
-          {loading ? "…" : `${filtered.length} lead${filtered.length > 1 ? "s" : ""}${query.trim() ? ` trouvé${filtered.length > 1 ? "s" : ""}` : ""}`}
-        </p>
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1" role="tablist" aria-label="Mode d'affichage">
-          <Button size="sm" variant={view === "kanban" ? "default" : "ghost"} className="h-8 gap-1.5 px-3 text-xs" onClick={() => setView("kanban")} role="tab" aria-selected={view === "kanban"}>
-            <LayoutGrid className="h-3.5 w-3.5" aria-hidden /> Kanban
-          </Button>
-          <Button size="sm" variant={view === "list" ? "default" : "ghost"} className="h-8 gap-1.5 px-3 text-xs" onClick={() => setView("list")} role="tab" aria-selected={view === "list"}>
-            <List className="h-3.5 w-3.5" aria-hidden /> Liste
-          </Button>
-        </div>
+      {/* ─── Filtres pilules (défilement horizontal sur mobile) ─── */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filtrer par étape">
+        {FILTERS.map((f) => {
+          const active = statusFilter === f.value;
+          return (
+            <Button
+              key={f.value}
+              size="sm"
+              variant={active ? "default" : "outline"}
+              className="h-8 shrink-0 gap-1.5 rounded-full px-3 text-xs"
+              onClick={() => setStatusFilter(f.value)}
+              aria-pressed={active}
+            >
+              {f.dot && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", f.dot)} aria-hidden />}
+              {f.label}
+              <span className={cn("tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>{loading ? "…" : f.count}</span>
+            </Button>
+          );
+        })}
       </div>
 
-      {/* ─── Pipeline vide : invitation ─── */}
-      {!loading && leads.length === 0 && (
+      {/* ─── Contenu ─── */}
+      {loading ? (
+        <Card className="divide-y p-0 shadow-sm">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3 p-4">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-56 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
+        </Card>
+      ) : leads.length === 0 ? (
+        /* Pipeline vide : invitation */
         <Card className="flex flex-col items-center gap-2 border-dashed p-10 text-center shadow-sm">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15">
             <Briefcase className="h-6 w-6 text-gold" aria-hidden />
@@ -274,192 +268,71 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
             <Plus className="mr-2 h-4 w-4" /> Nouveau lead
           </Button>
         </Card>
-      )}
-
-      {/* ─── Contenu : kanban ou liste ─── */}
-      {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          {STAGES.map((s) => (
-            <div key={s.value} className="space-y-2 rounded-lg border bg-muted/30 p-3">
-              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-              <div className="h-16 animate-pulse rounded bg-muted" />
-            </div>
-          ))}
-        </div>
       ) : (
-        <AnimatePresence mode="wait">
-          {view === "kanban" ? (
-            <motion.div
-              key="kanban"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
-            >
-              {STAGES.map((stage) => {
-                const stageLeads = filtered.filter((l) => l.status === stage.value);
-                const stageValue = stageLeads.reduce((s, l) => s + (l.value ?? 0), 0);
-                return (
-                  <div key={stage.value} className="flex min-w-0 flex-col rounded-xl border bg-muted/30">
-                    <div className="flex items-center justify-between px-3 py-2.5">
-                      <p className="flex items-center gap-2 text-sm font-semibold">
-                        <span className={cn("h-2 w-2 shrink-0 rounded-full", stage.dot)} aria-hidden />
-                        {stage.label}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+          <Card className="p-0 shadow-sm">
+            <p className="sr-only">Liste des leads du pipeline commercial</p>
+            {filtered.length === 0 ? (
+              <p className="p-10 text-center text-sm text-muted-foreground">Aucun lead ne correspond à votre recherche.</p>
+            ) : (
+              <ul className="divide-y">
+                {filtered.map((l) => {
+                  const stage = STAGES.find((s) => s.value === l.status);
+                  return (
+                    <li key={l.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/30">
+                      <span className={cn("h-2 w-2 shrink-0 rounded-full", stage?.dot ?? "bg-muted-foreground")} aria-hidden />
+                      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                        <p className="truncate text-sm font-semibold leading-tight">
+                          {l.name}
+                          {l.company && <span className="font-normal text-muted-foreground"> · {l.company}</span>}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[l.source !== "AUTRE" ? SOURCE_LABEL[l.source] : "", l.email ?? l.phone ?? "", relTime(l.updatedAt)].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <p className={cn("ml-auto shrink-0 text-sm font-bold tabular-nums", l.value > 0 ? "text-gold" : "text-muted-foreground/50")}>
+                        {l.value > 0 ? fmtFcfa(l.value) : "—"}
                       </p>
-                      <Badge variant="outline" className="text-[10px] tabular-nums">{stageLeads.length}</Badge>
-                    </div>
-                    <p className="px-3 pb-2 text-[11px] tabular-nums text-muted-foreground">{fmtCompact(stageValue)}</p>
-                    <div className="max-h-[420px] min-h-0 flex-1 space-y-2 overflow-y-auto p-2 pr-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar]:w-1.5">
-                      {stageLeads.length === 0 ? (
-                        <div className="flex flex-col items-center gap-1 py-8 text-center">
-                          <Inbox className="h-6 w-6 text-muted-foreground/40" aria-hidden />
-                          <p className="text-xs text-muted-foreground">Vide</p>
-                        </div>
-                      ) : (
-                        stageLeads.map((l) => (
-                          <Card key={l.id} className="group border-border/60 p-3 shadow-none transition-shadow hover:shadow-sm">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold leading-tight">{l.name}</p>
-                                {(l.company || l.source !== "AUTRE") && (
-                                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                    {l.company}
-                                    {l.company && l.source !== "AUTRE" ? " · " : ""}
-                                    {l.source !== "AUTRE" ? SOURCE_LABEL[l.source] : ""}
-                                  </p>
-                                )}
-                                {(l.email || l.phone) && (
-                                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{l.email ?? l.phone}</p>
-                                )}
-                              </div>
-                              <div className="flex shrink-0 gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(l)} aria-label={`Modifier ${l.name}`}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                {isAdmin && (
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => remove(l)} aria-label={`Supprimer ${l.name}`}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between gap-2">
-                              {l.value > 0 ? (
-                                <p className="text-sm font-bold tabular-nums text-gold">{fmtCompact(l.value)}</p>
-                              ) : (
-                                <span />
-                              )}
-                              <span className="text-[10px] text-muted-foreground">{relTime(l.updatedAt)}</span>
-                            </div>
-                            <Select value={l.status} onValueChange={(v) => changeStatus(l, v)}>
-                              <SelectTrigger className="mt-2 h-7 w-full text-[11px]" aria-label={`Statut de ${l.name}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STAGES.map((s) => (
-                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </Card>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </motion.div>
-          ) : (
-            <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-              <Card className="overflow-hidden p-0 shadow-sm">
-                <div className="overflow-x-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar]:h-1.5">
-                  <table className="w-full min-w-[720px] text-sm">
-                    <caption className="sr-only">Liste des leads du pipeline commercial</caption>
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                        <th scope="col" className="px-4 py-3 font-medium">Prospect</th>
-                        <th scope="col" className="px-4 py-3 font-medium">Contact</th>
-                        <th scope="col" className="px-4 py-3 font-medium">Statut</th>
-                        <th scope="col" className="px-4 py-3 font-medium">Valeur</th>
-                        <th scope="col" className="px-4 py-3 font-medium">Mise à jour</th>
-                        <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                            Aucun lead ne correspond à votre recherche.
-                          </td>
-                        </tr>
-                      ) : (
-                        filtered.map((l) => (
-                          <tr key={l.id} className="border-b transition-colors last:border-0 hover:bg-muted/30">
-                            <td className="px-4 py-3">
-                              <p className="font-semibold">{l.name}</p>
-                              {(l.company || l.source !== "AUTRE") && (
-                                <p className="text-xs text-muted-foreground">
-                                  {l.company}
-                                  {l.company && l.source !== "AUTRE" ? " · " : ""}
-                                  {l.source !== "AUTRE" ? SOURCE_LABEL[l.source] : ""}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {l.email && <p className="truncate text-xs">{l.email}</p>}
-                              {l.phone && <p className="text-xs text-muted-foreground">{l.phone}</p>}
-                              {!l.email && !l.phone && <span className="text-xs text-muted-foreground">—</span>}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Select value={l.status} onValueChange={(v) => changeStatus(l, v)}>
-                                <SelectTrigger className="h-8 w-[150px] text-xs" aria-label={`Statut de ${l.name}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STAGES.map((s) => (
-                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="px-4 py-3 font-semibold tabular-nums">{l.value > 0 ? fmtFcfa(l.value) : "—"}</td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">{relTime(l.updatedAt)}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(l)} aria-label={`Modifier ${l.name}`}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                {isAdmin && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => remove(l)} aria-label={`Supprimer ${l.name}`}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                      <Select value={l.status} onValueChange={(v) => changeStatus(l, v)}>
+                        <SelectTrigger className="h-8 w-[132px] shrink-0 text-xs" aria-label={`Statut de ${l.name}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STAGES.map((s) => (
+                            <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex shrink-0 gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(l)} aria-label={`Modifier ${l.name}`}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => remove(l)} aria-label={`Supprimer ${l.name}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </motion.div>
       )}
 
-      {/* ─── Dialog création / édition ─── */}
+      {/* ─── Dialog création / édition (une colonne, lisible) ─── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier le lead" : "Nouveau lead"}</DialogTitle>
             <DialogDescription>
               {editing ? "Mettez à jour les informations du prospect." : "Ajoutez un prospect au pipeline commercial."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
               <Label htmlFor="lead-name">Nom du contact *</Label>
               <Input id="lead-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ex. : Ibrahima Fall" />
             </div>
@@ -479,32 +352,34 @@ export default function CrmLeadsView({ isAdmin }: { isAdmin: boolean }) {
               <Label htmlFor="lead-phone">Téléphone</Label>
               <Input id="lead-phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+221 77 …" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Source</Label>
-              <Select value={form.source} onValueChange={(v) => setForm((f) => ({ ...f, source: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="QRTAGS">QRTags</SelectItem>
-                  <SelectItem value="QRBAGS">QRBags</SelectItem>
-                  <SelectItem value="VERIFSCAN">VerifScan</SelectItem>
-                  <SelectItem value="RECOMMANDATION">Recommandation</SelectItem>
-                  <SelectItem value="SITE_WEB">Site web</SelectItem>
-                  <SelectItem value="AUTRE">Autre</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Source</Label>
+                <Select value={form.source} onValueChange={(v) => setForm((f) => ({ ...f, source: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="QRTAGS">QRTags</SelectItem>
+                    <SelectItem value="QRBAGS">QRBags</SelectItem>
+                    <SelectItem value="VERIFSCAN">VerifScan</SelectItem>
+                    <SelectItem value="RECOMMANDATION">Recommandation</SelectItem>
+                    <SelectItem value="SITE_WEB">Site web</SelectItem>
+                    <SelectItem value="AUTRE">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Statut</Label>
+                <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Statut</Label>
-              <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STAGES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="lead-notes">Notes</Label>
               <Textarea id="lead-notes" rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
