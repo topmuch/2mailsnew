@@ -643,3 +643,23 @@ model HostingRenewal {
 
   @@index([domainId])
 }
+
+// Cache persistant des articles d'actualités résolus (Task 69) : chaque
+// article Google Actualités résolu vers son média d'origine est mémorisé ici
+// pour éviter de consommer le quota web_search à chaque rafraîchissement.
+// Clé unique = titre normalisé (normKey) ; un article vu sous plusieurs
+// sujets n'occupe qu'une ligne.
+model NewsArticle {
+  id         String    @id @default(cuid())
+  titleKey   String    @unique // titre normalisé (sans accents/ponctuation)
+  title      String
+  url        String // URL réelle de l'article chez l'éditeur
+  host       String    @default("")
+  source     String    @default("") // nom du média (RSS Google)
+  snippet    String    @default("")
+  image      String? // og:image résolue en URL absolue
+  topicKey   String    @default("") // premier sujet où l'article est apparu
+  publishedAt DateTime? // date de publication (flux RSS)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}

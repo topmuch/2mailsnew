@@ -9,9 +9,10 @@ import { authFetch } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 // ─── Actus : actualités web avec photos ──────────────────────────────────────
-// Onglet « Actus » (Task 68, demande utilisateur) : récupère des actualités
-// via /api/news (recherche web + photo réelle de chaque article extraite du
-// site source), les affiche en grille de cartes cliquables.
+// Onglet « Actus » (Task 68, source Google Actualités en Task 69) : récupère
+// les fils Google Actualités via /api/news, résout chaque article vers le
+// média d'origine et affiche la photo réelle (og:image) en grille de cartes
+// cliquables.
 // 4 sujets : À la une, Économie, Tech, Sport. Cache serveur 30 min/sujet,
 // bouton Actualiser, squelettes pendant le chargement, placeholder doré
 // quand un article n'a pas de photo.
@@ -21,6 +22,7 @@ interface NewsItem {
   snippet: string;
   url: string;
   host: string;
+  source: string;
   date: string;
   image: string | null;
 }
@@ -31,6 +33,8 @@ interface NewsPayload {
   label: string;
   cached?: boolean;
   stale?: boolean;
+  fallback?: boolean;
+  provider?: "google" | "search";
 }
 
 const TOPICS = [
@@ -40,11 +44,7 @@ const TOPICS = [
   { key: "sport", label: "Sport" },
 ];
 
-const fmtDate = (d: string) => {
-  const t = new Date(d).getTime();
-  if (!Number.isFinite(t) || !d) return "";
-  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(t);
-};
+// Les dates arrivent déjà formatées en français depuis l'API (« il y a 3 h »).
 
 const fmtAge = (ts: number) => {
   const m = Math.max(0, Math.round((Date.now() - ts) / 60_000));
@@ -90,7 +90,7 @@ export default function NewsView() {
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground" aria-live="polite">
             {data
-              ? `L'actualité ${data.label.toLowerCase()} — mise à jour ${fmtAge(data.fetchedAt)}${data.stale ? " (cache)" : ""}`
+              ? `L'actualité ${data.label.toLowerCase()} — via ${data.provider === "search" ? "recherche web" : "Google Actualités"} — mise à jour ${fmtAge(data.fetchedAt)}${data.stale ? " (cache)" : ""}`
               : "L'actualité du Sénégal et du monde, avec les photos."}
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function NewsView() {
         <div className="space-y-3">
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            Recherche des articles et récupération des photos… (quelques secondes)
+            Récupération des articles et des photos… (quelques secondes)
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -166,9 +166,9 @@ export default function NewsView() {
           transition={{ duration: 0.2 }}
           className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {data.items.map((item) => (
+          {data.items.map((item, idx) => (
             <a
-              key={item.url}
+              key={`${idx}-${item.url}`}
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -199,8 +199,8 @@ export default function NewsView() {
                 {item.snippet && <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{item.snippet}</p>}
                 <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                   <span className="min-w-0 truncate">
-                    {item.host}
-                    {fmtDate(item.date) ? ` · ${fmtDate(item.date)}` : ""}
+                    {item.source || item.host}
+                    {item.date ? ` · ${item.date}` : ""}
                   </span>
                   <span className="flex shrink-0 items-center gap-1 font-medium text-gold">
                     Lire <ExternalLink className="h-3 w-3" aria-hidden />
