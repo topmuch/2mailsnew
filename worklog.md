@@ -1729,3 +1729,18 @@ Work Log:
 
 Stage Summary:
 - Les photos de l'Actus sont désormais servies depuis notre disque (cache persistant à côté de la DB) : instantanées (~10 ms), résistantes à l'anti-hotlink, au contenu mixte, aux lentesurs des médias et aux photos déplacées/supprimées ; préchauffage automatique à chaque réponse /api/news. Le code affiche bien les photos (9/9 vérifiées navigateur) — si l'utilisateur en voit encore aucune, c'est qu'il regarde la production Coolify (redéployer les Tasks 68-70) ou un onglet au cache ancien (Ctrl+Shift+R). Fichiers : src/lib/news-image-cache.ts (nouveau), api/news/image/route.ts (réécrit), api/news/route.ts (warm-up dans serve()). Rappels inchangés : redeploy Coolify, IMAP/SMTP, token GitHub révocable.
+
+---
+Task ID: 71
+Agent: Z.ai Code (principal)
+Task: « synchronise la version github et la version locale » — resynchronisation après nouveau rembobinage sandbox
+
+Work Log:
+- Constat : le sandbox était reparti de l'instantané Task 61 — git log local figé à c8a5e6a (Task 61), fichiers Actus absents (api/news, api/news/image, lib/news-image-cache.ts), modèle NewsArticle absent du schéma ; le serveur tournait encore sur le vieux code en mémoire. GitHub 2mailsnew était complet jusqu'à d3e3d4e (Task 70-b).
+- Synchronisation sûre (recette Tasks 59/66) : ① sauvegarde db/custom.db hors dépôt (/tmp) ; ② arrêt serveur (kill PID + pkill next) ; ③ fetch 2mailsnew (credential helper jetable — le fetch par URL inline sans helper échoue « could not read Password », utiliser -c credential.helper=…) ; ④ vérification préalable qu'AUCUN travail local ne serait perdu : le seul commit orphelin local (Task 61 « bouton + Ajouter une ligne ») a son équivalent dans l'arbre GitHub (grep « Ajouter une ligne » présent dans FETCH_HEAD:src/components/items-editor.tsx) ; ⑤ git reset --hard FETCH_HEAD → local = GitHub, rev-list --left-right --count main...FETCH_HEAD = 0 0 ; ⑥ bun install (inchangé) + bunx prisma generate (client NewsArticle) + db:push (no-op, la DB commitée a déjà la table) ; ⑦ relance .zscripts/dev.sh.
+- Pièges rencontrés : le serveur relancé a été MOISSONNÉ entre deux appels shell (GET passait 200 puis 000 sans rien dans dev.log) → relance + TOUTES les vérifications enchaînées dans le même appel bash (recette connue) ; le test final `!= 200` renvoie exit 1 bénin.
+- E2E post-sync : serveur 200 ; login admin → token OK ; /api/news?topic=a-la-une → provider google, 9 articles, photos proxifiées (3 ce cycle — le fil Google tourne, la complétion DB/warm-up comblera) ; navigateur : login → onglet Actus → 9 cartes rendues ; titre « Actus » présent.
+- Reste à pousser : entrée worklog Task 71 (+ db/dev.pid runtime) → commit → push 2mailsnew pour que les deux versions soient à nouveau strictement identiques.
+
+Stage Summary:
+- Local (d3e3d4e + worklog Task 71) et GitHub topmuch/2mailsnew resynchronisés après rembobinage sandbox à la Task 61 : reset --hard vers 2mailsnew/main après vérification zéro-perte, prisma régénéré, serveur relancé, app entièrement fonctionnelle (login, Dashboard, onglet Actus avec photos proxifiées). Leçon : le credential helper doit accompagner le FETCH aussi (pas seulement le push) ; vérifier les serveurs entre chaque méga-appel. Rappels inchangés : redeploy Coolify, IMAP/SMTP, token GitHub révocable.
