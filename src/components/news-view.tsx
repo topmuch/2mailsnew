@@ -177,8 +177,13 @@ export default function NewsView() {
             >
               {/* Photo : placeholder doré sous l'image réelle (fallback auto si casse) */}
               <div className="relative aspect-video overflow-hidden bg-muted">
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gold/15 via-muted to-[#0b366b]/10">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gold/15 via-muted to-[#0b366b]/10">
                   <Newspaper className="h-8 w-8 text-gold/50" aria-hidden />
+                  {item.source && (
+                    <span className="mt-1.5 max-w-[85%] truncate px-2 text-[10px] font-medium uppercase tracking-wider text-gold/60">
+                      {item.source}
+                    </span>
+                  )}
                 </div>
                 {item.image && (
                   <img

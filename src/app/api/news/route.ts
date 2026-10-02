@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/auth";
 import { extractSiteInfo } from "@/lib/crm-api";
 import { db } from "@/lib/db";
 import { warmNewsImages } from "@/lib/news-image-cache";
+import { harvestFeedImages } from "@/lib/news-feed-images";
 
 // ─── GET /api/news?topic=… : actualités Google Actualités, avec photos ───────
 // Source primaire (Task 69, demande utilisateur) : flux RSS public de Google
@@ -427,6 +428,49 @@ async function fetchNewsGoogle(topicKey: string): Promise<NewsCacheEntry> {
     );
     items.push(...resolved);
   }
+
+  // ── Complétion gratuite par les flux des éditeurs ──────────────────────────
+  // De nombreux médias bloquent le fetch serveur de leurs pages (403 anti-
+  // robot) mais laissent leurs flux RSS accessibles, et plusieurs y publient
+  // la photo de chaque article (media:content/enclosure). On récolte ces
+  // photos pour les articles restés sans image — 0 appel SDK (0 quota) —
+  // puis on persiste en base pour les cycles suivants.
+  const sansPhoto = items.filter((it) => !it.image);
+  if (sansPhoto.length > 0) {
+    try {
+      await harvestFeedImages(
+        sansPhoto.map((it) => ({ key: normKey(it.title), host: it.host })),
+        (key, url) => {
+          const it = sansPhoto.find((x) => normKey(x.title) === key);
+          if (it && !it.image) it.image = url;
+        }
+      );
+      for (const it of items) {
+        if (!it.image) continue;
+        const key = normKey(it.title);
+        if (dbByKey.has(key)) {
+          await db.newsArticle
+            .updateMany({ where: { titleKey: key, image: null }, data: { image: it.image } })
+            .catch(() => {});
+        } else {
+          await db.newsArticle
+            .upsert({
+              where: { titleKey: key },
+              create: {
+                titleKey: key, title: it.title, url: it.url, host: it.host,
+                source: it.source, snippet: it.snippet, image: it.image,
+                topicKey,
+              },
+              update: { image: it.image },
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {
+      // complétion best effort : le cycle suivant réessaiera
+    }
+  }
+
   return { items: items.slice(0, MAX_ITEMS), fetchedAt: Date.now(), provider: "google" };
 }
 
@@ -479,9 +523,13 @@ function serve(entry: NewsCacheEntry, extra: Record<string, unknown>) {
   // disque — l'affichage utilisateur devient instantané et ne dépend plus
   // de la disponibilité des sites des médias au moment du clic.
   warmNewsImages(entry.items.map((i) => i.image));
+  // Ordre d'affichage : les articles AVEC photo d'abord (ordre relatif
+  // conservé) — le mur d'actus reste illustré en tête même quand certains
+  // médias bloquent leurs photos, au lieu d'aligner des placeholders.
+  const ordered = [...entry.items].sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image)));
   return NextResponse.json({
     ...entry,
-    items: entry.items.map((i) => ({ ...i, image: proxifyImage(i.image) })),
+    items: ordered.map((i) => ({ ...i, image: proxifyImage(i.image) })),
     ...extra,
   });
 }

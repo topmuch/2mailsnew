@@ -1744,3 +1744,21 @@ Work Log:
 
 Stage Summary:
 - Local (d3e3d4e + worklog Task 71) et GitHub topmuch/2mailsnew resynchronisés après rembobinage sandbox à la Task 61 : reset --hard vers 2mailsnew/main après vérification zéro-perte, prisma régénéré, serveur relancé, app entièrement fonctionnelle (login, Dashboard, onglet Actus avec photos proxifiées). Leçon : le credential helper doit accompagner le FETCH aussi (pas seulement le push) ; vérifier les serveurs entre chaque méga-appel. Rappels inchangés : redeploy Coolify, IMAP/SMTP, token GitHub révocable.
+
+---
+Task ID: 72
+Agent: Z.ai Code (principal)
+Task: « les images ne s'affichent toujours pas » — cause racine : les médias bloquent le fetch serveur (403) ; moisson des flux RSS éditeurs
+
+Work Log:
+- Preuves récoltées d'abord : dev.log montre TOUTES les images demandées en 200 ; test du chemin complet passerelle (:81) → app 200, login OK, /api/news 9 articles, IMAGE via passerelle 200 image/jpeg 127 Ko — tout fonctionne sur tous les chemins internes (localhost:3000 ET passerelle).
+- Cause racine identifiée par diagnostic par média : les Pages des médias retournent désormais 403 (xalimasn, wiwsport, rfi, jeuneafrique, tv5monde, apanews — anti-robot déclenché par le volume de fetch), 404 (lequotidien et seneplus ont supprimé les articles), 406 (africanews). Résultat : les cycles récents n'extrayaient plus d'og:image pour ces sources → 3-6 placeholders dorés sur 9 → ressenti « pas d'images ». Nouveau rollback sandbox à la Task 61 également survenu entre-temps (resynchronisé en Task 71).
+- Levier découvert : les FLUX RSS DES ÉDITEURS restent accessibles (faits pour la syndication) et plusieurs y publient la photo de chaque article — senenews.com/feed : 32 items avec media:content+enclosure+img (64 balises image), aps.sn et lesoleil.sn répondent aussi (images dans content:encoded).
+- Nouvelle lib src/lib/news-feed-images.ts : harvestFeedImages(targets, setImage) — flux connus (senenews, aps, lesoleil, leral, dakaractu…) + génériques /feed /rss par hôte, cache mémoire 1 h (positif ET négatif), parsing media:content / media:thumbnail / enclosure image/* / 1re <img> du corps avec filtre logo|icon|avatar|ads|gravatar, résolution URL absolue, decodeEntities local, normKey identique à l'API, matching par clé exacte puis flou (recouvrement de mots >3 lettres ≥ 60 %). 0 appel SDK (0 quota).
+- api/news/route.ts : en fin de fetchNewsGoogle, pass de complétion — les articles restés sans photo sont rattachés aux photos des flux de LEUR éditeur, puis persistance (updateMany sur les rows connues, upsert sinon, y compris pour les articles non résolus qui gardent leur lien Google + gagnent une photo). warmNewsImages préchauffe ensuite le disque.
+- UX : ① placeholder doré affiche désormais le NOM DU MÉDIA (uppercase, doré) — les cartes sans photo ont l'air volontaires, plus « cassées » ; ② serve() trie les articles AVEC photo en tête (ordre relatif conservé) — le mur reste illustré même si certains médias bloquent.
+- Backfill exécuté : refresh=1 sur les 4 sujets → couverture passée de ~3/9 à 5-6/9 par sujet (a-la-une 6/9, tech 6/9, economie 4/9, sport 4/9) ; DB 44 articles dont 22+ avec photo ; proxy sert les photos moissonnées (senenews webp 52 Ko, aps webp 33 Ko → 200).
+- E2E navigateur : rechargement → Actus → 6 photos chargées, TOUTES les cartes du haut illustrées (BBC JOJ Dakar, Leral, SeneNews météo, APS Thiès, revue de presse, Dakar Actu) ; captures task72-actus-moisson{,-dark,-mobile}.png + task72-actus-final.png ; lint 0/0 ; dev.log sans erreur.
+
+Stage Summary:
+- Les « images qui ne s'affichent pas » venaient du BLOCAGE anti-robot des médias sénégalais sur les fetch serveur de pages (403) + articles supprimés (404) : le proxy marchait, mais il n'y avait plus de photos à servir pour ces sources. Correctif : moisson des photos directement dans les flux RSS des éditeurs (accessibles, riches en images, 0 quota), persistance DB, tri photos-d'abord, placeholder nominatif. Couverture en hausse (~50-60 %) et mur d'actus toujours illustré en tête. Limites connues : rfi/jeuneafrique/tv5monde/xalimasn/wiwsport/apanews bloquent tout (feeds inclus) → placeholders nominatifs, complétés si les blocages tombent. Rappels : redeploy Coolify (indispensable pour voir ces correctifs en production), IMAP/SMTP, token GitHub révocable.
