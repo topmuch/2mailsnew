@@ -6,6 +6,11 @@
 // enclosure, ou <img> du corps). Cette lib récolte ces photos (1 h de cache,
 // échecs mis en cache aussi) et les associe aux articles sans photo par
 // similarité de titre — sans AUCUN appel au SDK de recherche (0 quota).
+// Les flux sont récupérés via fetchTextResilient : direct d'abord, puis relais
+// publics — un média qui bloque l'IP du serveur (production) ne bloque pas
+// forcément les relais, et inversement le direct reste prioritaire.
+
+import { fetchTextResilient } from "@/lib/fetch-mirrors";
 
 interface FeedImageMap {
   imgs: Map<string, string>;
@@ -102,19 +107,12 @@ async function loadFeedMap(host: string): Promise<Map<string, string>> {
 
   for (const url of candidates.slice(0, 2)) {
     try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          Accept: "application/rss+xml, application/xml, text/xml, */*",
-          "Accept-Language": "fr-FR,fr;q=0.9",
-        },
-        redirect: "follow",
-        cache: "no-store",
-        signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
+      const hit = await fetchTextResilient(url, {
+        accept: "application/rss+xml, application/xml, text/xml, */*",
+        timeoutMs: FEED_TIMEOUT_MS,
       });
-      if (!res.ok) continue;
-      const xml = await res.text();
+      if (!hit) continue;
+      const xml = hit.text;
       const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>/g) ?? [];
       for (const b of blocks) {
         const titleM = b.match(/<title[^>]*>([\s\S]*?)<\/title>/i);

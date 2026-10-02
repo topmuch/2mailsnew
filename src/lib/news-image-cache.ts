@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { fetchImageResilient } from "@/lib/fetch-mirrors";
 
 // ─── Cache disque des photos d'articles (onglet Actus) ──────────────────────
 // Les photos transitent par notre proxy /api/news/image. Pour que l'affichage
@@ -77,17 +78,10 @@ const inflight = new Map<string, Promise<{ bytes: Buffer; type: string } | null>
 // URLs déjà garanties sur disque (évite de retester à chaque requête servie).
 const warmed = new Set<string>();
 
-async function fetchAndStore(rawUrl: string): Promise<{ bytes: Buffer; type: string } | null> {
-  let target: URL;
+// Fetch direct (le média laisse parfois passer — c'est le plus fidèle).
+async function directFetch(target: URL): Promise<Response | null> {
   try {
-    target = new URL(rawUrl);
-  } catch {
-    return null;
-  }
-  if (!/^https?:$/.test(target.protocol) || PRIVATE_HOST.test(target.hostname)) return null;
-
-  try {
-    const upstream = await fetch(target, {
+    const res = await fetch(target, {
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
@@ -99,8 +93,28 @@ async function fetchAndStore(rawUrl: string): Promise<{ bytes: Buffer; type: str
       cache: "no-store",
       signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
     });
-    if (!upstream.ok) return null;
+    return res.ok ? res : null;
+  } catch {
+    return null;
+  }
+}
 
+async function fetchAndStore(rawUrl: string): Promise<{ bytes: Buffer; type: string } | null> {
+  let target: URL;
+  try {
+    target = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(target.protocol) || PRIVATE_HOST.test(target.hostname)) return null;
+
+  // 1) Fetch direct ; 2) si le média bloque notre serveur (403 anti-robot,
+  // typique d'une IP de datacenter en production), relais images CDN
+  // (wsrv.nl / images.weserv.nl) qui récupèrent la photo depuis leurs réseaux.
+  const upstream = (await directFetch(target)) ?? (await fetchImageResilient(rawUrl));
+  if (!upstream) return null;
+
+  try {
     const declared = upstream.headers.get("content-type") ?? "";
     if (declared && !declared.startsWith("image/") && !declared.includes("octet-stream")) return null;
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { extractSiteInfo } from "@/lib/crm-api";
 import { db } from "@/lib/db";
+import { fetchTextResilient } from "@/lib/fetch-mirrors";
 import { warmNewsImages } from "@/lib/news-image-cache";
 import { harvestFeedImages } from "@/lib/news-feed-images";
 
@@ -251,20 +252,16 @@ function extractFallbackImage(html: string, baseUrl: string): string | null {
 /** Récupère la photo d'un article (og:image / twitter:image), résolue en URL absolue. */
 async function fetchArticleImage(url: string): Promise<string | null> {
   try {
-    // UA navigateur complet : plusieurs médias (olympics.com, lequotidien.sn…)
-    // bloquent les robots et servaient du vide à l'UA « compatible ».
-    const res = await fetch(url, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+    // UA navigateur complet + relais en repli (fetchTextResilient) : plusieurs
+    // médias (olympics.com, lequotidien.sn, xalimasn…) bloquent les robots et
+    // l'IP du serveur — le direct échoue (403), les relais publiques passent.
+    const hit = await fetchTextResilient(url, {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      timeoutMs: IMAGE_TIMEOUT_MS,
     });
-    if (!res.ok) return null;
+    if (!hit) return null;
     // Les balises <meta> vivent dans le <head> : 300 ko suffisent largement.
-    const html = (await res.text()).slice(0, 300_000);
+    const html = hit.text.slice(0, 300_000);
     const { image } = extractSiteInfo(html, url);
     const picked = image ?? extractFallbackImage(html, url);
     if (!picked) return null;
