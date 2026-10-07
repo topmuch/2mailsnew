@@ -41,7 +41,17 @@ interface NewsCacheEntry {
 const GNEWS_PARAMS = "hl=fr&gl=SN&ceid=SN:fr";
 const gsearch = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&${GNEWS_PARAMS}`;
 
-const TOPICS: Record<string, { label: string; rss: string; fallback: string; recency: number; maxAgeDays: number }> = {
+const TOPICS: Record<string, {
+  label: string;
+  rss: string; // Google News (sujets classiques)
+  fallback: string;
+  recency: number;
+  maxAgeDays: number;
+  // Flux RSS directs (Task 74) : utilisés comme source PRIMAIRE d'articles
+  // pour les sujets où Google News ne fournit pas d'images (ex. Tech).
+  // Chaque flux publie la photo de chaque article via media:content/enclosure.
+  directFeeds?: { url: string; label: string }[];
+}> = {
   // Requêtes Google News : ciblent des ARTICLES (les requêtes trop génériques
   // font remonter les pages d'accueil des portails). « À la une » = fil
   // principal Google Actualités Sénégal. L'opérateur when:Xd limite aux
@@ -62,10 +72,26 @@ const TOPICS: Record<string, { label: string; rss: string; fallback: string; rec
   },
   tech: {
     label: "Tech",
-    rss: gsearch("Sénégal numérique technologie when:10d"),
-    fallback: "technologie numérique intelligence artificielle Afrique startup",
-    recency: 7,
-    maxAgeDays: 11,
+    rss: "", // non utilisé : directFeeds sert de source primaire
+    fallback: "intelligence artificielle IA technologie numérique",
+    recency: 14,
+    maxAgeDays: 14,
+    // 12 flux High-Tech / IA (testés 100 % images via media:content/enclosure).
+    // Priorité IA (3 premiers), puis grands médias tech français.
+    directFeeds: [
+      { url: "https://www.actuia.com/feed/", label: "ActuIA" },
+      { url: "https://www.ia-france.fr/feed", label: "IA France" },
+      { url: "https://www.lemonde.fr/pixels/rss_full.xml", label: "Le Monde Pixels" },
+      { url: "https://www.frandroid.com/feed", label: "Frandroid" },
+      { url: "https://www.clubic.com/articles.rss", label: "Clubic" },
+      { url: "https://numerama.com/feed/", label: "Numerama" },
+      { url: "https://www.zdnet.fr/feeds/rss/actualites/", label: "ZDNet" },
+      { url: "https://www.silicon.fr/feed", label: "Silicon" },
+      { url: "https://www.itespresso.fr/feed/", label: "ITespresso" },
+      { url: "https://www.blogdumoderateur.com/feed/", label: "BDM" },
+      { url: "https://www.journaldunet.com/rss/", label: "JDN" },
+      { url: "https://www.phonandroid.com/feed/", label: "Phonandroid" },
+    ],
   },
   sport: {
     label: "Sport",
@@ -87,7 +113,7 @@ const EXCLUDED_HOSTS = [
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 const MAX_ITEMS = 9;
-const MAX_CANDIDATES = 14; // sur-recherche RSS : certains articles n'ont pas de photo trouvable
+const MAX_CANDIDATES = 24; // sur-recherche : le filtrage strict sans-image en écarte une partie
 const IMAGE_TIMEOUT_MS = 6_000;
 const RSS_TIMEOUT_MS = 10_000;
 const RESOLVE_CHUNK = 3; // petits lots : le SDK web_search est limité en débit (bursts → résultats vides)
@@ -334,6 +360,107 @@ async function resolvePublisher(title: string): Promise<{ url: string; snippet: 
   return null;
 }
 
+// ─── Flux RSS directs (Task 74) : source PRIMAIRE pour Tech ──────────────────
+// Pour les sujets où Google News ne fournit pas d'images (ex. Tech), on parse
+// directement des flux RSS d'éditeurs qui publient la photo de chaque article
+// via media:content/enclosure. Aucune résolution d'URL, aucun appel SDK — les
+// articles arrivent déjà avec leur image, prêts à afficher.
+
+function extractFeedImage(block: string, feedBase: string): string | null {
+  const imgRej = /logo|icon|avatar|ads?[-_.]|gravatar|spinner|placeholder|default/i;
+  // 1. media:content / media:thumbnail (Yahoo Media RSS)
+  const media =
+    block.match(/<media:content[^>]*\burl="([^"]+)"[^>]*>/i) ??
+    block.match(/<media:thumbnail[^>]*\burl="([^"]+)"[^>]*>/i);
+  if (media) {
+    try {
+      const u = new URL(decodeEntities(media[1]), feedBase).toString();
+      if (!imgRej.test(u)) return u;
+    } catch { /* ignore */ }
+  }
+  // 2. enclosure image/*
+  const enc = block.match(/<enclosure[^>]*\burl="([^"]+)"[^>]*>/i);
+  if (enc && /type="image\//i.test(enc[0])) {
+    try {
+      const u = new URL(decodeEntities(enc[1]), feedBase).toString();
+      if (!imgRej.test(u)) return u;
+    } catch { /* ignore */ }
+  }
+  // 3. <img> du content:encoded / description
+  const body = block.match(/<img[^>]*\bsrc=["']([^"']+)["']/i);
+  if (body) {
+    try {
+      const u = new URL(decodeEntities(body[1]), feedBase).toString();
+      if (!imgRej.test(u) && !u.startsWith("data:")) return u;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+function parseDirectFeed(xml: string, feedBase: string, sourceLabel: string): NewsItem[] {
+  const stripCdata = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>/g) ?? [];
+  const items: NewsItem[] = [];
+  for (const b of blocks) {
+    const pick = (tag: string) => {
+      const m = b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
+      return m ? decodeEntities(stripCdata(m[1])).trim() : "";
+    };
+    const title = pick("title");
+    const link = pick("link");
+    const pubDate = pick("pubDate");
+    if (!title || !link) continue;
+    if (isExcluded(link)) continue;
+    const image = extractFeedImage(b, feedBase);
+    items.push({
+      title,
+      snippet: "",
+      url: link,
+      host: hostOf(link),
+      source: sourceLabel,
+      date: fmtFrRelative(pubDate),
+      image,
+    });
+  }
+  return items;
+}
+
+async function fetchDirectFeeds(topicKey: string): Promise<NewsCacheEntry> {
+  const topic = TOPICS[topicKey];
+  if (!topic.directFeeds?.length) throw new Error("Pas de flux directs pour ce sujet");
+
+  // Charge tous les flux en parallèle via fetchTextResilient (direct + relais)
+  const feeds = await Promise.all(
+    topic.directFeeds.map(async (f) => {
+      try {
+        const hit = await fetchTextResilient(f.url, {
+          accept: "application/rss+xml, application/xml, text/xml, */*",
+          timeoutMs: RSS_TIMEOUT_MS,
+        });
+        if (!hit) return [] as NewsItem[];
+        return parseDirectFeed(hit.text, f.url, f.label);
+      } catch {
+        return [] as NewsItem[];
+      }
+    })
+  );
+
+  // Fusionne, dédoublonne par titre normalisé
+  const all = feeds.flat();
+  const seen = new Set<string>();
+  const items: NewsItem[] = [];
+  for (const it of all) {
+    const key = normKey(it.title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(it);
+    if (items.length >= MAX_CANDIDATES) break;
+  }
+
+  if (!items.length) throw new Error("Tous les flux directs sont indisponibles");
+  return { items, fetchedAt: Date.now(), provider: "google" };
+}
+
 async function fetchNewsGoogle(topicKey: string): Promise<NewsCacheEntry> {
   const topic = TOPICS[topicKey];
   const xml = await fetchRssXml(topic.rss);
@@ -529,13 +656,14 @@ function serve(entry: NewsCacheEntry, extra: Record<string, unknown>) {
   // disque — l'affichage utilisateur devient instantané et ne dépend plus
   // de la disponibilité des sites des médias au moment du clic.
   warmNewsImages(entry.items.map((i) => i.image));
-  // Ordre d'affichage : les articles AVEC photo d'abord (ordre relatif
-  // conservé) — le mur d'actus reste illustré en tête même quand certains
-  // médias bloquent leurs photos, au lieu d'aligner des placeholders.
-  const ordered = [...entry.items].sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image)));
+  // Task 74 : filtrage STRICT des articles sans image (demande utilisateur).
+  // Les sources sans image sont écartées — le mur d'actus n'affiche que des
+  // cartes illustrées. Si le filtrage laisse moins d'articles que MAX_ITEMS,
+  // c'est voulu : mieux vaut peu d'articles mais tous avec photo.
+  const withImages = entry.items.filter((it) => it.image);
   return NextResponse.json({
     ...entry,
-    items: ordered.map((i) => ({ ...i, image: proxifyImage(i.image) })),
+    items: withImages.map((i) => ({ ...i, image: proxifyImage(i.image) })),
     ...extra,
   });
 }
@@ -568,10 +696,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Source primaire : Google Actualités
-    const entry = await ensureFetch(topicKey, () => fetchNewsGoogle(topicKey));
+    // Source primaire : flux RSS directs si le sujet en a (ex. Tech), sinon Google Actualités
+    const entry = topic.directFeeds?.length
+      ? await ensureFetch(topicKey, () => fetchDirectFeeds(topicKey))
+      : await ensureFetch(topicKey, () => fetchNewsGoogle(topicKey));
     return serve(entry, { topic: topicKey, label: topic.label, cached: false });
-  } catch (googleErr) {
+  } catch (primaryErr) {
     // Repli : pipeline recherche web, puis cache périmé, sinon erreur.
     try {
       const entry = await ensureFetch(`${topicKey}::search`, () => fetchNewsSearch(topicKey));
@@ -580,7 +710,7 @@ export async function GET(request: NextRequest) {
       if (cached) {
         return serve(cached, { topic: topicKey, label: topic.label, cached: true, stale: true });
       }
-      console.error("GET /api/news", googleErr, searchErr);
+      console.error("GET /api/news", primaryErr, searchErr);
       return NextResponse.json({ error: "Impossible de récupérer les actualités pour le moment" }, { status: 502 });
     }
   }

@@ -1841,3 +1841,33 @@ Stage Summary:
 - Amélioration progressive garantie : le cache DB (NewsArticle) accumule les images résolues — les cycles suivants réutilisent ces images même si le flux RSS a tourné (articles > 24h).
 - Limite résiduelle : les articles de sources locales sans flux RSS accessible (SenePlus, Pressafrik, DakarActu, Leral, Capmad, Sika Finance, Afrique IT News) restent sans image. Ce sera résolu quand l'utilisateur fournira ses propres flux RSS (offre déjà sur la table).
 - Artéfacts : .zscreens/actus-images-fixed.png (capture navigateur avec 4 images rendues).
+
+---
+Task ID: 74
+Agent: Z.ai Code (principal)
+Task: 1) Enlever toutes les sources sans images (filtrage strict). 2) Ajouter des sources High-Tech/IA avec images pour l'onglet Tech (était à 0/9).
+
+Work Log:
+- Test de 28 flux RSS tech/IA (français + africains) : 12 flux retenus avec 100% de couverture d'images via media:content/enclosure :
+  • IA spécialisée : ActuIA, IA France
+  • Grands médias tech FR : Le Monde Pixels, Frandroid, Clubic, Numerama, ZDNet, Silicon, ITespresso, BDM (Blog du Modérateur), JDN (Journal du Net), Phonandroid
+- Architecture : ajout d'un champ `directFeeds?: {url, label}[]` aux TOPICS. Si présent, fetchDirectFeeds() sert de source PRIMAIRE (au lieu de Google News).
+- fetchDirectFeeds : charge les 12 flux en parallèle via fetchTextResilient (direct + relais), parse chaque <item> (titre + lien + date + image via extractFeedImage qui réutilise les 3 méthodes media:content/enclosure/<img>), fusionne, dédoublonne par normKey(title). Aucun appel SDK, aucune résolution d'URL — les articles arrivent avec leur image.
+- Topic Tech modifié : directFeeds = 12 flux (priorité IA : ActuIA + IA France en tête). rss="" (Google News désactivé pour ce sujet). maxAgeDays=14 (les articles tech restent pertinents plus longtemps).
+- Filtrage STRICT des articles sans image dans serve() : `entry.items.filter((it) => it.image)`. Tous les sujets sont concernés. Si le filtrage laisse moins d'articles que MAX_ITEMS, c'est voulu (demande utilisateur : "tous les sources sans images il faut les enlever").
+- MAX_CANDIDATES passé de 14 à 24 pour compenser le filtrage (sur-recherche pour garder assez d'articles avec image).
+- Lint : 0 erreur / 0 warning.
+- Test API (curl, refresh=1) :
+  • Tech : 0/9 → 24/24 articles AVEC image (ActuIA : DeepSeek, Mistral, AI Act, OpenAI, API d'IA…)
+  • À la une : 9 (1 image) → 4/4 articles AVEC image
+  • Économie : 9 (3 images) → 3/3 articles AVEC image
+  • Sport : 9 (3 images) → 3/3 articles AVEC image
+- Navigateur (agent-browser) : onglet Tech affiche 24 cartes, 18 images chargées (6 en lazy-load), 0 cassée. Onglet À la une : 4 cartes, 4 images. Captures :
+  • .zscreens/actus-tech-with-images.png (24 cartes IA/tech avec images)
+  • .zscreens/actus-alaune-filtered.png (4 cartes filtrées avec images)
+
+Stage Summary:
+- Objectif atteint : 100% des articles affichés ont désormais une image (tous sujets confondus). Plus aucun placeholder doré.
+- Tech : 0/9 → 24/24 images. Sources High-Tech/IA intégrées : ActuIA, IA France (IA spécialisée) + Le Monde Pixels, Frandroid, Clubic, Numerama, ZDNet, Silicon, ITespresso, BDM, JDN, Phonandroid (tech généraliste).
+- Filtrage strict appliqué à tous les sujets : les sources sans image (SenePlus, Pressafrik, DakarActu, Leral, Capmad, Sika Finance…) sont écartées de l'affichage.
+- Architecture évolutive : il suffit d'ajouter des {url, label} à directFeeds pour étendre les sources d'un sujet. Prêt pour les flux RSS personnalisés de l'utilisateur.
