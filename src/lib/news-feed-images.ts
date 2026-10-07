@@ -35,17 +35,37 @@ function decodeEntities(s: string): string {
 }
 
 // Flux connus (les sites bloqués échoueront vite et seront mis en cache négatif).
+// Liste étoffée (Task 73) avec les grands médias qui publient la photo de chaque
+// article via media:content / enclosure : RFI Afrique, France 24 Afrique, Le Monde,
+// BBC Afrique, Africanews, SeneNews, SeneWeb… testés ~100 % de couverture d'images.
+// IMPORTANT : les URLs ont été vérifiées (RFI a refait son site, l'ancien
+// /fr/rss/afrique est 404 → le bon est /fr/afrique/rss).
 const FEED_CANDIDATES: Record<string, string[]> = {
+  // ── Médias internationaux / africains (testés avec images) ───────────────
+  "www.rfi.fr": ["https://www.rfi.fr/fr/afrique/rss", "https://www.rfi.fr/fr/rss"],
+  "rfi.fr": ["https://www.rfi.fr/fr/afrique/rss", "https://www.rfi.fr/fr/rss"],
+  "www.france24.com": ["https://www.france24.com/fr/afrique/rss", "https://www.france24.com/fr/rss"],
+  "france24.com": ["https://www.france24.com/fr/afrique/rss", "https://www.france24.com/fr/rss"],
+  "www.lemonde.fr": ["https://www.lemonde.fr/afrique/rss_full.xml", "https://www.lemonde.fr/rss/une.xml"],
+  "lemonde.fr": ["https://www.lemonde.fr/afrique/rss_full.xml", "https://www.lemonde.fr/rss/une.xml"],
+  "www.bbc.com": ["https://feeds.bbci.co.uk/news/world/africa/rss.xml"],
+  "bbc.com": ["https://feeds.bbci.co.uk/news/world/africa/rss.xml"],
+  "www.africanews.com": ["https://www.africanews.com/feed/"],
+  "africanews.com": ["https://www.africanews.com/feed/"],
+  // ── Médias sénégalais (testés avec images) ───────────────────────────────
   "www.senenews.com": ["https://www.senenews.com/feed"],
   "senenews.com": ["https://www.senenews.com/feed"],
-  "aps.sn": ["https://aps.sn/feed/", "https://aps.sn/feed"],
+  "seneweb.com": ["https://seneweb.com/rss.xml"],
+  "www.seneweb.com": ["https://seneweb.com/rss.xml"],
   "lesoleil.sn": ["https://lesoleil.sn/feed/", "https://lesoleil.sn/feed"],
+  "www.lesoleil.sn": ["https://lesoleil.sn/feed/", "https://lesoleil.sn/feed"],
+  // ── Médias sénégalais (cache négatif fréquent mais réessayés au TTL) ─────
+  "aps.sn": ["https://aps.sn/feed/", "https://aps.sn/feed"],
   "leral.net": ["https://www.leral.net/feed/", "https://leral.net/feed/"],
   "www.leral.net": ["https://www.leral.net/feed/", "https://leral.net/feed/"],
   "dakaractu.com": ["https://www.dakaractu.com/rss.xml", "https://www.dakaractu.com/feed/"],
   "www.dakaractu.com": ["https://www.dakaractu.com/rss.xml", "https://www.dakaractu.com/feed/"],
   "actussenegal.com": ["https://actussenegal.com/feed/"],
-  "seneweb.com": ["https://seneweb.com/rss.xml"],
 };
 
 // Hôtes dont on sait déjà que le flux est vide d'images ou bloqué : on évite
@@ -132,7 +152,7 @@ async function loadFeedMap(host: string): Promise<Map<string, string>> {
   return imgs;
 }
 
-/** Meilleure correspondance floue : recouvrement de mots ≥ 60 %. */
+/** Meilleure correspondance floue : recouvrement de mots ≥ 50 %. */
 function bestMatch(
   imgs: Map<string, string>,
   key: string
@@ -146,7 +166,7 @@ function bestMatch(
     if (kw.length === 0) continue;
     const inter = kw.filter((w) => words.has(w)).length;
     const score = inter / Math.min(words.size, kw.length);
-    if (score >= 0.6 && (!best || score > best.score)) best = { url, score };
+    if (score >= 0.5 && (!best || score > best.score)) best = { url, score };
   }
   return best?.url ?? null;
 }
@@ -158,30 +178,60 @@ export interface FeedImageTarget {
   host: string;
 }
 
+// Flux "globaux" : toujours chargés, quelle que soit la source de l'article.
+// Ces médias couvrent l'actualité africaine/sénégalaise et publient des photos
+// pour CHAQUE article (media:content). Une même dépêche (ex. RFI sur les
+// inondations à Dakar) est reprise par tv5monde, BBC, etc. — en cherchant
+// dans TOUS ces flux, on récupère l'image même quand la source primaire de
+// l'article n'a pas de flux RSS accessible.
+const GLOBAL_FEED_HOSTS = [
+  "www.rfi.fr",
+  "www.france24.com",
+  "www.bbc.com",
+  "www.africanews.com",
+  "www.lemonde.fr",
+  "www.senenews.com",
+  "seneweb.com",
+];
+
 /**
  * Rattache des photos aux articles sans photo en interrogeant les flux des
- * éditeurs concernés. `setImage(key, url)` est appelé pour chaque photo
- * trouvée — l'appelant s'occupe de mettre à jour l'item et la base.
+ * éditeurs. `setImage(key, url)` est appelé pour chaque photo trouvée.
+ *
+ * Stratégie (Task 73) : on charge en parallèle TOUS les flux globaux (RFI,
+ * France 24, BBC, Africanews, SeneNews, SeneWeb) + les flux spécifiques aux
+ * sources des articles, on fusionne en une MAP GLOBALE titre→photo, puis on
+ * cherche chaque article dans cette map. Une dépêche reprise par plusieurs
+ médias trouve ainsi sa photo même si la source primaire n'a pas de flux.
  */
 export async function harvestFeedImages(
   targets: FeedImageTarget[],
   setImage: (key: string, url: string) => void
 ): Promise<void> {
-  const byHost = new Map<string, FeedImageTarget[]>();
+  // Hôtes spécifiques aux articles (en plus des globaux)
+  const targetHosts = new Set<string>();
   for (const t of targets) {
     if (!t.host || t.host.includes("news.google.com")) continue;
-    const list = byHost.get(t.host) ?? [];
-    list.push(t);
-    byHost.set(t.host, list);
+    targetHosts.add(t.host);
   }
-  await Promise.all(
-    [...byHost.entries()].slice(0, 4).map(async ([host, list]) => {
-      const imgs = await loadFeedMap(host);
-      if (imgs.size === 0) return;
-      for (const t of list) {
-        const url = bestMatch(imgs, t.key);
-        if (url) setImage(t.key, url);
-      }
-    })
-  );
+
+  // Tous les hôtes à charger : globaux + spécifiques (dédupliqués)
+  const allHosts = [...new Set([...GLOBAL_FEED_HOSTS, ...targetHosts])].slice(0, 16);
+
+  // Chargement parallèle de tous les flux
+  const feedMaps = await Promise.all(allHosts.map((h) => loadFeedMap(h).catch(() => new Map())));
+
+  // Fusion en une map globale titre→photo
+  const globalMap = new Map<string, string>();
+  for (const imgs of feedMaps) {
+    for (const [k, v] of imgs) globalMap.set(k, v);
+  }
+
+  if (globalMap.size === 0) return;
+
+  // Recherche de chaque article dans la map globale
+  for (const t of targets) {
+    const url = bestMatch(globalMap, t.key);
+    if (url) setImage(t.key, url);
+  }
 }

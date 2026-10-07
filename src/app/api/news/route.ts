@@ -92,7 +92,7 @@ const IMAGE_TIMEOUT_MS = 6_000;
 const RSS_TIMEOUT_MS = 10_000;
 const RESOLVE_CHUNK = 3; // petits lots : le SDK web_search est limité en débit (bursts → résultats vides)
 const RESOLVE_PAUSE_MS = 450; // respiration entre les lots
-const SEARCH_BUDGET_PER_TOPIC = 6; // recherches individuelles max par cycle/sujet (quota SDK)
+const SEARCH_BUDGET_PER_TOPIC = 2; // dernier recours seulement (harvestFeedImages couvre la majorité)
 const SDK_MIN_GAP_MS = 1_200; // respiration globale entre deux appels web_search
 const SDK_COOLDOWN_MS = 60_000; // pause après un 429
 
@@ -360,115 +360,124 @@ async function fetchNewsGoogle(topicKey: string): Promise<NewsCacheEntry> {
     if (candidates.length >= MAX_CANDIDATES) break;
   }
 
-  // Cache persistant : les articles déjà résolus (cycles précédents) sont
-  // réutilisés sans AUCUN appel SDK — c'est ce qui économise le quota.
-  const keys = candidates.map((c) => normKey(cleanTitle(c.title, c.sourceName)));
-  const dbRows = await db.newsArticle.findMany({ where: { titleKey: { in: keys } } });
-  const dbByKey = new Map(dbRows.map((r) => [r.titleKey, r]));
-
-  let budget = SEARCH_BUDGET_PER_TOPIC; // recherches individuelles restantes ce cycle
-  const items: NewsItem[] = [];
-  for (let i = 0; i < candidates.length && items.length < MAX_ITEMS; i += RESOLVE_CHUNK) {
-    if (i > 0) await sleep(RESOLVE_PAUSE_MS);
-    const chunk = candidates.slice(i, i + RESOLVE_CHUNK);
-    const resolved = await Promise.all(
-      chunk.map(async (c) => {
-        const title = cleanTitle(c.title, c.sourceName);
-        const key = normKey(title);
-        const source = c.sourceName || hostOf(c.sourceUrl) || hostOf(c.link);
-        const date = fmtFrRelative(c.pubDate);
-
-        // 1. Déjà résolu lors d'un cycle précédent → réutilise (0 appel SDK)
-        const cachedRow = dbByKey.get(key);
-        if (cachedRow) {
-          let image = cachedRow.image;
-          if (!image) {
-            image = await fetchArticleImage(cachedRow.url);
-            if (image) {
-              await db.newsArticle
-                .update({ where: { id: cachedRow.id }, data: { image } })
-                .catch(() => {});
-            }
-          }
-          return {
-            title, snippet: cachedRow.snippet, url: cachedRow.url,
-            host: cachedRow.host || hostOf(cachedRow.url), source, date, image,
-          } as NewsItem;
-        }
-
-        // 2. Article inconnu : résolution web_search dans la limite du budget
-        if (budget > 0 && Date.now() >= sdkCooldownUntil) {
-          budget--;
-          const pub = await resolvePublisher(title);
-          if (pub) {
-            const image = await fetchArticleImage(pub.url);
-            const publishedAt = new Date(c.pubDate);
-            await db.newsArticle
-              .upsert({
-                where: { titleKey: key },
-                create: {
-                  titleKey: key, title, url: pub.url, host: hostOf(pub.url),
-                  source, snippet: pub.snippet.slice(0, 500), image,
-                  topicKey, publishedAt: Number.isFinite(publishedAt.getTime()) ? publishedAt : null,
-                },
-                update: { image, snippet: pub.snippet.slice(0, 500) },
-              })
-              .catch(() => {});
-            return { title, snippet: pub.snippet, url: pub.url, host: hostOf(pub.url), source, date, image } as NewsItem;
-          }
-        }
-
-        // 3. Non résolu : lien Google conservé (cliquable depuis un navigateur) ;
-        //    sera complété aux cycles suivants quand le quota sera disponible.
-        return { title, snippet: "", url: c.link, host: hostOf(c.sourceUrl) || hostOf(c.link), source, date, image: null } as NewsItem;
-      }),
-    );
-    items.push(...resolved);
+  // ── Construction des items initiaux (sans image) ───────────────────────────
+  // Les liens Google Actualités sont désormais chiffrés (non résolvables côté
+  // serveur) : on les conserve tels quels (cliquables dans un navigateur) et
+  // on se concentre sur récupérer la PHOTO par d'autres canaux.
+  interface WorkItem extends NewsItem {
+    _key: string;
+    _pubDate: string;
   }
+  const items: WorkItem[] = candidates.map((c) => {
+    const title = cleanTitle(c.title, c.sourceName);
+    const source = c.sourceName || hostOf(c.sourceUrl) || hostOf(c.link);
+    const date = fmtFrRelative(c.pubDate);
+    const host = hostOf(c.sourceUrl) || hostOf(c.link);
+    return { title, snippet: "", url: c.link, host, source, date, image: null, _key: normKey(title), _pubDate: c.pubDate };
+  });
 
-  // ── Complétion gratuite par les flux des éditeurs ──────────────────────────
-  // De nombreux médias bloquent le fetch serveur de leurs pages (403 anti-
-  // robot) mais laissent leurs flux RSS accessibles, et plusieurs y publient
-  // la photo de chaque article (media:content/enclosure). On récolte ces
-  // photos pour les articles restés sans image — 0 appel SDK (0 quota) —
-  // puis on persiste en base pour les cycles suivants.
-  const sansPhoto = items.filter((it) => !it.image);
-  if (sansPhoto.length > 0) {
+  // ── PHASE 1 : harvestFeedImages — source PRIMAIRE (gratuite, fiable) ───────
+  // Les flux RSS directs des éditeurs (RFI, France 24, Le Monde, BBC, Africanews,
+  // SeneNews, SeneWeb…) publient la photo de chaque article via media:content /
+  // enclosure. On rapproche par titre normalisé. 0 appel SDK, 0 quota.
+  const sansPhoto1 = items.filter((it) => !it.image);
+  if (sansPhoto1.length > 0) {
     try {
       await harvestFeedImages(
-        sansPhoto.map((it) => ({ key: normKey(it.title), host: it.host })),
+        sansPhoto1.map((it) => ({ key: it._key, host: it.host })),
         (key, url) => {
-          const it = sansPhoto.find((x) => normKey(x.title) === key);
+          const it = sansPhoto1.find((x) => x._key === key);
           if (it && !it.image) it.image = url;
         }
       );
-      for (const it of items) {
-        if (!it.image) continue;
-        const key = normKey(it.title);
-        if (dbByKey.has(key)) {
-          await db.newsArticle
-            .updateMany({ where: { titleKey: key, image: null }, data: { image: it.image } })
-            .catch(() => {});
-        } else {
-          await db.newsArticle
-            .upsert({
-              where: { titleKey: key },
-              create: {
-                titleKey: key, title: it.title, url: it.url, host: it.host,
-                source: it.source, snippet: it.snippet, image: it.image,
-                topicKey,
-              },
-              update: { image: it.image },
-            })
-            .catch(() => {});
-        }
-      }
     } catch {
-      // complétion best effort : le cycle suivant réessaiera
+      // best effort : la phase suivante compensera
     }
   }
 
-  return { items: items.slice(0, MAX_ITEMS), fetchedAt: Date.now(), provider: "google" };
+  // ── PHASE 2 : cache persistant DB (cycles précédents) ──────────────────────
+  // Les articles déjà résolus lors d'un cycle précédent sont réutilisés sans
+  // AUCUN appel SDK. On récupère aussi l'URL réelle de l'éditeur si elle a été
+  // résolue lors d'un cycle antérieur (le lien Google chiffré devient le vrai).
+  const sansPhoto2 = items.filter((it) => !it.image);
+  const dbByKey = new Map<string, { id: string; image: string | null; snippet: string; url: string; host: string }>();
+  if (sansPhoto2.length > 0) {
+    const keys2 = sansPhoto2.map((it) => it._key);
+    const dbRows = await db.newsArticle.findMany({ where: { titleKey: { in: keys2 } } });
+    for (const r of dbRows) dbByKey.set(r.titleKey, r);
+    for (const it of sansPhoto2) {
+      const row = dbByKey.get(it._key);
+      if (!row) continue;
+      if (row.image) it.image = row.image;
+      if (row.snippet) it.snippet = row.snippet;
+      // URL réelle de l'éditeur (résolue lors d'un cycle précédent) → remplace le lien Google
+      if (row.url && !row.url.includes("news.google.com")) {
+        it.url = row.url;
+        if (row.host) it.host = row.host;
+      }
+    }
+  }
+
+  // ── PHASE 3 : web_search — dernier recours (budget réduit) ─────────────────
+  // La Phase 1 (harvest) couvre désormais la majorité des articles. Le SDK
+  // n'est sollicité QUE pour les articles toujours sans photo. Budget réduit à
+  // 2/sujet (au lieu de 6) car la plupart des sources ont désormais un flux RSS
+  // connu. Dès un 429, pause de 60 s sur tout le module.
+  let budget = SEARCH_BUDGET_PER_TOPIC;
+  const sansPhoto3 = items.filter((it) => !it.image);
+  for (let i = 0; i < sansPhoto3.length && budget > 0 && Date.now() >= sdkCooldownUntil; i += RESOLVE_CHUNK) {
+    if (i > 0) await sleep(RESOLVE_PAUSE_MS);
+    const chunk = sansPhoto3.slice(i, i + RESOLVE_CHUNK);
+    await Promise.all(
+      chunk.map(async (it) => {
+        if (it.image) return; // déjà résolu par une phase précédente
+        if (budget <= 0 || Date.now() < sdkCooldownUntil) return;
+        budget--;
+        const pub = await resolvePublisher(it.title);
+        if (!pub) return;
+        const image = await fetchArticleImage(pub.url);
+        if (image) {
+          it.image = image;
+          it.snippet = pub.snippet;
+          it.url = pub.url;
+          it.host = hostOf(pub.url);
+        }
+      }),
+    );
+  }
+
+  // ── Persistance : on enregistre images + snippets pour les cycles suivants ─
+  for (const it of items) {
+    if (!it.image && !it.snippet) continue; // rien de nouveau à stocker
+    const publishedAt = new Date(it._pubDate);
+    try {
+      await db.newsArticle.upsert({
+        where: { titleKey: it._key },
+        create: {
+          titleKey: it._key,
+          title: it.title,
+          url: it.url,
+          host: it.host,
+          source: it.source,
+          snippet: it.snippet.slice(0, 500),
+          image: it.image,
+          topicKey,
+          publishedAt: Number.isFinite(publishedAt.getTime()) ? publishedAt : null,
+        },
+        update: {
+          ...(it.image ? { image: it.image } : {}),
+          ...(it.snippet ? { snippet: it.snippet.slice(0, 500) } : {}),
+          ...(it.url && !it.url.includes("news.google.com") ? { url: it.url, host: it.host } : {}),
+        },
+      });
+    } catch {
+      // persistance best effort : le cycle suivant réessaiera
+    }
+  }
+
+  // Nettoyage de la clé interne avant retour
+  const cleanItems: NewsItem[] = items.map(({ _key, _pubDate, ...rest }) => rest);
+  return { items: cleanItems.slice(0, MAX_ITEMS), fetchedAt: Date.now(), provider: "google" };
 }
 
 // ─── Repli : pipeline recherche web (Task 68) ────────────────────────────────
