@@ -1871,3 +1871,36 @@ Stage Summary:
 - Tech : 0/9 → 24/24 images. Sources High-Tech/IA intégrées : ActuIA, IA France (IA spécialisée) + Le Monde Pixels, Frandroid, Clubic, Numerama, ZDNet, Silicon, ITespresso, BDM, JDN, Phonandroid (tech généraliste).
 - Filtrage strict appliqué à tous les sujets : les sources sans image (SenePlus, Pressafrik, DakarActu, Leral, Capmad, Sika Finance…) sont écartées de l'affichage.
 - Architecture évolutive : il suffit d'ajouter des {url, label} à directFeeds pour étendre les sources d'un sujet. Prêt pour les flux RSS personnalisés de l'utilisateur.
+
+---
+Task ID: 75
+Agent: Z.ai Code (principal)
+Task: Synchroniser GitHub/local (sandbox réinitialisé), augmenter le nombre de nouvelles (4 → 12), ajouter France 24 et médias français avec images à tous les sujets.
+
+Work Log:
+- Diagnostic : le sandbox a été réinitialisé au template de départ. Tous les fichiers src/ ont été perdus localement (dates Jul 28 pour les dirs, May 12 pour les fichiers = template original). Le code Task 73/74 n'existait plus que sur GitHub.
+- Restauration : re-clone depuis GitHub vers /tmp/2mailsnew, puis rsync vers /home/z/my-project (en préservant le mount /upload). bun install (990 paquets), db:push (schéma en sync), relance dev server via .zscripts/dev.sh en setsid.
+- Test de 16 flux topic-spécifiques France 24 / RFI / Le Monde / BBC / L'Équipe :
+  • Économie : F24 Éco (30 items, img✅), RFI Éco (30, img✅), Le Monde Éco (20, img✅)
+  • Sport : F24 Sport (30, img✅), RFI Sport (15, img✅), Le Monde Sport (20, img✅), BBC Sport (76, img✅), L'Équipe (50, img✅)
+- Ajout de directFeeds à TOUS les sujets (Task 75) :
+  • À la une : 7 flux (RFI Afrique, France 24 Afrique, BBC Afrique, Africanews, Le Monde Afrique, SeneNews, SeneWeb)
+  • Économie : 5 flux (F24 Éco, RFI Éco, Le Monde Éco, F24 Afrique, RFI Afrique)
+  • Tech : 12 flux (inchangés Task 74 — ActuIA, IA France, Le Monde Pixels, Frandroid, Clubic, Numerama, ZDNet, Silicon, ITespresso, BDM, JDN, Phonandroid)
+  • Sport : 6 flux (F24 Sport, RFI Sport, Le Monde Sport, BBC Sport, L'Équipe, F24 Afrique)
+- MAX_ITEMS augmenté de 9 à 12 (demande utilisateur). MAX_CANDIDATES de 24 à 40.
+- Ajout tri chronologique dans fetchDirectFeeds : interface DirectFeedItem avec _ts (timestamp pubDate), tri par _ts desc avant dédoublonnage, strip _ts avant retour. Les articles les plus récents s'affichent en premier.
+- Capping à MAX_ITEMS dans serve() : `.filter(it => it.image).slice(0, MAX_ITEMS)`.
+- Lint : 0/0.
+- Test API (curl, refresh=1) :
+  • À la une : 4 → 12 articles AVEC image (SeneNews, RFI, France 24, BBC Afrique, Africanews, Le Monde Afrique, SeneWeb)
+  • Économie : 3 → 12 articles AVEC image (RFI Afrique, Le Monde, RFI, France 24)
+  • Tech : 24 → 12 articles AVEC image (ZDNet, ActuIA, Frandroid, Clubic, etc.)
+  • Sport : 3 → 12 articles AVEC image (BBC Sport, Le Monde, L'Équipe, France 24)
+- Navigateur : 12 cartes / 12 images sur "À la une". Capture .zscreens/actus-12-articles.png.
+
+Stage Summary:
+- Sync GitHub/local effectuée : le sandbox réinitialisé a été restauré depuis GitHub (commit f15c3ad).
+- Nombre de nouvelles : 4 → 12 par sujet (tous sujets confondus).
+- Sources : France 24 + médias français (RFI, Le Monde, BBC, L'Équipe) ajoutés à tous les sujets. 100% des articles ont une image.
+- Architecture : directFeeds est désormais la source PRIMAIRE pour les 4 sujets. Google News est fallback (rss encore présent pour a-la-une/economie/sport, mais non utilisé tant que directFeeds répond).

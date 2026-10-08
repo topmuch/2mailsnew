@@ -62,6 +62,17 @@ const TOPICS: Record<string, {
     fallback: "Sénégal gouvernement annonce conseil des ministres",
     recency: 3,
     maxAgeDays: 4,
+    // 7 flux directs Afrique/Sénégal (Task 75) — tous testés 100% images.
+    // Source PRIMAIRE : les articles arrivent avec leur photo, pas de Google News.
+    directFeeds: [
+      { url: "https://www.rfi.fr/fr/afrique/rss", label: "RFI" },
+      { url: "https://www.france24.com/fr/afrique/rss", label: "France 24" },
+      { url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", label: "BBC Afrique" },
+      { url: "https://www.africanews.com/feed/", label: "Africanews" },
+      { url: "https://www.lemonde.fr/afrique/rss_full.xml", label: "Le Monde Afrique" },
+      { url: "https://www.senenews.com/feed", label: "SeneNews" },
+      { url: "https://seneweb.com/rss.xml", label: "SeneWeb" },
+    ],
   },
   economie: {
     label: "Économie",
@@ -69,6 +80,14 @@ const TOPICS: Record<string, {
     fallback: "Sénégal économie réforme commerce entreprise",
     recency: 7,
     maxAgeDays: 8,
+    // 5 flux Économie (Task 75) — F24/RFI/Le Monde éco + Afrique.
+    directFeeds: [
+      { url: "https://www.france24.com/fr/economie/rss", label: "France 24" },
+      { url: "https://www.rfi.fr/fr/economie/rss", label: "RFI" },
+      { url: "https://www.lemonde.fr/economie/rss_full.xml", label: "Le Monde" },
+      { url: "https://www.france24.com/fr/afrique/rss", label: "France 24 Afrique" },
+      { url: "https://www.rfi.fr/fr/afrique/rss", label: "RFI Afrique" },
+    ],
   },
   tech: {
     label: "Tech",
@@ -99,6 +118,15 @@ const TOPICS: Record<string, {
     fallback: "Lions du Sénégal football victoire match",
     recency: 10,
     maxAgeDays: 11,
+    // 6 flux Sport (Task 75) — F24/RFI/Le Monde/BBC/L'Équipe.
+    directFeeds: [
+      { url: "https://www.france24.com/fr/sport/rss", label: "France 24" },
+      { url: "https://www.rfi.fr/fr/sport/rss", label: "RFI" },
+      { url: "https://www.lemonde.fr/sport/rss_full.xml", label: "Le Monde" },
+      { url: "https://feeds.bbci.co.uk/sport/rss.xml", label: "BBC Sport" },
+      { url: "https://dwh.lequipe.fr/api/edito/rss?path=/", label: "L'Équipe" },
+      { url: "https://www.france24.com/fr/afrique/rss", label: "France 24 Afrique" },
+    ],
   },
 };
 
@@ -112,8 +140,8 @@ const EXCLUDED_HOSTS = [
 ];
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const MAX_ITEMS = 9;
-const MAX_CANDIDATES = 24; // sur-recherche : le filtrage strict sans-image en écarte une partie
+const MAX_ITEMS = 12; // Task 75 : augmenté de 9 à 12 (demande utilisateur)
+const MAX_CANDIDATES = 40; // sur-recherche : filtrage strict sans-image + plus de sources
 const IMAGE_TIMEOUT_MS = 6_000;
 const RSS_TIMEOUT_MS = 10_000;
 const RESOLVE_CHUNK = 3; // petits lots : le SDK web_search est limité en débit (bursts → résultats vides)
@@ -397,10 +425,14 @@ function extractFeedImage(block: string, feedBase: string): string | null {
   return null;
 }
 
-function parseDirectFeed(xml: string, feedBase: string, sourceLabel: string): NewsItem[] {
+interface DirectFeedItem extends NewsItem {
+  _ts: number; // timestamp pubDate pour le tri chronologique
+}
+
+function parseDirectFeed(xml: string, feedBase: string, sourceLabel: string): DirectFeedItem[] {
   const stripCdata = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
   const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>/g) ?? [];
-  const items: NewsItem[] = [];
+  const items: DirectFeedItem[] = [];
   for (const b of blocks) {
     const pick = (tag: string) => {
       const m = b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
@@ -412,6 +444,7 @@ function parseDirectFeed(xml: string, feedBase: string, sourceLabel: string): Ne
     if (!title || !link) continue;
     if (isExcluded(link)) continue;
     const image = extractFeedImage(b, feedBase);
+    const ts = new Date(pubDate).getTime();
     items.push({
       title,
       snippet: "",
@@ -420,6 +453,7 @@ function parseDirectFeed(xml: string, feedBase: string, sourceLabel: string): Ne
       source: sourceLabel,
       date: fmtFrRelative(pubDate),
       image,
+      _ts: Number.isFinite(ts) ? ts : 0,
     });
   }
   return items;
@@ -437,23 +471,24 @@ async function fetchDirectFeeds(topicKey: string): Promise<NewsCacheEntry> {
           accept: "application/rss+xml, application/xml, text/xml, */*",
           timeoutMs: RSS_TIMEOUT_MS,
         });
-        if (!hit) return [] as NewsItem[];
+        if (!hit) return [] as DirectFeedItem[];
         return parseDirectFeed(hit.text, f.url, f.label);
       } catch {
-        return [] as NewsItem[];
+        return [] as DirectFeedItem[];
       }
     })
   );
 
-  // Fusionne, dédoublonne par titre normalisé
-  const all = feeds.flat();
+  // Fusionne, trie par date (plus récent d'abord), dédoublonne par titre
+  const all = feeds.flat().sort((a, b) => b._ts - a._ts);
   const seen = new Set<string>();
   const items: NewsItem[] = [];
   for (const it of all) {
     const key = normKey(it.title);
     if (seen.has(key)) continue;
     seen.add(key);
-    items.push(it);
+    const { _ts, ...rest } = it; // strip clé interne
+    items.push(rest);
     if (items.length >= MAX_CANDIDATES) break;
   }
 
@@ -657,10 +692,8 @@ function serve(entry: NewsCacheEntry, extra: Record<string, unknown>) {
   // de la disponibilité des sites des médias au moment du clic.
   warmNewsImages(entry.items.map((i) => i.image));
   // Task 74 : filtrage STRICT des articles sans image (demande utilisateur).
-  // Les sources sans image sont écartées — le mur d'actus n'affiche que des
-  // cartes illustrées. Si le filtrage laisse moins d'articles que MAX_ITEMS,
-  // c'est voulu : mieux vaut peu d'articles mais tous avec photo.
-  const withImages = entry.items.filter((it) => it.image);
+  // Task 75 : capping à MAX_ITEMS (12) — plus de sources mais pas trop de cartes.
+  const withImages = entry.items.filter((it) => it.image).slice(0, MAX_ITEMS);
   return NextResponse.json({
     ...entry,
     items: withImages.map((i) => ({ ...i, image: proxifyImage(i.image) })),
