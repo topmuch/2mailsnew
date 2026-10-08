@@ -1932,3 +1932,30 @@ Stage Summary:
 - Chaque consultation de l'onglet Actus déclenche maintenant un rafraîchissement automatique (cache 30s + auto-refresh on visibilitychange).
 - L'utilisateur n'a plus besoin de cliquer "Actualiser" pour voir les dernières nouvelles — elles se mettent à jour toutes seules à chaque visite.
 - Le bouton "Actualiser" reste pour un forçage manuel immédiat.
+
+---
+Task ID: 77
+Agent: Z.ai Code (principal)
+Task: Précharger les articles avant le clic sur Actus + éviter les cartes vides à chaque déconnexion.
+
+Work Log:
+- Backend (src/app/api/news/route.ts) : export d'une fonction `warmNewsCache()` qui précharge les 4 sujets (a-la-une, economie, tech, sport) en appelant fetchDirectFeeds/fetchNewsGoogle. Ne re-fetch pas si le cache est encore frais (< 30 s).
+- Instrumentation (src/instrumentation.ts) : au démarrage du serveur, setTimeout 8 s puis setInterval 25 s qui appelle warmNewsCache(). Le cache reste CHAUD en permanence (refresh avant l'expiration du cache 30 s).
+- Frontend (src/components/news-view.tsx) : stale-while-revalidate.
+  • Nouvel état `refreshing` (distinct de `loading`).
+  • `loading` = on n'a JAMAIS eu de données → squelettes (premier chargement uniquement).
+  • `refreshing` = on a déjà des données, on refresh en arrière-plan → on GARDE les anciens articles affichés + indicateur discret "Mise à jour des articles en arrière-plan…".
+  • Bouton "Actualiser" désactivé pendant loading/refreshing, spinner sur les deux.
+- Lint : 0/0.
+- Test API (curl) après redémarrage serveur :
+  • 1ère consultation (cache froid) : 0.15s à 2.5s (compile + fetch)
+  • 2ème consultation (cache chaud) : 9ms à 12ms pour tous les sujets ✅
+- Test navigateur :
+  • 1er clic Actus : 12 cartes affichées
+  • Navigation Dashboard → Actus : 12 cartes IMMÉDIATEMENT (pas de squelettes, stale-while-revalidate)
+  • Capture .zscreens/actus-instant.png
+
+Stage Summary:
+- Problème "temps de chargement au clic Actus" résolu : le cache serveur est préchargé au démarrage (+8s) puis rafraîchi toutes les 25s. Les articles sont déjà là quand l'utilisateur clique — réponse en ~10ms au lieu de 2-5s.
+- Problème "cartes vides à chaque déconnexion" résolu : stale-while-revalidate. Les anciens articles restent affichés pendant le refresh en arrière-plan. Plus de squelettes visibles après la 1ère consultation.
+- L'indicateur "Mise à jour des articles en arrière-plan…" remplace les squelettes pendant le refresh — discret, n'efface pas le contenu.

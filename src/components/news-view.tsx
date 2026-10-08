@@ -58,11 +58,22 @@ const fmtAge = (ts: number) => {
 export default function NewsView() {
   const [topic, setTopic] = useState("a-la-une");
   const [data, setData] = useState<NewsPayload | null>(null);
+  // Task 77 : stale-while-revalidate. On distingue :
+  //   - `loading` = on n'a JAMAIS eu de données pour ce sujet → on affiche les squelettes
+  //   - `refreshing` = on a déjà des données, on refresh en arrière-plan → on garde les anciennes affichées
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (t: string, refresh = false) => {
-    setLoading(true);
+    // Stale-while-revalidate : si on a déjà des données, on les garde affichées
+    // et on refresh en arrière-plan (refreshing=true). Sinon, premier chargement
+    // → squelettes (loading=true).
+    setData((prev) => {
+      if (prev) setRefreshing(true);
+      else setLoading(true);
+      return prev;
+    });
     setError(null);
     try {
       const res = await authFetch(`/api/news?topic=${t}${refresh ? "&refresh=1" : ""}`);
@@ -73,6 +84,7 @@ export default function NewsView() {
       setError("Impossible de charger les actualités. Vérifiez la connexion internet puis réessayez.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -104,8 +116,8 @@ export default function NewsView() {
               : "L'actualité du Sénégal et du monde, avec les photos."}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => load(topic, true)} disabled={loading} className="shrink-0 gap-2">
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden /> Actualiser
+        <Button variant="outline" size="sm" onClick={() => load(topic, true)} disabled={loading || refreshing} className="shrink-0 gap-2">
+          <RefreshCw className={cn("h-4 w-4", (loading || refreshing) && "animate-spin")} aria-hidden /> Actualiser
         </Button>
       </div>
 
@@ -129,6 +141,13 @@ export default function NewsView() {
       </div>
 
       {/* ─── Contenu ─── */}
+      {/* Task 77 : indicateur discret de mise à jour en arrière-plan (sans cacher les articles) */}
+      {refreshing && data && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Mise à jour des articles en arrière-plan…
+        </p>
+      )}
       {loading ? (
         <div className="space-y-3">
           <p className="flex items-center gap-2 text-xs text-muted-foreground">

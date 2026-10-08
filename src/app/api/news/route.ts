@@ -753,3 +753,28 @@ export async function GET(request: NextRequest) {
     }
   }
 }
+
+// ─── Préchauffage du cache (Task 77) ─────────────────────────────────────────
+// Appelé au démarrage du serveur (instrumentation.ts) puis toutes les 25 s
+// (juste avant que le cache 30 s n'expire) pour garder le cache CHAUD en
+// permanence. Ainsi, quand l'utilisateur clique sur « Actus », la réponse
+// est instantanée (cache serveur déjà rempli) — plus de squelettes visibles.
+
+export async function warmNewsCache(): Promise<void> {
+  for (const topicKey of Object.keys(TOPICS)) {
+    try {
+      const cached = cache.get(topicKey);
+      // Ne pas re-fetch si le cache est encore frais (< CACHE_TTL_MS)
+      if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) continue;
+      // Précharge en arrière-plan (directFeeds si présent, sinon Google News)
+      const topic = TOPICS[topicKey];
+      await ensureFetch(topicKey, () =>
+        topic.directFeeds?.length
+          ? fetchDirectFeeds(topicKey)
+          : fetchNewsGoogle(topicKey)
+      ).catch(() => null);
+    } catch {
+      // best effort : le prochain cycle réessaiera
+    }
+  }
+}
