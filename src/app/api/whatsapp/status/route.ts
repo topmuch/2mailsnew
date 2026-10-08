@@ -12,6 +12,15 @@ export async function GET() {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (e) {
-    return NextResponse.json({ ready: false, error: "Service WhatsApp injoignable" }, { status: 503 });
+    // Service down : on retourne un état explicite pour que le frontend
+    // puisse afficher un message clair ( distinction "démarrage" vs "injoignable").
+    return NextResponse.json({
+      ready: false,
+      qr: false,
+      chromiumReady: false,
+      serviceDown: true,
+      error: "Service WhatsApp non démarré",
+    }, { status: 503 });
   }
 }
+

@@ -33,9 +33,14 @@ const io = new Server(httpServer, {
 });
 
 // ─── État global ──────────────────────────────────────────────────────────────
+// serviceStarted = le service Express écoute (ne prouve pas que Chromium est prêt)
+// chromiumReady = Chromium a démarré (le client WhatsApp peut générer un QR)
+// clientReady = WhatsApp authentifié (session valide)
 let qrCodeData: string | null = null;
 let clientReady = false;
+let chromiumReady = false;
 let clientInfo: { phone?: string; name?: string } | null = null;
+const serviceStartTime = Date.now();
 
 // ─── Client WhatsApp ──────────────────────────────────────────────────────────
 // En production (Docker), on utilise le Chromium système (PUPPETEER_EXECUTABLE_PATH).
@@ -63,6 +68,7 @@ client.on("qr", async (qr: string) => {
   console.log("[whatsapp] QR code généré");
   qrCodeData = qr;
   clientReady = false;
+  chromiumReady = true; // Le QR ne peut être généré que si Chromium est prêt
   // Génère aussi une data URL pour affichage direct en <img>
   const dataUrl = await qrcode.toDataURL(qr, { width: 300 });
   io.emit("qr", { qr, dataUrl });
@@ -82,7 +88,14 @@ client.on("ready", () => {
 
 client.on("authenticated", () => {
   console.log("[whatsapp] Authentifié");
+  chromiumReady = true;
   io.emit("authenticated");
+});
+
+// Événement 'loading_screen' : Chromium démarre
+client.on("loading_screen", (percent: string) => {
+  console.log("[whatsapp] Chromium démarre:", percent);
+  chromiumReady = false;
 });
 
 client.on("auth_failure", (msg: string) => {
@@ -194,7 +207,13 @@ client.initialize().catch((e: unknown) => console.error("init error:", e));
 // ─── API REST (appelée depuis le frontend via XTransformPort=3003) ────────────
 
 app.get("/status", (_req, res) => {
-  res.json({ ready: clientReady, qr: qrCodeData ? true : false, info: clientInfo });
+  res.json({
+    ready: clientReady,
+    qr: !!qrCodeData,
+    chromiumReady,
+    info: clientInfo,
+    uptime: Math.floor((Date.now() - serviceStartTime) / 1000),
+  });
 });
 
 app.get("/qr", async (_req, res) => {

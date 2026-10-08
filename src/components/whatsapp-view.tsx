@@ -223,7 +223,16 @@ export default function WhatsAppView() {
           await loadQr();
           return;
         }
-        setError(attempts > 3 ? "Service WhatsApp en cours de démarrage…" : null);
+        // Messages précis selon l'état du service
+        if (s.serviceDown) {
+          // Service down : instructions claires
+          setError("Service WhatsApp non démarré. Ouvrez un terminal sur le serveur et lancez : bash start-whatsapp.sh");
+        } else if (s.chromiumReady === false) {
+          // Service up mais Chromium démarre (peut prendre 10-30s)
+          setError(`Démarrage de Chromium en cours… (${attempts * 3}s) — le QR apparaîtra dans quelques secondes.`);
+        } else {
+          setError("Service en cours de démarrage…");
+        }
       } catch {
         if (cancelled) return;
         setLoading(false);
