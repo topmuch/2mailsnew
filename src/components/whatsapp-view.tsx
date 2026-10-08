@@ -126,7 +126,10 @@ export default function WhatsAppView() {
     socket.on("disconnected", (d: { reason: string }) => {
       setReady(false);
       setInfo(null);
-      setError("Déconnecté : " + d.reason + ". Redémarrage du QR…");
+      // Task 79-c : ne PAS effacer le QR ici — le service se relance et
+      // régénère un nouveau QR. On garde l'ancien affiché pour éviter le
+      // clignotement, le nouveau le remplacera dès qu'il arrivera.
+      setError("Reconnexion en cours…");
     });
 
     socket.on("message_received", (m: Message) => {
@@ -189,22 +192,53 @@ export default function WhatsAppView() {
     };
   }, [selectedJid]);
 
-  // ─── Chargement initial ────────────────────────────────────────────────────
+  // ─── Chargement initial + polling (Task 79-c) ─────────────────────────────
+  // Poll /status et /qr toutes les 3s tant qu'on n'est pas connecté et qu'on
+  // n'a pas de QR. Arrête le polling dès qu'on a le QR ou la connexion.
+  const qrRef = useRef<string | null>(null);
+  const readyRef = useRef(false);
+  useEffect(() => { qrRef.current = qrDataUrl; }, [qrDataUrl]);
+  useEffect(() => { readyRef.current = ready; }, [ready]);
+
   useEffect(() => {
-    // Récupère l'état initial via /status
-    fetch(`/api/whatsapp/status?XTransformPort=${WHATSAPP_PORT}`)
-      .then((r) => r.json())
-      .then((s: { ready: boolean; qr: boolean; info: ClientInfo | null }) => {
+    let cancelled = false;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (cancelled || readyRef.current || qrRef.current) return;
+      attempts++;
+      try {
+        const res = await fetch(`/api/whatsapp/status?XTransformPort=${WHATSAPP_PORT}`);
+        const s = await res.json();
+        if (cancelled || readyRef.current || qrRef.current) return;
         setReady(s.ready);
         setInfo(s.info);
         setLoading(false);
-        if (s.ready) loadConversations();
-        else if (s.qr) loadQr();
-      })
-      .catch(() => {
+        if (s.ready) {
+          setError(null);
+          loadConversations();
+          return;
+        }
+        if (s.qr) {
+          await loadQr();
+          return;
+        }
+        setError(attempts > 3 ? "Service WhatsApp en cours de démarrage…" : null);
+      } catch {
+        if (cancelled) return;
         setLoading(false);
-        setError("Service WhatsApp injoignable. Le mini-service est-il démarré ?");
-      });
+        if (attempts > 3) {
+          setError("Service WhatsApp injoignable. Vérifiez que le mini-service est démarré (bash start-whatsapp.sh).");
+        }
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // ─── Auto-scroll des messages ──────────────────────────────────────────────
