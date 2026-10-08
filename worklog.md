@@ -1959,3 +1959,39 @@ Stage Summary:
 - Problème "temps de chargement au clic Actus" résolu : le cache serveur est préchargé au démarrage (+8s) puis rafraîchi toutes les 25s. Les articles sont déjà là quand l'utilisateur clique — réponse en ~10ms au lieu de 2-5s.
 - Problème "cartes vides à chaque déconnexion" résolu : stale-while-revalidate. Les anciens articles restent affichés pendant le refresh en arrière-plan. Plus de squelettes visibles après la 1ère consultation.
 - L'indicateur "Mise à jour des articles en arrière-plan…" remplace les squelettes pendant le refresh — discret, n'efface pas le contenu.
+
+---
+Task ID: 78
+Agent: Z.ai Code (principal)
+Task: Intégrer un onglet Shopping (Amazon, AliExpress, Shein, Temu, Cdiscount, etc.).
+
+Work Log:
+- Diagnostic : testé 13 flux RSS de sites e-commerce (Amazon FR/com bestsellers, Cdiscount, eBay, Fnac, Darty, Rakuten, Boulanger, Rueducommerce, Lesnumériques, AliExpress). TOUS bloqués (404/403/410/503). Testé aussi l'iframe embedding : tous ont X-Frame-Options SAMEORIGIN/DENY ou CSP frame-ancestors. Impossible d'afficher ces sites intégrés.
+- Solution pragmatique : comparateur multi-plateformes avec ouverture en nouveaux onglets.
+  • src/components/shopping-view.tsx créé (composant client, pas de backend nécessaire).
+  • 12 plateformes : Amazon, AliExpress, Shein, Temu, Cdiscount, eBay, Fnac, Leboncoin, Rakuten, La Redoute, Darty, Boulanger.
+  • Chaque plateforme = tuile colorée avec emoji + gradient + case à cocher visuelle.
+  • Barre de recherche + bouton "Comparer sur N sites" qui ouvre chaque site sélectionné dans un nouvel onglet avec la recherche pré-remplie.
+  • 10 suggestions rapides (iPhone 15, casque bluetooth, aspirateur robot…).
+  • Double-clic sur une tuile ouvre la homepage du site.
+  • Liens rapides "Accès direct" en bas pour ouvrir la homepage de chaque site.
+  • 3 plateformes sélectionnées par défaut (Amazon, AliExpress, Cdiscount).
+  • Boutons "Tout sélectionner" / "Tout désélectionner".
+  • Carte "Comment ça marche" explicative + note sur les pop-ups.
+- src/components/app-shell.tsx modifié :
+  • Import ShoppingCart icon (lucide-react).
+  • Ajout "shopping" au type View.
+  • Entrée menu "Shopping (comparateur multi-sites)" sous section "Pilotage" (après Actus).
+  • Import + rendu <ShoppingView />.
+- Lint : 0/0.
+- Test navigateur (agent-browser) :
+  • Clic sur "Shopping" dans le sidebar → page affichée avec titre, barre de recherche, 12 tuiles, suggestions.
+  • Saisie "iPhone 15" dans la barre → bouton "Comparer sur 3 sites".
+  • Clic "Tout sélectionner" → 12 tuiles sélectionnées, bouton "Comparer sur 12 sites".
+  • Captures : .zscreens/shopping.png (3 sélectionnées), .zscreens/shopping-all.png (12 sélectionnées).
+
+Stage Summary:
+- Onglet Shopping intégré sous "Pilotage" dans le sidebar, à côté d'Actus.
+- 12 plateformes e-commerce : Amazon, AliExpress, Shein, Temu, Cdiscount, eBay, Fnac, Leboncoin, Rakuten, La Redoute, Darty, Boulanger.
+- Architecture : comparateur multi-sites avec ouverture en nouveaux onglets (les sites bloquent iframe ET flux RSS). L'utilisateur saisit un produit, sélectionne les plateformes, clique "Comparer sur N sites" → chaque site s'ouvre avec la recherche pré-remplie.
+- Composant 100% client (pas de backend, pas de cache) — réactif instantanément.

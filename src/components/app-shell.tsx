@@ -49,6 +49,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   ShoppingBag,
+  ShoppingCart,
   Star,
   Truck,
   UserPlus,
@@ -85,6 +86,7 @@ import CrmTasksView from "@/components/crm/crm-tasks-view";
 import CrmCoachView from "@/components/crm/crm-coach-view";
 import CrmLeadsView from "@/components/crm/crm-leads-view";
 import NewsView from "@/components/news-view";
+import ShoppingView from "@/components/shopping-view";
 import CrmProjectsView from "@/components/crm/crm-projects-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch, GlobalSearchTrigger } from "@/components/global-search";
@@ -103,6 +105,7 @@ type ViewId =
   | "rapports"
   | "calendrier"
   | "actus"
+  | "shopping"
   | "mails"
   | "hosting"
   | "blog-notes"
@@ -139,6 +142,7 @@ const NAV: {
   { id: "rapports", label: "Rapports de vente", short: "Rapports", icon: BarChart3, section: "Pilotage" },
   { id: "calendrier", label: "Calendrier", short: "Calendrier", icon: CalendarDays, section: "Pilotage" },
   { id: "actus", label: "Actus (actualités web)", short: "Actus", icon: Newspaper, section: "Pilotage" },
+  { id: "shopping", label: "Shopping (comparateur multi-sites)", short: "Shopping", icon: ShoppingCart, section: "Pilotage" },
   // ─── CRM Unifié (qrtags.pro + qrbags.com + pipeline commercial) ───
   { id: "crm", label: "CRM — Vue d'ensemble", short: "CRM Unifié", icon: Globe2, section: "CRM Unifié" },
   { id: "crm-leads", label: "Leads (pipeline commercial)", short: "Leads", icon: UserPlus, section: "CRM Unifié" },
@@ -697,6 +701,7 @@ export function AppShell() {
               {view === "rapports" && <ReportsView />}
               {view === "calendrier" && <CalendarView />}
               {view === "actus" && <NewsView />}
+              {view === "shopping" && <ShoppingView />}
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
               {view === "crm-qrbags" && <CrmItemsView platform="QRBAGS" />}
               {view === "crm-qrtags" && <CrmItemsView platform="QRTAGS" />}
