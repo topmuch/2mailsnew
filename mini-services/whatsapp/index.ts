@@ -38,18 +38,25 @@ let clientReady = false;
 let clientInfo: { phone?: string; name?: string } | null = null;
 
 // ─── Client WhatsApp ──────────────────────────────────────────────────────────
+// En production (Docker), on utilise le Chromium système (PUPPETEER_EXECUTABLE_PATH).
+// En dev, whatsapp-web.js télécharge son propre Chromium.
+const puppeteerConfig: any = {
+  headless: true,
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-accelerated-2d-canvas",
+    "--disable-gpu",
+  ],
+};
+if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+  puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: path.join(__dirname, "session") }),
-  puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-accelerated-2d-canvas",
-      "--disable-gpu",
-    ],
-  },
+  puppeteer: puppeteerConfig,
 });
 
 client.on("qr", async (qr: string) => {

@@ -85,13 +85,18 @@ FROM node:20-alpine
 # le conteneur est déclaré « not healthy » → rollback.
 # « sqlite » RETIRÉ (moteur embarqué par Prisma) + même robustesse apk que le
 # builder : 3 tentatives puis miroir dl-2 en secours (échec déploiement #6).
+# Task 79 : chromium + deps pour whatsapp-web.js (Puppeteer) en production.
 RUN set -ex; \
-    PKGS="libc6-compat tzdata curl"; \
+    PKGS="libc6-compat tzdata curl chromium nss freetype harfbuzz ca-certificates ttf-freefont"; \
     apk add --no-cache $PKGS \
       || { echo "apk: index indisponible → nouvel essai dans 20 s…"; sleep 20; apk add --no-cache $PKGS; } \
       || { echo "apk: bascule sur le miroir dl-2.alpinelinux.org…"; \
            sed -i 's/dl-cdn\.alpinelinux\.org/dl-2.alpinelinux.org/g' /etc/apk/repositories; \
            sleep 5; apk add --no-cache $PKGS; }
+
+# Puppeteer : utiliser le Chromium système (ne pas télécharger le sien)
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 
