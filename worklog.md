@@ -1904,3 +1904,31 @@ Stage Summary:
 - Nombre de nouvelles : 4 → 12 par sujet (tous sujets confondus).
 - Sources : France 24 + médias français (RFI, Le Monde, BBC, L'Équipe) ajoutés à tous les sujets. 100% des articles ont une image.
 - Architecture : directFeeds est désormais la source PRIMAIRE pour les 4 sujets. Google News est fallback (rss encore présent pour a-la-une/economie/sport, mais non utilisé tant que directFeeds répond).
+
+---
+Task ID: 76
+Agent: Z.ai Code (principal)
+Task: Faire en sorte qu'il y ait des mises à jour à chaque consultation de l'onglet Actus.
+
+Work Log:
+- Diagnostic : le cache serveur était de 30 min (CACHE_TTL_MS = 30*60*1000). L'utilisateur voyait des données figées pendant 30 min sauf s'il cliquait "Actualiser".
+- Backend (src/app/api/news/route.ts) : CACHE_TTL_MS réduit de 30 min à 30 s.
+  • Chaque consultation après 30 s déclenche un fresh fetch (re-fetch des 7-12 flux RSS).
+  • Les navigations rapides (<30 s) entre onglets restent instantanées (pas de spam RSS).
+  • Le bouton "Actualiser" force toujours un refresh immédiat (cache ignoré, refresh=1).
+- Frontend (src/components/news-view.tsx) : ajout d'un listener `visibilitychange` dans le useEffect.
+  • Montage du composant (clic sur "Actus" dans le menu) → fetch.
+  • Changement de sujet → fetch.
+  • L'onglet navigateur redevient visible (l'utilisateur revient d'un autre onglet browser) → fetch.
+  • Cleanup du listener au démontage.
+- Lint : 0/0.
+- Test API (curl) :
+  • Consultation 1 (immédiate) : cached=True (utilise le cache existant)
+  • Consultation 2 (immédiate) : cached=True (cache 30s)
+  • Consultation 3 (après 32s) : cached=False (re-fetch !) ✅
+- Test navigateur : navigation Dashboard → Actus déclenche un re-mount → fetch → "mise à jour à l'instant", 12 cartes chargées.
+
+Stage Summary:
+- Chaque consultation de l'onglet Actus déclenche maintenant un rafraîchissement automatique (cache 30s + auto-refresh on visibilitychange).
+- L'utilisateur n'a plus besoin de cliquer "Actualiser" pour voir les dernières nouvelles — elles se mettent à jour toutes seules à chaque visite.
+- Le bouton "Actualiser" reste pour un forçage manuel immédiat.

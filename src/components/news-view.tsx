@@ -76,8 +76,18 @@ export default function NewsView() {
     }
   }, []);
 
+  // Task 76 : rafraîchissement à chaque consultation.
+  // - Montage du composant (l'utilisateur clique sur « Actus ») → fetch.
+  // - Changement de sujet → fetch.
+  // - L'onglet navigateur redevient visible (l'utilisateur revient d'un autre onglet) → fetch.
   useEffect(() => {
     load(topic);
+    // Auto-refresh quand l'onglet navigateur redevient visible
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load(topic);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [topic, load]);
 
   return (

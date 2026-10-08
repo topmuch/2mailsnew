@@ -139,7 +139,12 @@ const EXCLUDED_HOSTS = [
   "flashscore.com", "footmercato.net",
 ];
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+// Task 76 : cache court (30 s) pour que CHAQUE consultation déclenche un
+// rafraîchissement. Les navigations rapides (<30 s) entre onglets restent
+// instantanées (pas de spam RSS), mais dès que l'utilisateur revient après
+// plus de 30 s, les flux sont re-fetchés. Le bouton « Actualiser » force
+// toujours un refresh immédiat (cache ignoré).
+const CACHE_TTL_MS = 30 * 1000; // 30 s (was 30 min)
 const MAX_ITEMS = 12; // Task 75 : augmenté de 9 à 12 (demande utilisateur)
 const MAX_CANDIDATES = 40; // sur-recherche : filtrage strict sans-image + plus de sources
 const IMAGE_TIMEOUT_MS = 6_000;
