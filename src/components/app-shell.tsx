@@ -42,6 +42,7 @@ import {
   Luggage,
   Mail,
   Menu,
+  MessageCircle,
   Newspaper,
   NotebookPen,
   Package,
@@ -87,6 +88,7 @@ import CrmCoachView from "@/components/crm/crm-coach-view";
 import CrmLeadsView from "@/components/crm/crm-leads-view";
 import NewsView from "@/components/news-view";
 import ShoppingView from "@/components/shopping-view";
+import WhatsAppView from "@/components/whatsapp-view";
 import CrmProjectsView from "@/components/crm/crm-projects-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch, GlobalSearchTrigger } from "@/components/global-search";
@@ -107,6 +109,7 @@ type ViewId =
   | "actus"
   | "shopping"
   | "mails"
+  | "whatsapp"
   | "hosting"
   | "blog-notes"
   | "favoris"
@@ -155,6 +158,7 @@ const NAV: {
   { id: "crm-automations", label: "Automatisations (rapports & rappels)", short: "Automatisations", icon: CalendarClock, section: "CRM Unifié" },
   { id: "crm-coach", label: "Coach Virtuel", short: "Coach Virtuel", icon: Bot, section: "CRM Unifié" },
   { id: "mails", label: "Boîte mail", short: "Boîte mail", icon: Mail, section: "Communication" },
+  { id: "whatsapp", label: "WhatsApp (chat intégré)", short: "WhatsApp", icon: MessageCircle, section: "Communication" },
   { id: "hosting", label: "Hosting (domaines & renouvellements)", short: "Hosting", icon: Globe, section: "Communication" },
   // ─── Notes & Favoris ───
   { id: "blog-notes", label: "Blog note (notes partagées)", short: "Blog note", icon: NotebookPen, section: "Notes & Favoris" },
@@ -702,6 +706,7 @@ export function AppShell() {
               {view === "calendrier" && <CalendarView />}
               {view === "actus" && <NewsView />}
               {view === "shopping" && <ShoppingView />}
+              {view === "whatsapp" && <WhatsAppView />}
               {view === "crm" && <CrmDashboardView isAdmin={isAdmin} />}
               {view === "crm-qrbags" && <CrmItemsView platform="QRBAGS" />}
               {view === "crm-qrtags" && <CrmItemsView platform="QRTAGS" />}
