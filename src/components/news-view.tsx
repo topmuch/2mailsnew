@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ExternalLink, Newspaper, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Newspaper, RefreshCw, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { authFetch } from "@/lib/auth-client";
@@ -25,6 +25,7 @@ interface NewsItem {
   source: string;
   date: string;
   image: string | null;
+  price?: string | null; // Task 78-b : prix détecté pour les produits Shopping
 }
 
 interface NewsPayload {
@@ -42,6 +43,7 @@ const TOPICS = [
   { key: "economie", label: "Économie" },
   { key: "tech", label: "Tech" },
   { key: "sport", label: "Sport" },
+  { key: "shopping", label: "Shopping", icon: ShoppingCart },
 ];
 
 // Les dates arrivent déjà formatées en français depuis l'API (« il y a 3 h »).
@@ -76,7 +78,11 @@ export default function NewsView() {
     });
     setError(null);
     try {
-      const res = await authFetch(`/api/news?topic=${t}${refresh ? "&refresh=1" : ""}`);
+      // Task 78-b : la pilule Shopping utilise /api/shopping (produits avec photos)
+      // au lieu de /api/news. Même format de réponse (items avec image).
+      const endpoint = t === "shopping" ? "/api/shopping" : `/api/news?topic=${t}`;
+      const url = `${endpoint}${refresh ? `${endpoint.includes("?") ? "&" : "?"}refresh=1` : ""}`;
+      const res = await authFetch(url);
       const json = await res.json();
       if (!res.ok) throw new Error(String(json?.error ?? "Erreur"));
       setData(json as NewsPayload);
@@ -102,18 +108,22 @@ export default function NewsView() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [topic, load]);
 
+  const isShopping = topic === "shopping";
+
   return (
     <div className="space-y-5">
       {/* ─── En-tête ─── */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <Newspaper className="h-6 w-6 text-gold" aria-hidden /> Actus
+            {isShopping ? <ShoppingCart className="h-6 w-6 text-gold" aria-hidden /> : <Newspaper className="h-6 w-6 text-gold" aria-hidden />} {isShopping ? "Shopping" : "Actus"}
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground" aria-live="polite">
-            {data
-              ? `L'actualité ${data.label.toLowerCase()} — via ${data.provider === "search" ? "recherche web" : "Google Actualités"} — mise à jour ${fmtAge(data.fetchedAt)}${data.stale ? " (cache)" : ""}`
-              : "L'actualité du Sénégal et du monde, avec les photos."}
+            {isShopping
+              ? "Produits du moment avec photos — smartphones, casques, TV, ordinateurs, montres…"
+              : data
+                ? `L'actualité ${data.label.toLowerCase()} — via ${data.provider === "search" ? "recherche web" : "Google Actualités"} — mise à jour ${fmtAge(data.fetchedAt)}${data.stale ? " (cache)" : ""}`
+                : "L'actualité du Sénégal et du monde, avec les photos."}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => load(topic, true)} disabled={loading || refreshing} className="shrink-0 gap-2">
@@ -121,7 +131,7 @@ export default function NewsView() {
         </Button>
       </div>
 
-      {/* ─── Sujets (pilules) ─── */}
+      {/* ─── Sujets (pilules) — inclut Shopping depuis Task 78 ─── */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Choisir un sujet">
         {TOPICS.map((t) => {
           const active = topic === t.key;
@@ -134,6 +144,7 @@ export default function NewsView() {
               onClick={() => setTopic(t.key)}
               aria-pressed={active}
             >
+              {"icon" in t && t.icon ? <t.icon className="h-3.5 w-3.5" aria-hidden /> : null}
               {t.label}
             </Button>
           );
@@ -145,7 +156,7 @@ export default function NewsView() {
       {refreshing && data && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          Mise à jour des articles en arrière-plan…
+          Mise à jour {isShopping ? "des produits" : "des articles"} en arrière-plan…
         </p>
       )}
       {loading ? (
@@ -207,7 +218,7 @@ export default function NewsView() {
               {/* Photo : placeholder doré sous l'image réelle (fallback auto si casse) */}
               <div className="relative aspect-video overflow-hidden bg-muted">
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gold/15 via-muted to-[#0b366b]/10">
-                  <Newspaper className="h-8 w-8 text-gold/50" aria-hidden />
+                  {isShopping ? <ShoppingCart className="h-8 w-8 text-gold/50" aria-hidden /> : <Newspaper className="h-8 w-8 text-gold/50" aria-hidden />}
                   {item.source && (
                     <span className="mt-1.5 max-w-[85%] truncate px-2 text-[10px] font-medium uppercase tracking-wider text-gold/60">
                       {item.source}
@@ -226,6 +237,11 @@ export default function NewsView() {
                     }}
                   />
                 )}
+                {isShopping && item.price && (
+                  <span className="absolute right-2 top-2 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-white shadow">
+                    {item.price}
+                  </span>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-gold group-hover:underline">
@@ -238,7 +254,7 @@ export default function NewsView() {
                     {item.date ? ` · ${item.date}` : ""}
                   </span>
                   <span className="flex shrink-0 items-center gap-1 font-medium text-gold">
-                    Lire <ExternalLink className="h-3 w-3" aria-hidden />
+                    {isShopping ? "Voir l'offre" : "Lire"} <ExternalLink className="h-3 w-3" aria-hidden />
                   </span>
                 </div>
               </div>

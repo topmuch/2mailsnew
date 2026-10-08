@@ -1995,3 +1995,30 @@ Stage Summary:
 - 12 plateformes e-commerce : Amazon, AliExpress, Shein, Temu, Cdiscount, eBay, Fnac, Leboncoin, Rakuten, La Redoute, Darty, Boulanger.
 - Architecture : comparateur multi-sites avec ouverture en nouveaux onglets (les sites bloquent iframe ET flux RSS). L'utilisateur saisit un produit, sélectionne les plateformes, clique "Comparer sur N sites" → chaque site s'ouvre avec la recherche pré-remplie.
 - Composant 100% client (pas de backend, pas de cache) — réactif instantanément.
+
+---
+Task ID: 78-b
+Agent: Z.ai Code (principal)
+Task: Garder l'onglet Shopping (sidebar) ET ajouter une pilule Shopping dans Actus qui affiche des produits avec photos.
+
+Work Log:
+- Backend : src/app/api/shopping/route.ts (nouveau). Utilise le SDK z-ai web_search avec 4 requêtes produit ciblées (smartphone, casque, TV, ordinateur), extrait l'og:image de chaque URL via fetchTextResilient (direct + relais), filtre strict (que les produits AVEC image), cache 5 min. Prix extrait du snippet via regex.
+  • 4 requêtes au lieu de 8 initialement (rate limit SDK 429 au-delà).
+  • Pacing 1.2s entre requêtes, cooldown 60s si 429.
+  • Filtrage strict : seuls les items avec og:image sont retournés.
+- Frontend (src/components/news-view.tsx) :
+  • Ajout de "shopping" comme 5e pilule dans TOPICS (avec icône ShoppingCart).
+  • load() utilise /api/shopping quand t === "shopping" (au lieu de /api/news).
+  • En-tête dynamique : "Shopping" + icône panier quand shopping sélectionné.
+  • Cards affichent : icône ShoppingCart sur placeholder, badge prix doré en haut à droite, libellé "Voir l'offre" au lieu de "Lire".
+  • Ajout champ price?: string | null à l'interface NewsItem.
+  • Indicateur "Mise à jour des produits en arrière-plan…" (au lieu de "articles").
+- Lint : 0/0.
+- Test API : 4 produits avec images retournés (Electro Dépôt, Cdiscount, Les Numériques, Lenovo). Prix détecté sur certains.
+- Test navigateur : pilule Shopping visible dans Actus (5e pilule après Sport). Clic → 4 cartes produits avec images. Capture .zscreens/actus-shopping-pilule.png.
+
+Stage Summary:
+- Pilule Shopping ajoutée dans la barre d'onglets d'Actus (À la une / Économie / Tech / Sport / Shopping).
+- Affiche des produits avec photos via /api/shopping (SDK z-ai web_search + og:image extraction).
+- L'onglet Shopping du sidebar (comparateur multi-plateformes Task 78) est conservé.
+- Cartes produits : badge prix doré, libellé "Voir l'offre", placeholder panier.
