@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { authFetch } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import ShoppingView from "@/components/shopping-view";
 
 // ─── Actus : actualités web avec photos ──────────────────────────────────────
 // Onglet « Actus » (Task 68, source Google Actualités en Task 69) : récupère
@@ -191,13 +192,20 @@ export default function NewsView() {
           </Button>
         </Card>
       ) : !data || data.items.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 border-dashed p-10 text-center shadow-sm">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15">
-            <Newspaper className="h-6 w-6 text-gold" aria-hidden />
-          </div>
-          <p className="font-semibold">Aucune actualité trouvée</p>
-          <p className="max-w-sm text-sm text-muted-foreground">Essayez un autre sujet ou actualisez dans un instant.</p>
-        </Card>
+        isShopping ? (
+          // Task 78-c : fallback au comparateur multi-plateformes si l'API shopping
+          // retourne 0 items (SDK 429 ou quota épuisé). On ne montre JAMAIS
+          // "Aucune actualité trouvée" pour Shopping — le comparateur est toujours là.
+          <ShoppingView />
+        ) : (
+          <Card className="flex flex-col items-center gap-2 border-dashed p-10 text-center shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15">
+              <Newspaper className="h-6 w-6 text-gold" aria-hidden />
+            </div>
+            <p className="font-semibold">Aucune actualité trouvée</p>
+            <p className="max-w-sm text-sm text-muted-foreground">Essayez un autre sujet ou actualisez dans un instant.</p>
+          </Card>
+        )
       ) : (
         <motion.div
           key={topic}

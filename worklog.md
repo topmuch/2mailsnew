@@ -2022,3 +2022,27 @@ Stage Summary:
 - Affiche des produits avec photos via /api/shopping (SDK z-ai web_search + og:image extraction).
 - L'onglet Shopping du sidebar (comparateur multi-plateformes Task 78) est conservé.
 - Cartes produits : badge prix doré, libellé "Voir l'offre", placeholder panier.
+
+---
+Task ID: 78-c
+Agent: Z.ai Code (principal)
+Task: Régler "Aucune actualité trouvée" sur la pilule Shopping d'Actus quand l'API retourne 0 items (SDK 429).
+
+Diagnostic :
+- /api/shopping utilise le SDK z-ai web_search qui est en 429 constant (rate limit strict).
+- Quand le SDK est en cooldown (60s) ou que toutes les requêtes échouent, l'API retourne items=[].
+- Le frontend affichait alors "Aucune actualité trouvée" — mauvaise UX pour Shopping.
+
+Solution : fallback au comparateur multi-plateformes.
+- src/components/news-view.tsx : la branche "!data || data.items.length === 0" affiche désormais
+  <ShoppingView /> (le comparateur 12 tuiles) quand isShopping=true, au lieu du card "Aucune actualité".
+- On ne montre JAMAIS "Aucune actualité trouvée" pour Shopping — le comparateur est toujours là.
+- Réimport de ShoppingView dans news-view.tsx.
+
+Résultat navigateur (testé) :
+- Pilule Shopping → si API a des items : cards produits avec photos.
+- Pilule Shopping → si API 0 items (SDK 429) : comparateur 12 tuiles (Amazon, AliExpress, Shein,
+  Temu, Cdiscount…) avec barre de recherche + suggestions.
+- Plus JAMAIS "Aucune actualité trouvée" sur Shopping.
+
+Lint : 0/0. Capture .zscreens/actus-shopping-fallback.png.
